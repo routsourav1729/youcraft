@@ -1,3 +1,3 @@
 @echo off
 cd /d "%~dp0"
-start "Ama Bartalap MCP" AmaBartalap.exe --control 9876
+start "YouCraft MCP" YouCraft.exe --control 9876

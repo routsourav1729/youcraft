@@ -541,7 +541,7 @@ impl FilmcraftMcp {
 
     #[tool(
         title = "Live app: control-channel call",
-        description = "Live app: call any control-channel method directly (ui.set, ui.scroll, ui.timeline.hit, ui.timeline.locate, ui.playback, ui.panel.show, ui.menu.list, …).",
+        description = "Live app: call any control-channel method directly (ui.set, ui.scroll, ui.timeline.hit, ui.timeline.locate, ui.playback, ui.panel.show, ui.menu.list, podcast.inspect, podcast.configure, podcast.review, podcast.action). Podcast inspect lists actions; configure selects local media; review saves corrected project fields; action starts asynchronous jobs. Poll inspect until busy=false and check error.",
         annotations(read_only_hint = false, destructive_hint = true, idempotent_hint = false, open_world_hint = false)
     )]
     async fn ui_control(&self, Parameters(p): Parameters<ControlParams>) -> Result<CallToolResult, McpError> {

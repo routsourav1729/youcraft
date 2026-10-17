@@ -1,6 +1,6 @@
-Ama Bartalap — Windows development build
+YouCraft — Windows development build
 
-Install AmaBartalap-Setup-x64.exe, then open Ama Bartalap.
+Install YouCraft-Setup-x64.exe, then open YouCraft.
 The analysis helper starts locally and closes with the app.
 No remote server is required. Audio > Process on > CPU tests without a GPU.
 Auto uses the configured runtime; GPU selects CUDA.
@@ -9,17 +9,17 @@ Flow: Audio > Speakers > Cameras > Transcript > Reactions > Export.
 Advanced Filmcraft tools remain available through the other workspaces.
 Save your .fcproj project. Export subtitles reads the current edited sequence.
 
-Model packs and compatible ML runtimes are separate from the installer.
-Install verified packs, then place models.json in:
-%LOCALAPPDATA%\AmaBartalap\models.json
-The source repository's ama-backend/docs/models.md covers configuration.
-External FFmpeg/ffprobe must be on PATH (libx264 needed for previews).
-The installer does not bundle these tools or ML weights.
+Run YouCraft model setup from Start to install the speech runtime and weights.
+Requires Python 3.11 x64, internet and your Hugging Face model access.
+Choose CPU or NVIDIA. Setup writes %LOCALAPPDATA%\YouCraft\models.json.
+External FFmpeg/ffprobe must be on PATH. Restart the app after setup.
+Optional vision and Romanized spelling packs still need separate preparation.
 
 Settings > Advanced contains optional remote development connection controls.
 Local authentication is automatic. For a remote test, use an SSH tunnel and
 that helper's token. Never post tokens in public issues.
 
+Run Connect AI.cmd to register Codex or Claude Code. See AI-WORKFLOW.md.
 Optional MCP: Start with MCP.cmd opens the editor's local control bridge.
 Point an MCP client to filmcraft-cli.exe with:
 mcp --bridge 127.0.0.1:9876

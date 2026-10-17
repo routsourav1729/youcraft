@@ -1,4 +1,4 @@
-name: Ama Bartalap Windows V1
+name: YouCraft Windows V1
 on:
   workflow_dispatch:
   push:
@@ -39,6 +39,15 @@ jobs:
           python -m pytest -q tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/betun.spec --noconfirm
+      - name: Validate setup helpers
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging/ama/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
       - name: Rust toolchain
         run: rustup toolchain install 1.95.0 --profile minimal
       - uses: Swatinem/rust-cache@v2
@@ -58,16 +67,17 @@ jobs:
       - name: Assemble application
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force release/AmaBartalap | Out-Null
-          Copy-Item target/release/filmcraft.exe release/AmaBartalap/AmaBartalap.exe
-          Copy-Item target/release/filmcraft-cli.exe release/AmaBartalap/
-          Copy-Item LICENSE-MIT,LICENSE-APACHE,NOTICE,ATTRIBUTION.md release/AmaBartalap/
-          Copy-Item packaging/ama/* release/AmaBartalap/ -Recurse
+          New-Item -ItemType Directory -Force release/YouCraft | Out-Null
+          Copy-Item target/release/filmcraft.exe release/YouCraft/YouCraft.exe
+          Copy-Item target/release/filmcraft-cli.exe release/YouCraft/
+          Copy-Item LICENSE-MIT,LICENSE-APACHE,NOTICE,ATTRIBUTION.md release/YouCraft/
+          Copy-Item packaging/ama/* release/YouCraft/ -Recurse
           if (Test-Path ama-backend/dist/BetunBackend) {
-            Copy-Item ama-backend/dist/BetunBackend release/AmaBartalap/ -Recurse
+            Copy-Item ama-backend/dist/BetunBackend release/YouCraft/ -Recurse
           }
-          Copy-Item ama-backend/packaging/models-3050.example.json release/AmaBartalap/
-          Copy-Item ama-backend/docs/models.md release/AmaBartalap/MODEL-SETUP.md
+          Copy-Item ama-backend/packaging/models-3050.example.json release/YouCraft/
+          Copy-Item ama-backend/docs/models.md release/YouCraft/MODEL-SETUP.md
+          Copy-Item ama-backend/scripts/download_models.py,ama-backend/scripts/configure_local_models.py release/YouCraft/
       - name: Build Windows installer
         shell: pwsh
         run: |
@@ -83,9 +93,9 @@ jobs:
         run: |
           $installed = Join-Path $env:RUNNER_TEMP 'ama-installed'
           $data = Join-Path $env:RUNNER_TEMP 'ama-smoke-data'
-          $setup = Start-Process release/AmaBartalap-Setup-x64.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
+          $setup = Start-Process release/YouCraft-Setup-x64.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
-          if (-not (Test-Path "$installed/AmaBartalap.exe")) { throw 'Editor missing from installation' }
+          if (-not (Test-Path "$installed/YouCraft.exe")) { throw 'Editor missing from installation' }
           $env:BETUN_NO_BROWSER = '1'
           $helper = Start-Process "$installed/BetunBackend/BetunBackend.exe" -ArgumentList @('--port', '18765', '--data-dir', "`"$data`"") -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/ama-helper.log" -RedirectStandardError "$env:RUNNER_TEMP/ama-helper-error.log"
           try {
@@ -110,5 +120,5 @@ jobs:
           }
       - uses: actions/upload-artifact@v4
         with:
-          name: AmaBartalap-Windows
-          path: release/AmaBartalap-Setup-x64.exe
+          name: YouCraft-Windows
+          path: release/YouCraft-Setup-x64.exe

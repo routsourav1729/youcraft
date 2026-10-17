@@ -39,3 +39,87 @@ fn podcast_workspace_renders_every_step_and_keeps_native_panels() {
         }
     }
 }
+
+#[test]
+fn podcast_control_is_atomic_and_does_not_expose_credentials() {
+    use filmcraft_ui_egui::control::{ControlRequest, Outcome, handle};
+    let mut app = FilmcraftApp::new(Session::default());
+    app.podcast.token = "private-token".into();
+    let ctx = egui::Context::default();
+    let (req, _) = ControlRequest::new("podcast.configure", serde_json::json!({"master":"audio.mp3","camera_a":["01.mp4","02.mp4"],"compute_device":"cpu"}));
+    assert!(matches!(handle(&mut app, &ctx, &req), Outcome::Done(_)));
+    assert_eq!(app.podcast.master, "audio.mp3");
+    let (req, _) = ControlRequest::new("podcast.configure", serde_json::json!({"master":"changed","compute_device":"invalid"}));
+    let _ = handle(&mut app, &ctx, &req);
+    assert_eq!(app.podcast.master, "audio.mp3");
+    assert_eq!(app.podcast.token, "private-token");
+    let (req, _) = ControlRequest::new("podcast.inspect", serde_json::json!({}));
+    let Outcome::Done(reply) = handle(&mut app, &ctx, &req) else { panic!("inspect deferred") };
+    assert!(!reply.to_string().contains("private-token"));
+    let (req, _) = ControlRequest::new("podcast.action", serde_json::json!({"action":"lock_roles","host":"missing"}));
+    let _ = handle(&mut app, &ctx, &req);
+    assert!(app.podcast.project.is_null());
+}
+
+/// Optional integration with the real local helper, exercised by the development smoke run.
+#[test]
+fn podcast_live_helper_flow() {
+    use filmcraft_ui_egui::control::{ControlRequest, Outcome, handle};
+    use serde_json::{Value, json};
+    let Ok(endpoint) = std::env::var("YOUCRAFT_SMOKE_ENDPOINT") else { return };
+    let media = std::env::var("YOUCRAFT_SMOKE_MEDIA").expect("test media directory");
+    let mut app = FilmcraftApp::new(Session::default());
+    app.podcast.endpoint = endpoint;
+    app.podcast.token = std::env::var("YOUCRAFT_SMOKE_TOKEN").expect("test helper token");
+    // Stay in another workspace to prove job polling does not depend on panel visibility.
+    app.set_workspace("Editing");
+    let ctx = egui::Context::default();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1200., 800.)).build_eframe(move |_| app);
+    fn call(app: &mut FilmcraftApp, ctx: &egui::Context, method: &str, params: Value) -> Value {
+        let (req, _) = ControlRequest::new(method, params);
+        let Outcome::Done(reply) = handle(app, ctx, &req) else { panic!("deferred podcast call") };
+        assert_eq!(reply["ok"], true, "{reply}");
+        reply["result"].clone()
+    }
+    macro_rules! wait {
+        () => {{
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+            loop {
+                harness.step();
+                let state = call(harness.state_mut(), &ctx, "podcast.inspect", json!({}));
+                if state["busy"] == false {
+                    assert_eq!(state["error"], "", "{state}");
+                    break;
+                }
+                assert!(std::time::Instant::now() < deadline, "job timeout: {state}");
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+        }};
+    }
+    call(harness.state_mut(), &ctx, "podcast.configure", json!({"name":"MCP workflow smoke","master":format!("{media}/master.wav"),"compute_device":"cpu"}));
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"create"}));
+    wait!();
+    call(harness.state_mut(), &ctx, "podcast.configure", json!({"camera_a":[format!("{media}/host.mp4")],"camera_b":[format!("{media}/guest.mp4")]}));
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"attach_cameras"}));
+    wait!();
+    assert!(harness.state().podcast.camera_a.is_empty());
+    // Synthetic diarization avoids an ML download in this integration test.
+    call(harness.state_mut(), &ctx, "podcast.review", json!({"activity":[{"start":0.,"end":2.,"speaker":"host"},{"start":2.,"end":4.,"speaker":"guest"}]}));
+    wait!();
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"lock_roles","host":"host"}));
+    wait!();
+    let mut clips = harness.state().podcast.project["clips"].clone();
+    for clip in clips.as_array_mut().unwrap() {
+        clip["sync_reviewed"] = json!(true);
+    }
+    call(harness.state_mut(), &ctx, "podcast.review", json!({"clips":clips}));
+    wait!();
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"shots"}));
+    wait!();
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"open_edit"}));
+    wait!();
+    assert!(harness.state().podcast.assembled);
+    call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"save"}));
+    wait!();
+    assert!(harness.state().session.active_sequence().is_some());
+}

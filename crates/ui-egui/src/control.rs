@@ -113,6 +113,11 @@ pub fn handle(app: &mut FilmcraftApp, ctx: &egui::Context, req: &ControlRequest)
             Err(e) => err(e),
         },
         "ui.menu.list" => ok(serde_json::to_value(crate::menus::menu_items(app)).unwrap_or_default()),
+        #[cfg(not(target_arch = "wasm32"))]
+        "podcast.inspect" | "podcast.configure" | "podcast.review" | "podcast.action" => match crate::podcast::control(app, &req.method, p) {
+            Ok(value) => ok(value),
+            Err(error) => err(error),
+        },
         "ui.inspect" => ok(inspect(app, ctx)),
         "perf.stats" => ok(crate::perf::stats(app)),
         "ui.elements" => {

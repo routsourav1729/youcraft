@@ -1,4 +1,4 @@
-# Ama Bartalap
+# YouCraft
 
 A Windows podcast editor built on [FilmCraft](https://github.com/storytold/filmcraft),
 with a native Rust interface and a Python helper running on the same computer.
@@ -16,7 +16,7 @@ attach ordered camera shards → review audio synchronization → correct Odia
 transcript → review camera and host-reaction suggestions → edit in FilmCraft →
 export video and edited Odia SRT.
 
-| Reused from FilmCraft | Added for Ama Bartalap |
+| Reused from FilmCraft | Added for YouCraft |
 | --- | --- |
 | Native timeline, source/program monitors, linked edits and undo | Docked Podcast workspace and guided analysis stages |
 | Effects, color tools, audio DSP and mixing | Master-audio sync and ordered camera shards |
@@ -41,16 +41,25 @@ For optional remote development testing, use an SSH tunnel to the service on loc
 server recordings and cache small proxies on Windows. Original files stay on the
 server. Final server export uses this fork's matching CLI and the edited project.
 
+## Local setup and AI control
+
+Run **YouCraft model setup** from Start to install speech models for CPU or NVIDIA.
+Weights and Torch are separate from the installer. See [model setup](ama-backend/docs/models.md).
+Run **YouCraft connect AI** to register your existing Codex or Claude Code client,
+then launch **YouCraft with AI**. The same MCP bridge now controls podcast imports,
+speaker roles, synchronization, correction and assembly as well as native editing.
+See [AI workflow](packaging/ama/AI-WORKFLOW.md). No embedded chat panel is included.
+
 ## Build on Windows
 
-Run the **Ama Bartalap Windows V1** workflow in `.github/workflows/ama-windows.yml`.
+Run the **YouCraft Windows V1** workflow in `.github/workflows/ama-windows.yml`.
 It builds the Rust editor and CLI, runs regression tests, and packages one
-Windows installer (`AmaBartalap-Setup-x64.exe`). When `ama-backend/` is included, it packages the Python service too.
+Windows installer (`YouCraft-Setup-x64.exe`). When `ama-backend/` is included, it packages the Python service too.
 The source staging script in the parent Betun workspace creates that combined tree.
 
 Manual build: install the Rust 1.95 toolchain and Visual Studio C++ build tools,
 then run `cargo build --locked --release -p filmcraft -p filmcraft-cli`.
-The executable is `target/release/filmcraft.exe` (packaged as `AmaBartalap.exe`).
+The executable is `target/release/filmcraft.exe` (packaged as `YouCraft.exe`).
 See `packaging/ama/READ-ME.txt` for launch, server and MCP instructions.
 
 Existing advanced FilmCraft tools remain available through its workspaces.
@@ -72,4 +81,4 @@ See [assistant integration](docs/ama-assistant.md) for the existing bridge and p
 Based on FilmCraft by the ArtCraft team and its contributors. The original
 MIT OR Apache-2.0 licenses, NOTICE, contributor credits and asset attributions are
 retained. ArtCraft trademark artwork is not used in the customized app or its
-source release bundle. Ama Bartalap uses original text branding for now.
+source release bundle. YouCraft uses original text branding for now.

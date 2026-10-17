@@ -1,3 +1,29 @@
+# Windows quick setup
+
+Install YouCraft, then run **YouCraft model setup** from Start. Install Python
+3.11 x64 with the Python launcher first. Choose CPU for a laptop without NVIDIA;
+choose NVIDIA for the RTX 3050. The helper creates a separate runtime and downloads
+pinned Nemotron diarization and Indic Transcribe Core weights under
+`%LOCALAPPDATA%\YouCraft`. It writes `models.json` where the app reads it.
+Restart YouCraft after setup. Model packs and Torch require several GB beyond the
+small installer (about 5 GiB of pinned speech weights, plus the runtime). Downloads happen explicitly during setup; inference is offline.
+
+Indic Core requires accepting its Hugging Face access conditions and logging in
+with your own account. The helper prompts for login using the official HF client.
+It does not log or bundle credentials. Install external FFmpeg/ffprobe and add their
+bin folder to PATH; these are not shipped in YouCraft. CPU and NVIDIA runtimes use
+separate folders. A failed setup does not replace the working model configuration.
+
+Start with `cpu-smoke-60s/master.wav`. MP3, WAV and camera audio from MP4/MOV are
+converted internally to 16 kHz mono PCM WAV for speech models. Video containers
+stay as video; there is no need to convert the whole video to a special AI format.
+The full 20-minute set tests shard sync. 480p reduces transfer/decode cost, not
+speech-model work. Workers exit between stages, releasing their model memory.
+
+The installer does not yet install the optional gaze or Romanized spelling packs.
+Their adapters exist but require separate runtime preparation and validation.
+Direct Odia corrections and normal editing work independently of those packs.
+
 # Model packs and workers
 
 A lightweight backend does not import Torch. `BETUN_MODEL_CONFIG` points to a

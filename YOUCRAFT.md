@@ -1,6 +1,6 @@
 # Betun — one-person Odia podcast editor
 
-**Ama Bartalap is a Windows-only, locally running customized Filmcraft editor.**
+**YouCraft is a Windows-only, locally running customized Filmcraft editor.**
 The Lenovo runs the editor and Python analysis helper together. CPU mode supports
 testing without an NVIDIA GPU; remote processing is only an optional development aid. Filmcraft's
 existing playback, timeline, trimming, project editing and export are the product
@@ -48,7 +48,7 @@ restricts use to noncommercial research and prohibits redistribution.
 
 Develop and test portable logic here. Build and package the actual Filmcraft fork
 on a Windows MSVC CI runner, then download its artifact for laptop testing.
-The user download is one `AmaBartalap-Setup-x64.exe` installer. Model packs remain
+The user download is one `YouCraft-Setup-x64.exe` installer. Model packs remain
 separate because their weights/runtimes are much larger than the editor.
 A Windows-only CI workflow is supplied at
 `vendor/filmcraft/.github/workflows/ama-windows.yml`. GitHub Actions records the
@@ -83,7 +83,7 @@ Windows installer and hardware validation remain separate release work.
   local proxies provide playback. Server-file selection never uploads the originals.
 - Build source bundle: `python scripts/stage_windows_source.py`. The ZIP contains
   the working fork, backend and Windows CI workflow, excluding recordings/weights.
-  Put its contents at the root of your fork, then run **Ama Bartalap Windows V1**.
+  Put its contents at the root of your fork, then run **YouCraft Windows V1**.
 - Model configuration: see `packaging/models-3050.example.json`. Replace all paths and
   placeholder revisions with installed, verified bundles. This is configuration,
   not an installer or proof of laptop compatibility. The default is Nemotron,

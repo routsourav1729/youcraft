@@ -4,7 +4,9 @@ Filmcraft's existing MCP bridge exposes editor actions to an AI client. It runs
 locally. A skill describes the editing workflow; MCP gives the assistant controls.
 Neither requires moving video files to a remote editing server.
 
-Start the editor with `Start with MCP.cmd`. In a compatible local MCP client,
+Run **YouCraft connect AI** from Start to register Codex or Claude Code, then
+open **YouCraft with AI**. See [the podcast control guide](../packaging/ama/AI-WORKFLOW.md).
+You can also start the editor with `Start with MCP.cmd`. In a compatible local MCP client,
 register the installed `filmcraft-cli.exe` with arguments:
 
 ```

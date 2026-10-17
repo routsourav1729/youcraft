@@ -81,3 +81,36 @@ The first Windows run passed native compilation, linked transcript tests and the
 smoke test. Its backend export test caught a removed FFmpeg option. Export now
 uses the current file-option syntax with a targeted fallback for older FFmpeg.
 The Python packaging checks run before the expensive native build.
+
+## YouCraft follow-up — 2026-10-17
+
+The product name is now YouCraft. A separate model setup helper installs the
+pinned speech packs into LocalAppData for CPU or NVIDIA; the installer still
+excludes model weights and external FFmpeg. The optional vision and IndicXlit
+runtimes remain separate, unvalidated installation work.
+
+The private 20-minute fixture uses master 25.320–1225.320 seconds, silence
+boundaries from saved diarization, three 480p MP4 shards and four 480p MOV shards.
+Original camera audio is retained; WAV/MP3 master alternatives and a 60-second
+subset are included. Original files are unchanged and private media is not in
+this repository. All videos fully decode. Twenty-one independent waveform
+checks had a maximum 28 ms mismatch. The actual importer/converter/sync pipeline
+also matched all seven shards with the MP3 master. Low camera-A correlation is
+still flagged for normal sync review; these are not human-certified labels.
+
+MCP now exposes podcast.inspect/configure/review/action through the inherited
+ui_control tool. Tests cover atomic configuration, credential exclusion and
+host selection guards. A live native egui harness with the real HTTP helper
+exercises import, camera attachment, speaker locking, shot creation and native
+assembly while the Podcast panel is hidden. Synthetic speaker labels avoid
+model downloads in that integration test. Existing native linked transcript,
+ripple delete, correction, undo and SRT regressions remain part of full CI.
+
+Fixed: failed camera attachment no longer discards chosen paths; podcast jobs
+continue polling outside their workspace; native assembly retains the backend
+save revision so subsequent review saves do not conflict.
+
+The 70 MB-class application is not a bundled ML distribution. Current pinned
+speech weights occupy approximately 5 GiB, before Torch and dependencies.
+The Windows setup scripts are syntax-checked in CI; actual Windows GPU/model
+installation and the RTX 3050 laptop still need acceptance testing.

@@ -2080,6 +2080,8 @@ impl eframe::App for FilmcraftApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
         }
         let had_synthetic = !self.synthetic.is_empty();
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::podcast::tick(self, ctx);
         self.drain_control(ctx);
         if !self.synthetic.is_empty() && !had_synthetic {
             // Occluded macOS windows stop running `ui`; bring the window forward (without taking

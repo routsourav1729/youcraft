@@ -33,7 +33,9 @@ pub fn start() -> Option<LocalBackend> {
         .stderr(Stdio::null())
         .creation_flags(0x0800_0000);
     if let Some(root) = std::env::var_os("LOCALAPPDATA") {
-        let config = std::path::PathBuf::from(root).join("AmaBartalap/models.json");
+        let root = std::path::PathBuf::from(root);
+        let current = root.join("YouCraft/models.json");
+        let config = if current.is_file() { current } else { root.join("AmaBartalap/models.json") };
         if config.is_file() && std::env::var_os("BETUN_MODEL_CONFIG").is_none() {
             command.env("BETUN_MODEL_CONFIG", config);
         }

@@ -65,7 +65,7 @@ impl Default for State {
             remote: false,
             compute_device: "auto".into(),
             project_id: String::new(),
-            name: "Ama Bartalap episode".into(),
+            name: "YouCraft episode".into(),
             project: Value::Null,
             step: 1,
             review_page: 0,
@@ -95,7 +95,7 @@ impl Default for State {
             cache: std::env::var("LOCALAPPDATA")
                 .map(PathBuf::from)
                 .unwrap_or_else(|_| std::env::temp_dir())
-                .join("AmaBartalap")
+                .join("YouCraft")
                 .join("media")
                 .to_string_lossy()
                 .into(),
@@ -399,6 +399,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                     Ok(plan)
                                 });
                             } else {
+                                if s.job_kind == "attach_cameras" {
+                                    s.camera_a.clear();
+                                    s.camera_b.clear();
+                                }
                                 s.refresh();
                             }
                         } else {
@@ -431,16 +435,25 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                 "downloaded" => {
                     s.status = format!("Saved to {}", string(&value, "folder"));
                 }
-                "assemble" => match app.session.execute("podcast.assemble", value) {
-                    Ok(_) => {
-                        s.assembled = true;
-                        s.step = 6;
-                        app.ui.mode = Mode::Edit;
-                        app.ui.text_tab = "Transcript".into();
-                        s.status = "Edit ready".into();
+                "assemble" => {
+                    if value["project"].is_object() {
+                        s.project = value["project"].clone();
                     }
-                    Err(e) => s.error = e.to_string(),
-                },
+                    if let Some(error) = value["error"].as_str() {
+                        s.error = error.into();
+                    } else {
+                        match app.session.execute("podcast.assemble", value.get("plan").cloned().unwrap_or(value)) {
+                            Ok(_) => {
+                                s.assembled = true;
+                                s.step = 6;
+                                app.ui.mode = Mode::Edit;
+                                app.ui.text_tab = "Transcript".into();
+                                s.status = "Edit ready".into();
+                            }
+                            Err(e) => s.error = e.to_string(),
+                        }
+                    }
+                }
                 _ => {}
             },
         }
@@ -452,7 +465,140 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
     }
 }
 
-pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+/// Local MCP uses the same state and asynchronous jobs as the visible workspace.
+pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
+    let s = &mut app.podcast;
+    if method == "podcast.inspect" {
+        return Ok(json!({"busy":s.busy(),"project_id":s.project_id,"project":s.project,
+            "master":s.master,"camera_a":s.camera_a,"camera_b":s.camera_b,
+            "compute_device":s.compute_device,"samples":s.samples,"job":s.job,
+            "job_kind":s.job_kind,"status":s.status,"error":s.error,"assembled":s.assembled,
+            "actions":["create","refresh","samples","save","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","sample","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
+    }
+    if s.busy() && !(method == "podcast.action" && p["action"] == "cancel") {
+        return Err("Podcast is busy; poll podcast.inspect or cancel the job".into());
+    }
+    match method {
+        "podcast.configure" => {
+            let fields = p.as_object().ok_or("Expected an object")?;
+            let mut state = serde_json::to_value(&*s).map_err(|e| e.to_string())?;
+            for (key, value) in fields {
+                if !["name", "master", "camera_a", "camera_b", "compute_device", "project_id"].contains(&key.as_str()) {
+                    return Err(format!("Unsupported setting: {key}"));
+                }
+                if matches!(key.as_str(), "camera_a" | "camera_b") {
+                    let paths = value.as_array().ok_or("Camera paths must be arrays")?;
+                    if paths.len() > 256 || paths.iter().any(|v| v.as_str().is_none_or(|s| s.is_empty() || s.len() > 32768)) {
+                        return Err("Invalid camera paths (maximum 256)".into());
+                    }
+                } else if value.as_str().is_none_or(|s| s.len() > 32768) {
+                    return Err("Expected a bounded string".into());
+                }
+                state[key] = value.clone();
+            }
+            if !matches!(state["compute_device"].as_str(), Some("auto" | "cpu" | "cuda")) {
+                return Err("compute_device must be auto, cpu or cuda".into());
+            }
+            let mut updated: State = serde_json::from_value(state).map_err(|e| e.to_string())?;
+            updated.token = s.token.clone();
+            updated.error.clear();
+            *s = updated;
+        }
+        "podcast.review" => {
+            if !s.project.is_object() {
+                return Err("Load a project first".into());
+            }
+            let mut project = s.project.clone();
+            for (key, value) in p.as_object().ok_or("Expected an object")? {
+                if !["settings", "activity", "captions", "clips", "reactions", "shots"].contains(&key.as_str()) {
+                    return Err(format!("Unsupported review field: {key}"));
+                }
+                project[key] = value.clone();
+            }
+            if serde_json::to_vec(&project).map_err(|e| e.to_string())?.len() > 8 * 1024 * 1024 {
+                return Err("Review exceeds 8 MB".into());
+            }
+            validate_project(&project)?;
+            // Backend validates times, IDs and relationships before committing the revision.
+            let id = s.project_id.clone();
+            s.start("project", move |c| c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project)));
+        }
+        "podcast.action" => {
+            let action = p["action"].as_str().ok_or("Missing action")?;
+            let options = p.get("options").cloned().unwrap_or(json!({}));
+            if !options.is_object() {
+                return Err("options must be an object".into());
+            }
+            if !matches!(action, "create" | "cancel") && s.project_id.is_empty() {
+                return Err("Create or load a project first".into());
+            }
+            match action {
+                "create" => {
+                    if s.master.is_empty() {
+                        return Err("Choose master audio first".into());
+                    }
+                    let name = s.name.clone();
+                    s.start("created", move |c| c.post("/v1/projects", json!({"name":name})));
+                }
+                "refresh" => s.refresh(),
+                "save" => s.save(),
+                "samples" => {
+                    let id = s.project_id.clone();
+                    s.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
+                }
+                "lock_roles" => {
+                    lock_roles(s, p["host"].as_str().ok_or("Missing host speaker ID")?)?;
+                    s.save();
+                }
+                "attach_cameras" => s.job(action, json!({"A":s.camera_a,"B":s.camera_b})),
+                "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "sample" | "reference_frame" | "reaction_preview" | "transliterate" => {
+                    s.job(action, options)
+                }
+                "open_edit" => {
+                    let id = s.project_id.clone();
+                    let project = s.project.clone();
+                    s.start("assemble", move |c| {
+                        let saved = c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))?;
+                        match c.get(&format!("/v1/projects/{id}/filmcraft")) {
+                            Ok(plan) => Ok(json!({"plan":plan,"project":saved})),
+                            Err(error) => Ok(json!({"error":error,"project":saved})),
+                        }
+                    });
+                }
+                "cancel" => {
+                    if s.pending.is_some() {
+                        return Err("Request in progress; retry cancel after polling".into());
+                    }
+                    let id = s.job.clone().ok_or("No active job")?;
+                    s.start("cancel", move |c| c.post(&format!("/v1/jobs/{id}/cancel"), json!({})));
+                }
+                _ => return Err(format!("Unknown podcast action: {action}")),
+            }
+        }
+        _ => return Err("Unknown podcast method".into()),
+    }
+    Ok(json!({"queued":s.pending.is_some(),"busy":s.busy(),"error":s.error}))
+}
+
+fn lock_roles(s: &mut State, host: &str) -> Result<(), String> {
+    let speakers: std::collections::BTreeSet<_> = rows(&s.project, "activity").iter().map(|a| string(a, "speaker")).filter(|s| !s.is_empty()).collect();
+    if !speakers.contains(host) {
+        return Err("Choose an identified host speaker".into());
+    }
+    let mapping: serde_json::Map<_, _> = speakers
+        .into_iter()
+        .map(|speaker| {
+            let camera = if speaker == host { "A" } else { "B" };
+            (speaker, json!(camera))
+        })
+        .collect();
+    s.project["settings"]["host_speaker"] = json!(host);
+    s.project["settings"]["speaker_camera"] = json!(mapping);
+    s.project["settings"]["roles_locked"] = json!(true);
+    Ok(())
+}
+
+pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut s = std::mem::take(&mut app.podcast);
     if s.token.is_empty()
         && !s.remote
@@ -462,13 +608,21 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         s.token = token.trim().into();
     }
     poll(app, &mut s);
+    if s.busy() {
+        ctx.request_repaint_after(Duration::from_millis(100));
+    }
+    app.podcast = s;
+}
+
+pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
+    let mut s = std::mem::take(&mut app.podcast);
     if let Err(error) = validate_project(&s.project) {
         s.error = error;
         s.step = 0;
     }
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(12.)).layout(egui::Layout::top_down(egui::Align::Min)));
     let ui = &mut child;
-    ui.heading("Ama Bartalap");
+    ui.heading("YouCraft");
     ui.horizontal_wrapped(|ui| {
         for (i, label) in [(1, "Audio"), (2, "Speakers"), (3, "Cameras"), (4, "Transcript"), (5, "Reactions"), (6, "Export"), (0, "Settings")] {
             let r = ui.selectable_label(s.step == i, label);
@@ -668,14 +822,10 @@ fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     }
     if button(app, ui, "lock_roles", "Confirm speakers") {
         let host = string(&s.project["settings"], "host_speaker");
-        let speakers: std::collections::BTreeSet<_> = rows(&s.project, "activity").iter().map(|a| string(a, "speaker")).collect();
-        let mut mapping = serde_json::Map::new();
-        for speaker in speakers {
-            mapping.insert(speaker.clone(), json!(if speaker == host { "A" } else { "B" }));
+        match lock_roles(s, &host) {
+            Ok(()) => s.save(),
+            Err(error) => s.error = error,
         }
-        s.project["settings"]["speaker_camera"] = Value::Object(mapping);
-        s.project["settings"]["roles_locked"] = json!(true);
-        s.save();
     }
 }
 fn shard_list(app: &mut FilmcraftApp, ui: &mut egui::Ui, paths: &mut Vec<String>, id: &str) {
@@ -712,8 +862,6 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     shard_list(app, ui, &mut s.camera_b, "b");
     if button(app, ui, "attach", "Add recordings") {
         s.job("attach_cameras", json!({"A":s.camera_a,"B":s.camera_b}));
-        s.camera_a.clear();
-        s.camera_b.clear();
     }
     if button(app, ui, "sync", "Sync") {
         s.job("sync", json!({}));
@@ -977,8 +1125,11 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         let id = s.project_id.clone();
         let project = s.project.clone();
         s.start("assemble", move |c| {
-            c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))?;
-            c.get(&format!("/v1/projects/{id}/filmcraft"))
+            let saved = c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))?;
+            match c.get(&format!("/v1/projects/{id}/filmcraft")) {
+                Ok(plan) => Ok(json!({"plan":plan,"project":saved})),
+                Err(error) => Ok(json!({"error":error,"project":saved})),
+            }
         });
     }
 }

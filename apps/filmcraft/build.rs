@@ -19,8 +19,8 @@ fn main() {
 mod windows {
     pub fn embed_resources() {
         let mut res = winresource::WindowsResource::new();
-        res.set("ProductName", "Ama Bartalap")
-            .set("FileDescription", "Ama Bartalap podcast editor")
+        res.set("ProductName", "YouCraft")
+            .set("FileDescription", "YouCraft podcast editor")
             .set("LegalCopyright", "Copyright (c) the FilmCraft contributors. MIT OR Apache-2.0.")
             .set("OriginalFilename", "filmcraft.exe")
             .set("InternalName", "filmcraft");
