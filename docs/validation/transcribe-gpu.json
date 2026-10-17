@@ -1,0 +1,14 @@
+{
+  "inference_tested": true,
+  "torch_version": "2.11.0+cu128",
+  "cuda_runtime": "12.8",
+  "cuda_available": true,
+  "gpu": "NVIDIA L40S",
+  "total_vram_gib": 44.40283203125,
+  "free_vram_gib": 43.9805908203125,
+  "bf16_supported": true,
+  "elapsed_seconds": 76.59955998696387,
+  "peak_allocated_gib": 2.3397579193115234,
+  "peak_reserved_gib": 2.40234375,
+  "provider": "indic-core"
+}

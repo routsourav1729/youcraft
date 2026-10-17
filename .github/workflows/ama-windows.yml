@@ -1,0 +1,81 @@
+name: Ama Bartalap Windows V1
+on:
+  workflow_dispatch:
+  push:
+    branches: [ama-bartalap]
+  pull_request:
+    branches: [ama-bartalap]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: 4
+      FILMCRAFT_REQUIRE_WINRES: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+      - name: Build editor and MCP CLI
+        run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
+      - name: Linked transcript regression tests
+        run: |
+          cargo +1.95.0 test --locked --release -p filmcraft-engine podcast --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked --release -p filmcraft-edit transcript --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked --release -p filmcraft-ui-egui podcast::tests --lib
+      - name: Podcast interface smoke test
+        run: cargo +1.95.0 test --locked --release -p filmcraft-ui-egui --test podcast_ui
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: External media test tools
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          ffmpeg -version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ffprobe -version
+      - name: Package Python analysis service when included in source bundle
+        if: ${{ hashFiles('ama-backend/pyproject.toml') != '' }}
+        working-directory: ama-backend
+        run: |
+          python -m pip install '.[packaging,test]'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest -q tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m PyInstaller packaging/betun.spec --noconfirm
+      - name: Assemble application
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/AmaBartalap | Out-Null
+          Copy-Item target/release/filmcraft.exe release/AmaBartalap/AmaBartalap.exe
+          Copy-Item target/release/filmcraft-cli.exe release/AmaBartalap/
+          Copy-Item LICENSE-MIT,LICENSE-APACHE,NOTICE,ATTRIBUTION.md release/AmaBartalap/
+          Copy-Item packaging/ama/* release/AmaBartalap/ -Recurse
+          if (Test-Path ama-backend/dist/BetunBackend) {
+            Copy-Item ama-backend/dist/BetunBackend release/AmaBartalap/ -Recurse
+          }
+          Copy-Item ama-backend/packaging/models-3050.example.json release/AmaBartalap/
+          Copy-Item ama-backend/docs/models.md release/AmaBartalap/MODEL-SETUP.md
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $compiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $compiler)) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          & $compiler "/DRepoRoot=$env:GITHUB_WORKSPACE" packaging/ama-installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AmaBartalap-Windows
+          path: release/AmaBartalap-Setup-x64.exe

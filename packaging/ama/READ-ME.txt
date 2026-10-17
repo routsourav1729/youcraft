@@ -1,0 +1,31 @@
+Ama Bartalap — Windows development build
+
+Install AmaBartalap-Setup-x64.exe, then open Ama Bartalap.
+The analysis helper starts locally and closes with the app.
+No remote server is required. Audio > Process on > CPU tests without a GPU.
+Auto uses the configured runtime; GPU selects CUDA.
+
+Flow: Audio > Speakers > Cameras > Transcript > Reactions > Export.
+Advanced Filmcraft tools remain available through the other workspaces.
+Save your .fcproj project. Export subtitles reads the current edited sequence.
+
+Model packs and compatible ML runtimes are separate from the installer.
+Install verified packs, then place models.json in:
+%LOCALAPPDATA%\AmaBartalap\models.json
+The source repository's ama-backend/docs/models.md covers configuration.
+External FFmpeg/ffprobe must be on PATH (libx264 needed for previews).
+The installer does not bundle these tools or ML weights.
+
+Settings > Advanced contains optional remote development connection controls.
+Local authentication is automatic. For a remote test, use an SSH tunnel and
+that helper's token. Never post tokens in public issues.
+
+Optional MCP: Start with MCP.cmd opens the editor's local control bridge.
+Point an MCP client to filmcraft-cli.exe with:
+mcp --bridge 127.0.0.1:9876
+ChatGPT/Claude reasoning requires their online services. Video edits stay local.
+An embedded chat panel, translation and dubbing are later work.
+
+Development status: Windows installation, full-episode playback and RTX 3050
+performance need acceptance testing. Vision and Romanized spelling adapters
+also need their compatible runtimes and real-model acceptance tests.

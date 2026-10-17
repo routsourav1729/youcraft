@@ -1,0 +1,14 @@
+{
+  "inference_tested": true,
+  "torch_version": "2.11.0+cu128",
+  "cuda_runtime": "12.8",
+  "cuda_available": true,
+  "gpu": "NVIDIA L40S",
+  "total_vram_gib": 44.40283203125,
+  "free_vram_gib": 43.9805908203125,
+  "bf16_supported": true,
+  "elapsed_seconds": 139.0127261930611,
+  "peak_allocated_gib": 0.45054101943969727,
+  "peak_reserved_gib": 0.484375,
+  "provider": "nemotron-transformers"
+}

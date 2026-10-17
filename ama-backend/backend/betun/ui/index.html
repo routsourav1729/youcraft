@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Betun · Audio review</title><link rel="stylesheet" href="ui/style.css"></head>
+<body>
+<header><div class="brand">b<span>etun</span><small>AUDIO REVIEW · ODIA</small></div><div id="status" role="status">Connect or open a review file</div><button id="export">Export corrections</button></header>
+<section id="connect" class="connection"><label>Backend token <input id="token" type="password" autocomplete="off" placeholder="Token from your local app"></label><button id="login">Connect</button><label class="file">Open review JSON<input id="open" type="file" accept=".json"></label><label class="file">Choose audio<input id="audio-file" type="file" accept="audio/*"></label></section>
+<main>
+<aside><h1>Listen. Check.<br>Correct.</h1><p>Review the model against what you hear. Keep uncertain words and overlapping voices marked until you have replayed them.</p><label>Project<select id="projects"><option>Select a project</option></select></label><div id="summary" class="summary">No project loaded</div><details><summary>New audio project</summary><label>Project name<input id="new-name" value="Odia audio review"></label><label>Full audio path on this backend<input id="master-path" placeholder="C:\Recordings\episode.wav"></label><button id="import-audio">Import audio</button></details><button id="reload">Reload from backend</button><button id="undo">Undo last correction</button><button id="restore">Restore original model result</button><button id="metrics">Compare reviewed text</button><pre id="scores"></pre><div class="hint">Space: play / pause<br>← / →: move 0.1 seconds<br>Ctrl/Cmd + S: save<br><br>Odia text uses Unicode. You can type directly with your Odia keyboard.</div></aside>
+<section class="workspace">
+<div class="player"><div class="player-top"><strong id="project-name">Audio accuracy workbench</strong><span id="position">00:00.0</span></div><audio id="audio" controls preload="metadata"></audio><div class="toolbar"><button id="replay">Replay selected</button><button id="back">−0.1s</button><button id="forward">+0.1s</button><label>Speed<select id="speed"><option value="0.75">0.75×</option><option selected value="1">1×</option><option value="1.25">1.25×</option></select></label><label>Timeline window<select id="zoom"><option value="30">30s</option><option selected value="60">60s</option><option value="120">120s</option></select></label></div>
+<canvas id="timeline" height="190" aria-label="Waveform and clickable speaker activity timeline"></canvas><div class="legend"><i class="speaker-a"></i>Speaker 1 <i class="speaker-b"></i>Speaker 2 <i class="overlap"></i>Overlap / extra speakers <span>Click a speaker segment to edit its boundaries</span></div></div>
+<div class="section-title"><h2>Speaker boundaries</h2><button id="add-turn">Add speaker turn</button></div><div id="turn-editor" class="empty">Select a speaker segment on the timeline.</div>
+<div class="section-title"><h2>Transcript</h2><div><select id="filter"><option value="all">All segments</option><option value="unreviewed">Needs review</option><option value="overlap">Overlap</option></select><button id="add-caption">Add transcript segment</button></div></div>
+<div id="transcript" class="empty">Generated transcript segments will appear here. You can also import a portable review JSON.</div>
+<details><summary>Processing jobs</summary><div class="toolbar"><button data-job="waveform">Build waveform</button><button data-job="diarize">Diarize audio</button><button data-job="transcribe">Transcribe turns</button></div><div id="jobs"></div></details>
+</section>
+</main>
+<footer>Corrections autosave locally. Connected projects also save to the backend. Export a review file before moving to another laptop.</footer>
+<script src="review-data.js"></script><script src="ui/app.js"></script>
+</body></html>

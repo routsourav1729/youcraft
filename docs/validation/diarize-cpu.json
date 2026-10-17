@@ -1,0 +1,10 @@
+{
+  "provider": "nemotron-transformers",
+  "device": "cpu",
+  "input_seconds": 60,
+  "cpu_threads": 4,
+  "allocation_ram_gib": 16,
+  "elapsed_seconds": 288.9801650480367,
+  "exit_code": 0,
+  "child_peak_rss_gib": 1.1142196655273438
+}

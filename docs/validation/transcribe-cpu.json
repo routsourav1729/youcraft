@@ -1,0 +1,10 @@
+{
+  "provider": "indic-core",
+  "device": "cpu",
+  "input_seconds": 60,
+  "cpu_threads": 4,
+  "allocation_ram_gib": 16,
+  "elapsed_seconds": 164.85112165589817,
+  "exit_code": 0,
+  "child_peak_rss_gib": 5.4128875732421875
+}
