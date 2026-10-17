@@ -99,6 +99,7 @@ fn podcast_live_helper_flow() {
     call(harness.state_mut(), &ctx, "podcast.configure", json!({"name":"MCP workflow smoke","master":format!("{media}/master.wav"),"compute_device":"cpu"}));
     call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"create"}));
     wait!();
+    assert_eq!(harness.state().podcast.compute_device, "cpu");
     call(harness.state_mut(), &ctx, "podcast.configure", json!({"camera_a":[format!("{media}/host.mp4")],"camera_b":[format!("{media}/guest.mp4")]}));
     call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"attach_cameras"}));
     wait!();

@@ -210,7 +210,7 @@ impl State {
         self.job_kind = kind.clone();
         self.project["settings"]["compute_device"] = json!(self.compute_device);
         let project = self.project.clone();
-        let save_first = matches!(kind.as_str(), "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "proxies" | "attach_cameras");
+        let save_first = matches!(kind.as_str(), "import" | "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "proxies" | "attach_cameras");
         self.start("job", move |c| {
             let saved = if save_first { c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))? } else { Value::Null };
             // Preserve the saved revision even if the job submission fails.
