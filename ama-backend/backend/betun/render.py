@@ -89,12 +89,13 @@ def render(project, directory, preview=False, start=0., end=None, cancel=lambda:
     filters = [f'[1:a:0]atrim=start={a}:end={b},asetpts=PTS-STARTPTS[a{i}]' for i, (a, b) in enumerate(ranges)]
     filters.append(''.join(f'[a{i}]' for i in range(len(ranges))) + f'concat=n={len(ranges)}:v=0:a=1[a]')
     script = directory / 'audio-filter.txt'
-    script.write_text(';'.join(filters))
+    script.write_text(';'.join(filters), encoding='utf-8')
     output = directory / ('preview.mp4' if preview else 'episode.mp4')
     partial = output.with_suffix('.partial.mp4')
-    run([binary('ffmpeg'), '-v', 'error', '-nostdin', '-y', '-f', 'concat', '-safe', '1', '-i', listing,
-         '-i', master.path, '-filter_complex_script', script, '-map', '0:v:0', '-map', '[a]',
-         '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', partial], cancel)
+    args = [binary('ffmpeg'), '-v', 'error', '-nostdin', '-y', '-f', 'concat', '-safe', '1', '-i', listing,
+            '-i', master.path, '-/filter_complex', script, '-map', '0:v:0', '-map', '[a]',
+            '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', partial]
+    run_filter_file(args, cancel)
     partial.replace(output)
     for part in parts:
         part.unlink()
@@ -107,3 +108,15 @@ def render(project, directory, preview=False, start=0., end=None, cancel=lambda:
         files += ['odia.srt', 'project.betun.json', 'transcript.json', 'transcript.txt']
     progress(1.)
     return dict(files=files, revision=project.revision, plan=plan, frame_rate=fps)
+
+
+def run_filter_file(args, cancel):
+    try:
+        run(args, cancel)
+    except RuntimeError as error:
+        # FFmpeg 7+ reads option values from files with -/; older builds used
+        # -filter_complex_script, which newer releases have removed.
+        if "Unrecognized option '/filter_complex'" not in str(error):
+            raise
+        legacy = ['-filter_complex_script' if arg == '-/filter_complex' else arg for arg in args]
+        run(legacy, cancel)

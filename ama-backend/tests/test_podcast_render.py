@@ -7,6 +7,30 @@ from betun.render import render
 from betun.schema import Project, Shot
 
 
+@pytest.mark.parametrize('message, retries', [
+    ("Unrecognized option '/filter_complex'.", True),
+    ('Error opening input file: access denied', False),
+])
+def test_filter_file_compatibility_only_retries_unsupported_option(monkeypatch, message, retries):
+    import importlib
+    module = importlib.import_module('betun.render')
+    calls = []
+    def execute(args, cancel):
+        calls.append(args)
+        if len(calls) == 1:
+            raise RuntimeError(message)
+    monkeypatch.setattr(module, 'run', execute)
+    args = ['ffmpeg', '-/filter_complex', 'audio-filter.txt', 'output.mp4']
+    if retries:
+        module.run_filter_file(args, lambda: False)
+        assert calls[1] == ['ffmpeg', '-filter_complex_script', 'audio-filter.txt', 'output.mp4']
+        assert args[1] == '-/filter_complex'
+    else:
+        with pytest.raises(RuntimeError, match='access denied'):
+            module.run_filter_file(args, lambda: False)
+        assert len(calls) == 1
+
+
 def test_camera_edit_exports_without_transcript(tmp_path):
     try:
         media.binary('ffmpeg')

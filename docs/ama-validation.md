@@ -63,7 +63,7 @@ The editor/Windows overhead was not part of the worker memory measurement.
 
 `cargo xtask ci` completed successfully: formatting, workspace Clippy, native
 workspace tests (3,499 passed, 44 ignored), dependency layers, asset attribution,
-and WASM compilation (49 crates). The backend suite passed all 34 tests.
+and WASM compilation (49 crates). The backend suite passed all 36 tests.
 A separate Windows MSVC target compiler check passed. The native seven-step UI
 harness also rendered all screens using software OpenGL after the label cleanup.
 The staged source passed its asset and dependency-layer checks.
@@ -76,3 +76,8 @@ results, model configuration and cached results. The Windows workflow also insta
 its generated installer and checks an Odia project through the packaged helper.
 The native headless MCP smoke test listed 17 tools, exposed all three podcast
 commands, and created/inspected a sequence without an AI provider.
+
+The first Windows run passed native compilation, linked transcript tests and the UI
+smoke test. Its backend export test caught a removed FFmpeg option. Export now
+uses the current file-option syntax with a targeted fallback for older FFmpeg.
+The Python packaging checks run before the expensive native build.

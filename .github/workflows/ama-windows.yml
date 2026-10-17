@@ -13,23 +13,10 @@ jobs:
     timeout-minutes: 120
     env:
       CARGO_BUILD_JOBS: 4
+      CARGO_PROFILE_DEV_DEBUG: 0
       FILMCRAFT_REQUIRE_WINRES: 1
     steps:
       - uses: actions/checkout@v4
-      - name: Rust toolchain
-        run: rustup toolchain install 1.95.0 --profile minimal
-      - uses: Swatinem/rust-cache@v2
-      - name: Build editor and MCP CLI
-        run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
-      - name: Linked transcript regression tests
-        run: |
-          cargo +1.95.0 test --locked --release -p filmcraft-engine podcast --lib
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked --release -p filmcraft-edit transcript --lib
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked --release -p filmcraft-ui-egui podcast::tests --lib
-      - name: Podcast interface smoke test
-        run: cargo +1.95.0 test --locked --release -p filmcraft-ui-egui --test podcast_ui
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -52,6 +39,22 @@ jobs:
           python -m pytest -q tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/betun.spec --noconfirm
+      - name: Rust toolchain
+        run: rustup toolchain install 1.95.0 --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Build editor and MCP CLI
+        run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
+      - name: Linked transcript regression tests
+        run: |
+          cargo +1.95.0 test --locked -p filmcraft-engine podcast --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked -p filmcraft-edit transcript --lib
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked -p filmcraft-ui-egui podcast::tests --lib
+      - name: Podcast interface smoke test
+        run: cargo +1.95.0 test --locked -p filmcraft-ui-egui --test podcast_ui
       - name: Assemble application
         shell: pwsh
         run: |
