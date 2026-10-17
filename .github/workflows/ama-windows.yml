@@ -48,6 +48,17 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count) { throw ($errors | Out-String) }
           }
+      - name: First-run setup and AI registration
+        shell: pwsh
+        run: |
+          & packaging/tests/onboarding.ps1 -Repository $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { throw 'AI registration test failed' }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-models.ps1 -Mode cpu -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -StatusFile "$env:RUNNER_TEMP/youcraft-runtime-status.json" -RuntimeOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Clean speech-runtime setup failed' }
+          $status = Get-Content "$env:RUNNER_TEMP/youcraft-runtime-status.json" -Raw | ConvertFrom-Json
+          if ($status.state -ne 'succeeded') { throw 'Speech-runtime setup did not finish' }
+          & "$env:RUNNER_TEMP/youcraft-runtime-test/speech-cpu/Scripts/python.exe" ama-backend/tests/windows_model_smoke.py "$env:RUNNER_TEMP/youcraft-runtime-test"
+          if ($LASTEXITCODE -ne 0) { throw 'Downloaded CPU speaker model failed inference' }
       - name: Rust toolchain
         run: rustup toolchain install 1.95.0 --profile minimal
       - uses: Swatinem/rust-cache@v2
@@ -62,6 +73,11 @@ jobs:
           cargo +1.95.0 test --locked -p filmcraft-edit transcript --lib
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo +1.95.0 test --locked -p filmcraft-ui-egui podcast::tests --lib
+      - name: Local helper startup regression tests
+        run: |
+          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft local_backend::tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft startup_tests
       - name: Podcast interface smoke test
         run: cargo +1.95.0 test --locked -p filmcraft-ui-egui --test podcast_ui
       - name: Assemble application
@@ -97,6 +113,21 @@ jobs:
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           if (-not (Test-Path "$installed/YouCraft.exe")) { throw 'Editor missing from installation' }
           $env:BETUN_NO_BROWSER = '1'
+          $env:BETUN_DATA_DIR = $data
+          $env:YOUCRAFT_INSTALLED_SMOKE = $installed
+          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft local_backend::tests -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $media = Join-Path $env:RUNNER_TEMP 'youcraft-media'
+          New-Item -ItemType Directory -Force $media | Out-Null
+          ffmpeg -y -f lavfi -i 'sine=frequency=440:duration=4' -ar 16000 -ac 1 "$media/master.wav"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($camera in @('host','guest')) {
+            ffmpeg -y -f lavfi -i 'color=c=blue:s=160x90:r=25:d=4' -i "$media/master.wav" -c:v libx264 -pix_fmt yuv420p -c:a aac -shortest "$media/$camera.mp4"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          $config = Join-Path $env:RUNNER_TEMP 'youcraft-synthetic-models.json'
+          @{diarize=@{revision='synthetic-test-v1';device='cpu';command=@((Get-Command python).Source, "$env:GITHUB_WORKSPACE/ama-backend/tests/fixtures/speaker_provider.py")}} | ConvertTo-Json -Depth 5 | Set-Content $config -Encoding utf8NoBOM
+          $env:BETUN_MODEL_CONFIG = $config
           $helper = Start-Process "$installed/BetunBackend/BetunBackend.exe" -ArgumentList @('--port', '18765', '--data-dir', "`"$data`"") -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/ama-helper.log" -RedirectStandardError "$env:RUNNER_TEMP/ama-helper-error.log"
           try {
             $ready = $false
@@ -104,7 +135,7 @@ jobs:
               if ($helper.HasExited) { throw 'Packaged helper exited during startup' }
               try {
                 $health = Invoke-RestMethod http://127.0.0.1:18765/health -TimeoutSec 2
-                if ($health.status -eq 'ok') { $ready = $true; break }
+                if ($health.status -eq 'ok' -and $health.service -eq 'youcraft' -and $health.protocol_version -eq 1) { $ready = $true; break }
               } catch { Start-Sleep -Seconds 1 }
             }
             if (-not $ready) { throw 'Packaged helper did not become ready' }
@@ -112,6 +143,14 @@ jobs:
             $body = [Text.Encoding]::UTF8.GetBytes((@{name='ନମସ୍କାର'} | ConvertTo-Json))
             $episode = Invoke-RestMethod http://127.0.0.1:18765/v1/projects -Method Post -Headers @{Authorization="Bearer $token"} -ContentType 'application/json; charset=utf-8' -Body $body
             if ($episode.name -ne 'ନମସ୍କାର') { throw 'Odia text did not round-trip through the packaged helper' }
+            $env:YOUCRAFT_SMOKE_ENDPOINT = 'http://127.0.0.1:18765'
+            $env:YOUCRAFT_SMOKE_TOKEN = $token
+            $env:YOUCRAFT_SMOKE_MEDIA = $media
+            $env:YOUCRAFT_SMOKE_AUTO_IDENTIFY = '1'
+            cargo +1.95.0 test --locked -p filmcraft-ui-egui --test podcast_ui podcast_live_helper_flow -- --nocapture
+            if ($LASTEXITCODE -ne 0) { throw 'Guided import and edit workflow failed' }
+            python ama-backend/tests/packaged_model_smoke.py $config "$env:RUNNER_TEMP/youcraft-runtime-test/models.json" $media
+            if ($LASTEXITCODE -ne 0) { throw 'Installed helper could not run the real CPU speaker model' }
           } catch {
             Get-Content "$env:RUNNER_TEMP/ama-helper-error.log" -Tail 40 -ErrorAction SilentlyContinue
             throw

@@ -9,18 +9,20 @@ Flow: Audio > Speakers > Cameras > Transcript > Reactions > Export.
 Advanced Filmcraft tools remain available through the other workspaces.
 Save your .fcproj project. Export subtitles reads the current edited sequence.
 
-Run YouCraft model setup from Start to install the speech runtime and weights.
-Requires Python 3.11 x64, internet and your Hugging Face model access.
-Choose CPU or NVIDIA. Setup writes %LOCALAPPDATA%\YouCraft\models.json.
-External FFmpeg/ffprobe must be on PATH. Restart the app after setup.
+Open Models in the app and choose Install CPU or Install NVIDIA.
+Setup prepares Python, speech dependencies, media tools and Hugging Face weights.
+Internet and several GB of free space are required. The Odia model may require
+accepting its Hugging Face terms and a read token. Setup progress and errors
+appear in the app. Cached downloads can be retried without starting over.
+The running app reloads installed models and media tools automatically.
 Optional vision and Romanized spelling packs still need separate preparation.
 
-Settings > Advanced contains optional remote development connection controls.
+Models > Advanced contains optional remote development connection controls.
 Local authentication is automatic. For a remote test, use an SSH tunnel and
 that helper's token. Never post tokens in public issues.
 
-Run Connect AI.cmd to register Codex or Claude Code. See AI-WORKFLOW.md.
-Optional MCP: Start with MCP.cmd opens the editor's local control bridge.
+Open Connect AI in the app for Claude Desktop, Claude Code or Codex.
+The local control bridge starts automatically. See AI-WORKFLOW.md.
 Point an MCP client to filmcraft-cli.exe with:
 mcp --bridge 127.0.0.1:9876
 ChatGPT/Claude reasoning requires their online services. Video edits stay local.

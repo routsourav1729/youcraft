@@ -13,6 +13,8 @@ type Reply = Result<Value, String>;
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct State {
+    #[serde(skip)]
+    pub setup: crate::podcast_setup::State,
     pub endpoint: String,
     #[serde(skip)]
     pub token: String,
@@ -56,10 +58,15 @@ pub struct State {
     action: String,
     #[serde(skip)]
     last_poll: Option<Instant>,
+    #[serde(skip)]
+    auto_identify: bool,
+    #[serde(skip)]
+    follow_up: String,
 }
 impl Default for State {
     fn default() -> Self {
         Self {
+            setup: Default::default(),
             endpoint: "http://127.0.0.1:8765".into(),
             token: String::new(),
             remote: false,
@@ -105,33 +112,134 @@ impl Default for State {
             pending: None,
             action: String::new(),
             last_poll: None,
+            auto_identify: false,
+            follow_up: String::new(),
         }
     }
 }
+const WRONG_SERVICE: &str = "Wrong local service. Restart YouCraft.";
+
+fn validate_endpoint(endpoint: &str) -> Result<(), String> {
+    let url = reqwest::Url::parse(endpoint).map_err(|e| e.to_string())?;
+    if url.scheme() != "http" || !matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")) {
+        return Err("Use a local helper address at http://127.0.0.1".into());
+    }
+    if !matches!(url.path(), "" | "/") || url.query().is_some() || url.fragment().is_some() || !url.username().is_empty() || url.password().is_some() {
+        return Err("Use the helper address without a file or folder path".into());
+    }
+    Ok(())
+}
+
+#[derive(PartialEq, Eq)]
+enum Service {
+    Ready,
+    Starting,
+    Other,
+}
+
+fn probe_service(http: &reqwest::blocking::Client, endpoint: &str) -> Service {
+    let response = match http.get(format!("{}/health", endpoint.trim_end_matches('/'))).timeout(Duration::from_millis(500)).send() {
+        Ok(response) => response,
+        Err(_) => return Service::Starting,
+    };
+    if !response.status().is_success() {
+        return Service::Other;
+    }
+    let mut body = String::new();
+    if response.take(8193).read_to_string(&mut body).is_err() {
+        return Service::Starting;
+    }
+    if body.len() > 8192 {
+        return Service::Other;
+    }
+    let Ok(value) = serde_json::from_str::<Value>(&body) else { return Service::Other };
+    let identity = value["service"] == "youcraft" && value["protocol_version"] == 1;
+    // Older helpers lack the setup contract; start the installed helper beside them.
+    if value["status"] == "ok" && value["schema_version"] == 1 && identity { Service::Ready } else { Service::Other }
+}
+
+pub fn helper_available(endpoint: &str) -> bool {
+    if validate_endpoint(endpoint).is_err() {
+        return false;
+    }
+    reqwest::blocking::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_millis(150))
+        .build()
+        .is_ok_and(|http| probe_service(&http, endpoint) == Service::Ready)
+}
+
+pub fn local_token() -> String {
+    let root = std::env::var_os("BETUN_DATA_DIR").map(PathBuf::from).or_else(|| std::env::var_os("LOCALAPPDATA").map(|root| PathBuf::from(root).join("Betun")));
+    root.and_then(|root| std::fs::read_to_string(root.join("api-token")).ok()).unwrap_or_default().trim().into()
+}
+
+fn response_value(status: reqwest::StatusCode, text: &str) -> Reply {
+    if status == reqwest::StatusCode::NOT_IMPLEMENTED || text.trim_start().starts_with('<') {
+        return Err(WRONG_SERVICE.into());
+    }
+    let value: Value = serde_json::from_str(text).map_err(|_| WRONG_SERVICE.to_string())?;
+    if !status.is_success() {
+        if status == reqwest::StatusCode::UNAUTHORIZED {
+            return Err("Local session expired. Restart YouCraft.".into());
+        }
+        let detail = value.get("detail").unwrap_or(&value);
+        let error = detail.as_str().map(str::to_string).unwrap_or_else(|| detail.to_string());
+        return Err(error.chars().take(1200).collect());
+    }
+    Ok(value)
+}
+
+fn display_error(error: String) -> String {
+    if error.contains("No diarize provider configured") || error.contains("No transcribe provider configured") {
+        "Speech models missing. Open Model setup.".into()
+    } else {
+        error
+    }
+}
+
 #[derive(Clone)]
 struct Client {
     http: reqwest::blocking::Client,
     base: String,
     token: String,
+    local: bool,
 }
 impl Client {
     fn new(s: &State) -> Result<Self, String> {
-        let url = reqwest::Url::parse(&s.endpoint).map_err(|e| e.to_string())?;
-        if url.scheme() != "http" || !matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]")) {
-            return Err("Use a local backend or an SSH tunnel at http://127.0.0.1:8765".into());
-        }
+        validate_endpoint(&s.endpoint)?;
         Ok(Self {
             http: reqwest::blocking::Client::builder()
+                .no_proxy()
+                .redirect(reqwest::redirect::Policy::none())
                 .connect_timeout(Duration::from_secs(10))
                 .timeout(Duration::from_secs(7200))
                 .build()
                 .map_err(|e| e.to_string())?,
             base: s.endpoint.trim_end_matches('/').into(),
             token: s.token.clone(),
+            local: !s.remote,
         })
     }
+    fn wait_ready(&self) -> Result<(), String> {
+        let deadline = Instant::now() + Duration::from_secs(12);
+        loop {
+            match probe_service(&self.http, &self.base) {
+                Service::Ready => break,
+                Service::Other => return Err(WRONG_SERVICE.into()),
+                Service::Starting if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(100)),
+                Service::Starting => return Err("Local helper did not start. Restart YouCraft; check analysis-helper.log if it persists.".into()),
+            }
+        }
+        Ok(())
+    }
     fn request(&self, method: reqwest::Method, path: &str, body: Option<&Value>) -> Reply {
-        let mut req = self.http.request(method, format!("{}{path}", self.base)).bearer_auth(&self.token).timeout(Duration::from_secs(60));
+        if method != reqwest::Method::GET {
+            self.wait_ready()?;
+        }
+        let token = if self.local && self.token.is_empty() { local_token() } else { self.token.clone() };
+        let mut req = self.http.request(method, format!("{}{path}", self.base)).bearer_auth(token).timeout(Duration::from_secs(60));
         if let Some(body) = body {
             req = req.json(body);
         }
@@ -142,11 +250,9 @@ impl Client {
         if text.len() > 32 * 1024 * 1024 {
             return Err("Backend response exceeds 32 MB".into());
         }
-        if !status.is_success() {
-            return Err(format!("{status}: {text}"));
-        }
-        serde_json::from_str(&text).map_err(|e| e.to_string())
+        response_value(status, &text)
     }
+
     fn get(&self, path: &str) -> Reply {
         self.request(reqwest::Method::GET, path, None)
     }
@@ -173,7 +279,7 @@ impl Client {
 }
 impl State {
     fn busy(&self) -> bool {
-        self.pending.is_some() || self.job.is_some()
+        self.pending.is_some() || self.job.is_some() || self.setup.busy()
     }
     fn start(&mut self, action: &str, work: impl FnOnce(Client) -> Reply + Send + 'static) {
         if self.pending.is_some() {
@@ -219,6 +325,56 @@ impl State {
                 Err(error) => Ok(json!({"error":error,"project":saved})),
             }
         });
+    }
+    fn import_audio(&mut self, identify: bool) {
+        if self.master.trim().is_empty() {
+            self.error = "Choose master audio first".into();
+            return;
+        }
+        if self.setup.checked
+            && !self.remote
+            && (self.setup.capabilities["media"]["ffmpeg"] != true
+                || self.setup.capabilities["media"]["ffprobe"] != true
+                || (identify && self.setup.capabilities["installed_providers"]["diarize"] != true))
+        {
+            self.step = 0;
+            self.error = "Install the speaker model and media tools first".into();
+            return;
+        }
+        self.auto_identify = identify;
+        self.follow_up.clear();
+        self.samples.clear();
+        self.status = "Importing audio…".into();
+        let name = self.name.clone();
+        self.start("created", move |c| c.post("/v1/projects", json!({"name":name})));
+    }
+    fn load_samples(&mut self) {
+        let id = self.project_id.clone();
+        self.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
+    }
+    pub fn add_files(&mut self, paths: Vec<String>) {
+        if self.busy() {
+            self.error = "Wait for the current task".into();
+            return;
+        }
+        if self.step == 1 {
+            if paths.len() != 1 {
+                self.error = "Choose one master audio file".into();
+                return;
+            }
+            self.destination = 0;
+        } else if self.step == 3 {
+            if self.destination == 0 {
+                self.destination = 1;
+            }
+        } else {
+            self.error = "Open Audio or Cameras to add files".into();
+            return;
+        }
+        for path in paths {
+            self.add(path);
+        }
+        self.error.clear();
     }
     fn add(&mut self, path: String) {
         match self.destination {
@@ -294,6 +450,14 @@ fn load_state(path: &Path) -> Result<State, String> {
 fn sample(s: &mut State, start: f64, end: f64) {
     s.job("sample", json!({"start":start,"end":end}));
 }
+fn job_label(kind: &str) -> &str {
+    match kind {
+        "import" => "Importing audio",
+        "diarize" => "Identifying speakers",
+        "transcribe" => "Transcribing",
+        _ => kind,
+    }
+}
 fn poll(app: &mut FilmcraftApp, s: &mut State) {
     let result = s.pending.as_ref().and_then(|rx| match rx.try_recv() {
         Ok(v) => Some(v),
@@ -303,13 +467,23 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
     if let Some(result) = result {
         s.pending = None;
         match result {
-            Err(e) => s.error = e,
+            Err(e) => {
+                s.error = display_error(e);
+                s.auto_identify = false;
+                s.follow_up.clear();
+            }
             Ok(value) => match s.action.as_str() {
                 "project" => {
                     s.project_id = string(&value, "id");
                     s.compute_device = value["settings"]["compute_device"].as_str().unwrap_or("auto").into();
                     s.project = value;
                     s.status = "Saved".into();
+                    match std::mem::take(&mut s.follow_up).as_str() {
+                        "diarize" => s.job("diarize", json!({})),
+                        "samples" => s.load_samples(),
+                        "cameras" => s.step = 3,
+                        _ => {}
+                    }
                 }
                 "created" => {
                     s.project_id = string(&value, "id");
@@ -324,8 +498,13 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                         .unwrap_or_default();
                 }
                 "capabilities" => {
-                    let count = value["configured_providers"].as_object().map_or(0, |v| v.len());
-                    s.status = format!("Connected · {count} models configured");
+                    s.setup.checked = true;
+                    s.setup.capabilities = value;
+                    s.status.clear();
+                    let advance = std::mem::take(&mut s.setup.advance_on_ready);
+                    if s.setup.ready() && s.step == 0 && advance {
+                        s.step = 1;
+                    }
                 }
                 "list" => {
                     s.browser = value.as_array().cloned().unwrap_or_default();
@@ -345,10 +524,12 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                         s.project = value["project"].clone();
                     }
                     if let Some(error) = value["error"].as_str() {
-                        s.error = error.into();
+                        s.error = display_error(error.into());
+                        s.auto_identify = false;
+                        s.follow_up.clear();
                     } else {
                         s.job = Some(string(&value["job"], "id"));
-                        s.status = format!("{} queued", s.job_kind);
+                        s.status = format!("{} queued", job_label(&s.job_kind));
                     }
                 }
                 "cancel" => {
@@ -356,7 +537,7 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                 }
                 "poll" => {
                     let state = string(&value, "state");
-                    s.status = format!("{} · {} · {:.0}%", s.job_kind, state, number(&value, "progress") * 100.);
+                    s.status = format!("{} · {} · {:.0}%", job_label(&s.job_kind), state, number(&value, "progress") * 100.);
                     if ["succeeded", "failed", "cancelled", "interrupted"].contains(&state.as_str()) {
                         let jid = s.job.take().unwrap_or_default();
                         if state == "succeeded" {
@@ -399,6 +580,21 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                     Ok(plan)
                                 });
                             } else {
+                                if s.job_kind == "import" {
+                                    s.step = 2;
+                                    if std::mem::take(&mut s.auto_identify) {
+                                        s.follow_up = "diarize".into();
+                                    }
+                                } else if s.job_kind == "diarize" {
+                                    s.step = 2;
+                                    s.follow_up = "samples".into();
+                                }
+                                if s.job_kind == "transcribe" {
+                                    s.step = 4;
+                                }
+                                if s.job_kind == "shots" {
+                                    s.step = 5;
+                                }
                                 if s.job_kind == "attach_cameras" {
                                     s.camera_a.clear();
                                     s.camera_b.clear();
@@ -406,7 +602,9 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                 s.refresh();
                             }
                         } else {
-                            s.error = string(&value, "error");
+                            s.error = display_error(string(&value, "error"));
+                            s.auto_identify = false;
+                            s.follow_up.clear();
                         }
                     }
                 }
@@ -469,9 +667,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
 pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
     let s = &mut app.podcast;
     if method == "podcast.inspect" {
-        return Ok(json!({"busy":s.busy(),"project_id":s.project_id,"project":s.project,
+        return Ok(json!({"busy":s.busy(),"step":s.step,"project_id":s.project_id,"project":s.project,
             "master":s.master,"camera_a":s.camera_a,"camera_b":s.camera_b,
             "compute_device":s.compute_device,"samples":s.samples,"job":s.job,
+            "setup":{"ready":s.setup.ready(),"busy":s.setup.busy(),"stage":s.setup.stage,"error":s.setup.error},
             "job_kind":s.job_kind,"status":s.status,"error":s.error,"assembled":s.assembled,
             "actions":["create","refresh","samples","save","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","sample","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
     }
@@ -501,6 +700,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
             }
             let mut updated: State = serde_json::from_value(state).map_err(|e| e.to_string())?;
             updated.token = s.token.clone();
+            updated.setup = std::mem::take(&mut s.setup);
             updated.error.clear();
             *s = updated;
         }
@@ -537,8 +737,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
                     if s.master.is_empty() {
                         return Err("Choose master audio first".into());
                     }
-                    let name = s.name.clone();
-                    s.start("created", move |c| c.post("/v1/projects", json!({"name":name})));
+                    s.import_audio(options["identify"].as_bool().unwrap_or(true));
                 }
                 "refresh" => s.refresh(),
                 "save" => s.save(),
@@ -548,6 +747,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
                 }
                 "lock_roles" => {
                     lock_roles(s, p["host"].as_str().ok_or("Missing host speaker ID")?)?;
+                    s.follow_up = "cameras".into();
                     s.save();
                 }
                 "attach_cameras" => s.job(action, json!({"A":s.camera_a,"B":s.camera_b})),
@@ -600,15 +800,25 @@ fn lock_roles(s: &mut State, host: &str) -> Result<(), String> {
 
 pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut s = std::mem::take(&mut app.podcast);
-    if s.token.is_empty()
-        && !s.remote
-        && let Ok(root) = std::env::var("LOCALAPPDATA")
-        && let Ok(token) = std::fs::read_to_string(PathBuf::from(root).join("Betun/api-token"))
-    {
-        s.token = token.trim().into();
+    if s.token.is_empty() && !s.remote {
+        s.token = local_token();
     }
     poll(app, &mut s);
-    if s.busy() {
+    let setup_finished = s.setup.poll();
+    let initial_setup = std::mem::take(&mut s.setup.check_on_start);
+    if initial_setup {
+        s.setup.advance_on_ready = true;
+    }
+    if (initial_setup || setup_finished) && !s.busy() {
+        if !s.setup.checked {
+            s.step = 0;
+        }
+        s.start("capabilities", |c| {
+            c.wait_ready()?;
+            c.get("/v1/capabilities")
+        });
+    }
+    if s.busy() || s.setup.busy() {
         ctx.request_repaint_after(Duration::from_millis(100));
     }
     app.podcast = s;
@@ -620,12 +830,59 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         s.error = error;
         s.step = 0;
     }
-    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(12.)).layout(egui::Layout::top_down(egui::Align::Min)));
+    let guided = !s.assembled;
+    if guided {
+        ui.painter().rect_filled(rect.shrink(8.), 12., egui::Color32::from_rgb(20, 25, 33));
+    }
+    let inset = if guided { 28. } else { 12. };
+    let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(inset)).layout(egui::Layout::top_down(egui::Align::Min)));
     let ui = &mut child;
-    ui.heading("YouCraft");
+    if guided {
+        ui.style_mut().override_font_id = Some(egui::FontId::proportional(15.));
+        ui.spacing_mut().item_spacing = egui::vec2(10., 10.);
+        ui.spacing_mut().button_padding = egui::vec2(12., 7.);
+        ui.spacing_mut().text_edit_width = 520.;
+        ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(35, 43, 55);
+    }
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new("YouCraft").size(if guided { 26. } else { 18. }).strong());
+        if button(app, ui, "models", "Models") {
+            s.step = 0;
+            s.start("capabilities", |c| c.get("/v1/capabilities"));
+        }
+        if button(app, ui, "connect_ai", "Connect AI") {
+            s.setup.ai_open = !s.setup.ai_open;
+        }
+        if button(app, ui, "editor", "Editor") {
+            app.set_workspace("Editing");
+        }
+    });
+    if s.setup.ai_open {
+        ai_connection(app, ui, &mut s);
+    }
+    if s.setup.busy() {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(&s.setup.stage);
+            if button(app, ui, "cancel_setup", "Cancel setup") {
+                s.setup.cancel();
+            }
+        });
+        ui.ctx().request_repaint_after(Duration::from_millis(100));
+    }
+    if !s.setup.error.is_empty() {
+        ui.colored_label(egui::Color32::LIGHT_RED, &s.setup.error);
+    }
     ui.horizontal_wrapped(|ui| {
-        for (i, label) in [(1, "Audio"), (2, "Speakers"), (3, "Cameras"), (4, "Transcript"), (5, "Reactions"), (6, "Export"), (0, "Settings")] {
-            let r = ui.selectable_label(s.step == i, label);
+        for (i, label) in [(1, "Audio"), (2, "Speakers"), (3, "Cameras"), (4, "Transcript"), (5, "Reactions"), (6, "Export")] {
+            let available = match i {
+                1 => true,
+                2 => number(&s.project, "duration") > 0.,
+                3 => s.project["settings"]["roles_locked"] == true,
+                4 | 5 => rows(&s.project, "clips").iter().any(|c| c["camera"] == "A" || c["camera"] == "B"),
+                _ => s.assembled,
+            };
+            let r = ui.add_enabled_ui(available, |ui| ui.selectable_label(s.step == i, label)).inner;
             app.auto.add(&format!("podcast.step.{i}"), r.rect, label);
             if r.clicked() {
                 s.step = i;
@@ -648,7 +905,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
     egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| {
-        ui.add_enabled_ui(!s.busy(), |ui| match s.step {
+        ui.add_enabled_ui(!s.busy() && !s.setup.busy(), |ui| match s.step {
             0 => connect(app, ui, &mut s),
             1 => audio(app, ui, &mut s),
             2 => speakers(app, ui, &mut s),
@@ -658,45 +915,130 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             _ => editing(app, ui, &mut s),
         });
     });
+    if app.session.state.source_item.is_some() && s.step != 0 {
+        let mut preview = true;
+        egui::Window::new("Listen / preview").default_size(egui::vec2(620., 300.)).open(&mut preview).show(ui.ctx(), |ui| {
+            let rect = ui.available_rect_before_wrap();
+            crate::panels::monitor::show(app, ui, rect, crate::panels::monitor::Which::Source);
+        });
+        if !preview {
+            let _ = app.session.execute("source.close", json!({}));
+        }
+    }
     app.podcast = s;
 }
+fn open_path(app: &mut FilmcraftApp, s: &mut State, path: &Path) {
+    if let Some(open) = app.hooks.open_path.as_mut() {
+        if let Err(error) = open(&path.to_string_lossy(), false) {
+            s.error = error;
+        }
+    } else {
+        s.error = "Opening files is unavailable here".into();
+    }
+}
+fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    ui.group(|ui| {
+        ui.strong("Connect AI");
+        ui.label("Choose your installed client. Sign in there with your existing account.");
+        ui.add_enabled_ui(!s.setup.busy(), |ui| {
+            ui.horizontal_wrapped(|ui| {
+                for (id, label) in [("desktop", "Claude Desktop"), ("claude", "Claude Code"), ("codex", "Codex")] {
+                    if button(app, ui, &format!("ai.{id}"), label) {
+                        s.setup.start("Connect-AI.ps1", "-Client", id);
+                    }
+                }
+            });
+        });
+        if !s.setup.stage.is_empty() {
+            ui.label(&s.setup.stage);
+        }
+        ui.label("Restart the client after connecting. Keep YouCraft open.");
+        if button(app, ui, "ai_prompt", "Copy first prompt") {
+            ui.ctx().copy_text("Use the youcraft MCP tools. Inspect the current podcast workflow, explain the next step, and help me edit this episode. Ask me to choose the host before assigning cameras. Save before editing.".into());
+            s.status = "Prompt copied".into();
+        }
+        ui.label("Browser chat needs a separate connection; it cannot use this local link directly.");
+        ui.hyperlink_to("Client connection help", "https://github.com/routsourav1729/youcraft/blob/ama-bartalap/packaging/ama/AI-WORKFLOW.md");
+    });
+}
 fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    ui.heading("Set up models");
+    ui.label("Local processing · CPU or NVIDIA");
+    for (key, label) in [("diarize", "Speaker model"), ("transcribe", "Odia model")] {
+        let ready = s.setup.capabilities["installed_providers"][key] == true;
+        ui.label(format!("{}  {}", if ready { "✓" } else { "○" }, label));
+    }
+    let media_ready = s.setup.capabilities["media"]["ffmpeg"] == true && s.setup.capabilities["media"]["ffprobe"] == true;
+    ui.label(format!("{}  Media tools", if media_ready { "✓" } else { "○" }));
+    ui.label("Downloads require internet and several GB of space.");
+    ui.hyperlink_to("Odia model access", "https://huggingface.co/bodhan-ai/indic-transcribe-core");
+    ui.label("Hugging Face read token (if required)");
+    let r = ui.add(egui::TextEdit::singleline(&mut s.setup.hf_token).password(true));
+    app.auto.add_response("podcast.hf_token", &r, "Hugging Face token");
+    ui.add_enabled_ui(!s.setup.busy(), |ui| {
+        ui.horizontal(|ui| {
+            if button(app, ui, "setup_cpu", "Install · CPU") {
+                s.setup.start("Setup-models.ps1", "-Mode", "cpu");
+            }
+            if button(app, ui, "setup_gpu", "Install · NVIDIA") {
+                s.setup.start("Setup-models.ps1", "-Mode", "nvidia");
+            }
+        });
+    });
+    if !s.setup.stage.is_empty() {
+        ui.label(&s.setup.stage);
+    }
+    if button(app, ui, "setup_log", "Setup log")
+        && let Some(root) = std::env::var_os("LOCALAPPDATA")
+    {
+        open_path(app, s, &PathBuf::from(root).join("YouCraft/setup.log"));
+    }
+    if button(app, ui, "continue_audio", "Continue to audio") {
+        s.step = 1;
+    }
+    ui.separator();
     if button(app, ui, "connection_test", "Check setup") {
         s.start("capabilities", move |c| c.get("/v1/capabilities"));
     }
-    ui.label("Episode ID");
-    field(app, ui, "project_id", &mut s.project_id);
-    if button(app, ui, "resume", "Open project") {
-        s.refresh();
-    }
-    if button(app, ui, "list_projects", "Saved episodes") {
-        s.start("projects", move |c| c.get("/v1/projects"));
-    }
-    if button(app, ui, "save_connection", "Save workflow") {
-        let path = PathBuf::from(&s.cache).join("workflow.json");
-        let result =
-            std::fs::create_dir_all(&s.cache).map_err(|e| e.to_string()).and_then(|_| serde_json::to_vec_pretty(&s).map_err(|e| e.to_string())).and_then(|b| {
-                if b.len() > 8 * 1024 * 1024 {
-                    return Err("Workflow state exceeds 8 MB; resume this episode by project ID instead".into());
-                }
-                std::fs::write(path, b).map_err(|e| e.to_string())
-            });
-        if let Err(e) = result {
-            s.error = e;
-        } else {
-            s.status = "Workflow saved".into();
-        }
-    }
-    if button(app, ui, "restore_connection", "Restore workflow") {
-        match load_state(&PathBuf::from(&s.cache).join("workflow.json")) {
-            Ok(mut restored) => {
-                restored.token = s.token.clone();
-                *s = restored;
-            }
-            Err(e) => s.error = e,
-        }
-    }
     ui.collapsing("Advanced", |ui| {
+        ui.label("Episode ID");
+        field(app, ui, "project_id", &mut s.project_id);
+        if button(app, ui, "resume", "Open project") {
+            s.refresh();
+        }
+        if button(app, ui, "list_projects", "Saved episodes") {
+            s.start("projects", move |c| c.get("/v1/projects"));
+        }
+        if button(app, ui, "save_connection", "Save workflow") {
+            let path = PathBuf::from(&s.cache).join("workflow.json");
+            let result = std::fs::create_dir_all(&s.cache)
+                .map_err(|e| e.to_string())
+                .and_then(|_| serde_json::to_vec_pretty(&s).map_err(|e| e.to_string()))
+                .and_then(|b| {
+                    if b.len() > 8 * 1024 * 1024 {
+                        return Err("Workflow state exceeds 8 MB; resume this episode by project ID instead".into());
+                    }
+                    std::fs::write(path, b).map_err(|e| e.to_string())
+                });
+            if let Err(e) = result {
+                s.error = e;
+            } else {
+                s.status = "Workflow saved".into();
+            }
+        }
+        if button(app, ui, "restore_connection", "Restore workflow") {
+            match load_state(&PathBuf::from(&s.cache).join("workflow.json")) {
+                Ok(mut restored) => {
+                    restored.token = s.token.clone();
+                    restored.setup = std::mem::take(&mut s.setup);
+                    if !s.remote && !restored.remote {
+                        restored.endpoint = s.endpoint.clone();
+                    }
+                    *s = restored;
+                }
+                Err(e) => s.error = e,
+            }
+        }
         ui.label("Address");
         field(app, ui, "endpoint", &mut s.endpoint);
         ui.label("Access token");
@@ -746,10 +1088,8 @@ fn picker(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 }
                 Ok(json!(result))
             });
-        } else {
-            for p in paths {
-                s.add(p);
-            }
+        } else if !paths.is_empty() {
+            s.add_files(paths);
         }
     }
     if s.remote {
@@ -793,14 +1133,20 @@ fn audio(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         }
     });
     if button(app, ui, "create", "Import") {
-        let name = s.name.clone();
-        s.start("created", move |c| c.post("/v1/projects", json!({"name":name})));
+        s.import_audio(true);
     }
     if !s.project_id.is_empty() && button(app, ui, "diarize", "Identify speakers") {
         s.job("diarize", json!({}));
     }
 }
 fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    if rows(&s.project, "activity").is_empty() && !s.project_id.is_empty() && button(app, ui, "identify_speakers", "Identify speakers") {
+        s.job("diarize", json!({}));
+    }
+    if s.error.contains("Model setup") && button(app, ui, "setup_models", "Set up models") {
+        s.step = 0;
+        s.start("capabilities", |c| c.get("/v1/capabilities"));
+    }
     if button(app, ui, "samples", "Speaker samples") {
         let id = s.project_id.clone();
         s.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
@@ -823,7 +1169,10 @@ fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if button(app, ui, "lock_roles", "Confirm speakers") {
         let host = string(&s.project["settings"], "host_speaker");
         match lock_roles(s, &host) {
-            Ok(()) => s.save(),
+            Ok(()) => {
+                s.follow_up = "cameras".into();
+                s.save();
+            }
             Err(error) => s.error = error,
         }
     }
@@ -1216,6 +1565,84 @@ fn pager(app: &mut FilmcraftApp, ui: &mut egui::Ui, page: &mut usize, count: usi
 
 #[cfg(test)]
 mod tests {
+    fn server_once(status: &str, body: &str) -> (String, std::thread::JoinHandle<String>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = format!("http://{}", listener.local_addr().unwrap());
+        let reply = format!("HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+            let mut request = [0; 8192];
+            let size = stream.read(&mut request).unwrap();
+            stream.write_all(reply.as_bytes()).unwrap();
+            String::from_utf8_lossy(&request[..size]).into_owned()
+        });
+        (address, worker)
+    }
+
+    #[test]
+    fn workflow_file_selection_updates_the_correct_input() {
+        let mut s = super::State::default();
+        s.add_files(vec!["audio.wav".into()]);
+        assert_eq!(s.master, "audio.wav");
+        s.add_files(vec!["one.wav".into(), "two.wav".into()]);
+        assert_eq!(s.master, "audio.wav");
+        assert!(s.error.contains("one master"));
+        s.step = 3;
+        s.destination = 2;
+        s.add_files(vec!["01.mov".into(), "02.mp4".into()]);
+        assert_eq!(s.camera_b, ["01.mov", "02.mp4"]);
+        assert!(s.camera_a.is_empty());
+    }
+
+    #[test]
+    fn fresh_install_keeps_audio_and_returns_to_setup_before_creating_a_project() {
+        let mut s = super::State { master: "my-recording.mp3".into(), ..Default::default() };
+        s.setup.checked = true;
+        s.import_audio(true);
+        assert_eq!(s.step, 0);
+        assert_eq!(s.master, "my-recording.mp3");
+        assert!(s.project_id.is_empty());
+        assert!(!s.busy());
+        assert!(s.error.contains("Install"));
+    }
+
+    #[test]
+    fn static_server_is_rejected_before_any_import_post() {
+        let (endpoint, worker) = server_once("501 Not Implemented", "<!DOCTYPE HTML><title>Unsupported method ('POST')</title>");
+        let state = super::State { endpoint, ..Default::default() };
+        let client = super::Client::new(&state).unwrap();
+        let error = client.post("/v1/projects", serde_json::json!({"name":"test"})).unwrap_err();
+        assert_eq!(error, super::WRONG_SERVICE);
+        assert!(worker.join().unwrap().starts_with("GET /health "));
+        assert!(!error.contains("<"));
+    }
+
+    #[test]
+    fn health_requires_helper_identity_and_protocol() {
+        for (body, expected) in [
+            (r#"{"status":"ok"}"#, false),
+            (r#"{"status":"ok","service":"other","schema_version":1,"protocol_version":1}"#, false),
+            (r#"{"status":"ok","service":"youcraft","schema_version":1,"protocol_version":1}"#, true),
+            (r#"{"status":"ok","version":"0.1.0","schema_version":1}"#, false),
+        ] {
+            let (endpoint, worker) = server_once("200 OK", body);
+            assert_eq!(super::helper_available(&endpoint), expected);
+            worker.join().unwrap();
+        }
+        assert!(super::validate_endpoint("http://127.0.0.1:8000/folder/index.html").is_err());
+        assert!(super::validate_endpoint("https://example.org").is_err());
+    }
+
+    #[test]
+    fn error_pages_never_become_long_html_in_the_interface() {
+        let status = reqwest::StatusCode::NOT_IMPLEMENTED;
+        assert_eq!(super::response_value(status, "<!DOCTYPE HTML>server").unwrap_err(), super::WRONG_SERVICE);
+        assert_eq!(super::response_value(reqwest::StatusCode::OK, "<html>files</html>").unwrap_err(), super::WRONG_SERVICE);
+        assert!(super::display_error("No diarize provider configured; set BETUN_MODEL_CONFIG".into()).contains("Model setup"));
+    }
+
     #[test]
     fn corrupt_workflow_rows_are_rejected_before_the_editor_mutates_them() {
         for value in [serde_json::json!("bad"), serde_json::json!({"settings":12}), serde_json::json!({"captions":[12]})] {

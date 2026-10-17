@@ -19,6 +19,14 @@ def client(tmp_path):
 def project():
     return Project(name='test',duration=20,clips=[Clip(camera='master',path='master.wav',duration=20,channels=2,fingerprint='m'),Clip(camera='A',path='a.mp4',duration=20,fingerprint='a',has_video=True,sync_reviewed=True),Clip(camera='B',path='b.mp4',duration=8,offset=4,fingerprint='b',has_video=True,sync_reviewed=True)])
 
+def test_health_identifies_helper_before_authentication(client):
+    client.headers.pop('Authorization')
+    health = client.get('/health')
+    assert health.status_code == 200
+    assert health.json() == dict(status='ok', service='youcraft', protocol_version=1,
+                                 schema_version=1, version='0.1.0')
+    assert client.get('/v1/projects').status_code == 401
+
 def test_ui_and_cookie_auth(client):
     assert client.get('/').status_code==200
     assert client.get('/ui/app.js').status_code==200
@@ -95,3 +103,17 @@ def test_review_import_preserves_project_identity(client):
     assert response.json()['name']=='corrected review'
     assert response.json()['revision']==1
     assert client.post('/v1/projects/'+p['id']+'/review',json={'format':'betun-review-v1','project':p}).status_code==409
+
+
+def test_setup_status_distinguishes_configured_from_installed(client, tmp_path, monkeypatch):
+    import sys
+    from betun import api
+    model = tmp_path/'missing-model'
+    monkeypatch.setattr(api, 'configuration', lambda: {'diarize':dict(model_path=str(model), python=sys.executable)})
+    status = client.get('/v1/capabilities').json()
+    assert status['configured_providers'] == {'diarize':'external-command'}
+    assert status['installed_providers'] == {'diarize':False,'transcribe':False}
+    assert not status['ready']
+    model.mkdir()
+    (model/'config.json').write_text('{}')
+    assert client.get('/v1/capabilities').json()['installed_providers']['diarize']

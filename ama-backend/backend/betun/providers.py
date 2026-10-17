@@ -9,6 +9,9 @@ from .media import run
 
 def configuration():
     path = os.environ.get('BETUN_MODEL_CONFIG')
+    if not path and os.environ.get('LOCALAPPDATA'):
+        base = Path(os.environ['LOCALAPPDATA'])
+        path = next((p for p in (base / 'YouCraft/models.json', base / 'AmaBartalap/models.json') if p.is_file()), None)
     return json.loads(Path(path).read_text(encoding='utf-8')) if path else {}
 
 

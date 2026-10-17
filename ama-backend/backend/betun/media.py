@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import signal
+import sys
+import threading
 from fractions import Fraction
 import time
 import numpy as np
@@ -15,9 +17,44 @@ class Cancelled(Exception):
     pass
 
 
+_spawn_lock = threading.Lock()
+
+
+def external_process(args, **kwargs):
+    """Do not make external Python/FFmpeg load the frozen helper's private DLLs.
+
+    See PyInstaller common-issues-and-pitfalls, launching external programs on Windows.
+    Restore the helper's DLL search directory immediately after creating the child.
+    """
+    bundle = getattr(sys, '_MEIPASS', None)
+    if os.name != 'nt' or not getattr(sys, 'frozen', False) or not bundle:
+        return subprocess.Popen(args, **kwargs)
+    import ctypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    set_directory = kernel.SetDllDirectoryW
+    set_directory.argtypes = [ctypes.c_wchar_p]
+    set_directory.restype = ctypes.c_int
+    environment = dict(os.environ)
+    directory = Path(bundle).resolve()
+    environment['PATH'] = os.pathsep.join(p for p in environment.get('PATH', '').split(os.pathsep)
+        if p and not Path(p).resolve().is_relative_to(directory))
+    with _spawn_lock:
+        if not set_directory(None):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            return subprocess.Popen(args, env=environment, **kwargs)
+        finally:
+            if not set_directory(str(directory)):
+                raise ctypes.WinError(ctypes.get_last_error())
+
+
 def binary(name):
     configured = os.environ.get('BETUN_' + name.upper())
     path = configured or shutil.which(name)
+    if not path and os.environ.get('LOCALAPPDATA'):
+        settings = Path(os.environ['LOCALAPPDATA']) / 'YouCraft/media-tools.json'
+        if settings.is_file():
+            path = json.loads(settings.read_text(encoding='utf-8')).get(name)
     if not path or not Path(path).is_file():
         raise RuntimeError(f"{name} unavailable; install it or set BETUN_{name.upper()} to its executable")
     return str(path)
@@ -27,9 +64,9 @@ def run(args, cancel=lambda: False, timeout=3600):
     # File-backed output prevents pipe deadlocks and unbounded RAM for noisy tools.
     import tempfile
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
-        with subprocess.Popen([str(x) for x in args], stdin=subprocess.DEVNULL,
+        with external_process([str(x) for x in args], stdin=subprocess.DEVNULL,
                               stdout=output, stderr=errors, start_new_session=os.name != 'nt',
-                              creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0) as process:
+                              creationflags=(subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW) if os.name == 'nt' else 0) as process:
             started = time.monotonic()
             try:
                 while process.poll() is None:

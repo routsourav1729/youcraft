@@ -46,3 +46,37 @@ def test_setup_preserves_optional_packs_and_previous_config_on_failure(tmp_path,
     with pytest.raises(ValueError):
         module.main()
     assert output.read_bytes() == saved
+
+
+def test_partial_setup_keeps_speaker_model_usable_without_odia_access(tmp_path, monkeypatch):
+    model = tmp_path/'nemotron'
+    model.mkdir()
+    (tmp_path/'manifest.json').write_text(json.dumps({'nemotron':{'path':str(model),'revision':'pinned'}}))
+    output = tmp_path/'models.json'
+    monkeypatch.setattr('sys.argv', ['setup','--directory',str(tmp_path),'--output',str(output),'--partial'])
+    module.main()
+    assert set(json.loads(output.read_text())) == {'diarize'}
+
+
+def test_running_helper_sees_completed_model_setup_without_restart(tmp_path, monkeypatch):
+    from betun.providers import configuration
+    monkeypatch.delenv('BETUN_MODEL_CONFIG', raising=False)
+    monkeypatch.setenv('LOCALAPPDATA', str(tmp_path))
+    assert configuration() == {}
+    folder = tmp_path/'YouCraft'
+    folder.mkdir()
+    (folder/'models.json').write_text(json.dumps({'diarize':{'revision':'installed-now'}}))
+    assert configuration()['diarize']['revision'] == 'installed-now'
+
+
+def test_media_tools_installed_after_app_start_are_found(tmp_path, monkeypatch):
+    from betun.media import binary
+    monkeypatch.delenv('BETUN_FFMPEG', raising=False)
+    monkeypatch.setenv('LOCALAPPDATA', str(tmp_path))
+    monkeypatch.setattr('betun.media.shutil.which', lambda _: None)
+    folder = tmp_path/'YouCraft'
+    folder.mkdir()
+    executable = tmp_path/'ffmpeg.exe'
+    executable.write_bytes(b'test fixture')
+    (folder/'media-tools.json').write_text(json.dumps({'ffmpeg':str(executable)}))
+    assert binary('ffmpeg') == str(executable)

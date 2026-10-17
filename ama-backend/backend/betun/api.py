@@ -171,7 +171,7 @@ def create_app(root=None, token=None):
 
     @app.get('/health')
     def health():
-        return dict(status='ok', version=__version__, schema_version=1)
+        return dict(status='ok', service='youcraft', protocol_version=1, version=__version__, schema_version=1)
 
     @app.get('/v1/capabilities')
     def capabilities():
@@ -182,7 +182,20 @@ def create_app(root=None, token=None):
                 tools[name] = True
             except RuntimeError:
                 tools[name] = False
-        return dict(media=tools, configured_providers={k: v.get('provider', 'external-command') for k, v in configuration().items()},
+        configured = configuration()
+        installed = {}
+        for task in ('diarize', 'transcribe'):
+            entry = configured.get(task, {})
+            command = entry.get('command', [])
+            if command:
+                installed[task] = bool(isinstance(command, list) and Path(command[0]).is_file())
+            else:
+                model = Path(entry.get('model_path', ''))
+                installed[task] = bool(entry.get('model_path') and model.is_dir()
+                    and (model / 'config.json').is_file() and Path(entry.get('python', '')).is_file())
+        return dict(media=tools, installed_providers=installed,
+                    ready=all(tools.values()) and all(installed.values()),
+                    configured_providers={k: v.get('provider', 'external-command') for k, v in configured.items()},
                     model_status='configured does not mean installed or validated', remote_inference=False)
 
     @app.post('/v1/projects', status_code=201)

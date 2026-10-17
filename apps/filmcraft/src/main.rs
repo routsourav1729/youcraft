@@ -86,7 +86,7 @@ fn main() -> eframe::Result {
             std::process::exit(2);
         }
     };
-    let _local_backend = local_backend::start();
+    let local_backend = local_backend::start();
     let data_root = launch.data_dir.clone().or_else(default_data_dir);
     let log_dir = data_root.as_ref().map(|d| d.join(logging::LOG_DIR));
     log::info!("FilmCraft {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
@@ -126,7 +126,11 @@ fn main() -> eframe::Result {
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
         let app_created = Arc::new(AtomicBool::new(false));
-        let result = eframe::run_native("YouCraft", options, app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created)));
+        let result = eframe::run_native(
+            "YouCraft",
+            options,
+            app_creator(launch.clone(), graphics.clone(), Arc::clone(&app_created), local_backend.as_ref().map(|b| b.connection.clone())),
+        );
         let app_created = app_created.load(Ordering::Relaxed);
         match &result {
             // wgpu reported the failure (no adapter, device creation failed) before the app
@@ -176,7 +180,12 @@ fn native_options(agent: bool) -> eframe::NativeOptions {
 
 /// Creates the app once eframe has its window and graphics device; sets `created` when it runs,
 /// and confirms the graphics mode once two frames have painted.
-fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<AtomicBool>) -> eframe::AppCreator<'static> {
+fn app_creator(
+    launch: Launch,
+    graphics: graphics::GraphicsStart,
+    created: Arc<AtomicBool>,
+    connection: Option<local_backend::Connection>,
+) -> eframe::AppCreator<'static> {
     let Launch { control_port, control_input_only, files, demo, startup_flag, recover, data_dir, graphics: _ } = launch;
     Box::new(move |cc| {
         created.store(true, Ordering::Relaxed);
@@ -219,7 +228,7 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
                     }
                 }
                 None => {
-                    let _ = session.execute("file.openDemoProject", json!({}));
+                    // No recent project: open the guided workflow without demo footage.
                 }
             }
         } else if !startup_flag && session.prefs.general.at_startup == "emptyProject" {
@@ -236,10 +245,15 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
                 Err(e) => log::error!("recovery failed: {e}"),
             }
         }
+        let has_edit = session.active_sequence().is_some() || !media.is_empty();
         let mut app = FilmcraftApp::new(session);
-        if app.workspaces.current.is_empty() {
-            app.set_workspace("Podcast");
+        if let Some(connection) = connection {
+            app.podcast.endpoint = connection.endpoint;
+            app.podcast.token = connection.token;
+            app.podcast.error = connection.error;
+            app.podcast.setup.check_on_start = !has_edit;
         }
+        startup_workspace(&mut app, has_edit);
         app.graphics_notice = notice;
         if recover == Some(false) {
             app.dialog = None;
@@ -331,12 +345,40 @@ fn app_creator(launch: Launch, graphics: graphics::GraphicsStart, created: Arc<A
             app.hooks.menu_changed = Some(update);
             app.ui.show_menu_bar = false;
         }
-        if let Some(port) = control_port {
+        {
+            let port = control_port.unwrap_or(9876);
             let rx = control_server::start(port, cc.egui_ctx.clone());
             app = if control_input_only { app.with_control_input_only(rx) } else { app.with_control(rx) };
         }
         Ok(Box::new(app))
     })
+}
+
+/// Open saved/recovered edits in the native editor, and new episodes in the guide.
+fn startup_workspace(app: &mut FilmcraftApp, has_edit: bool) {
+    app.ui.mode = filmcraft_ui_egui::state::Mode::Edit;
+    app.podcast.assembled = has_edit;
+    if !has_edit {
+        app.set_workspace("Podcast");
+    } else if app.workspaces.current.is_empty() || app.workspaces.current == "Podcast" {
+        app.set_workspace("Editing");
+    }
+}
+
+#[cfg(test)]
+mod startup_tests {
+    #[test]
+    fn existing_sequence_opens_in_editor_and_empty_session_opens_the_guide() {
+        let mut app = super::FilmcraftApp::new(super::Session::default());
+        super::startup_workspace(&mut app, false);
+        assert_eq!(app.ui.workspace, "Podcast");
+        assert!(!app.podcast.assembled);
+        app.session.execute("file.newSequence", serde_json::json!({"name":"Saved edit", "fps":25})).unwrap();
+        let has_edit = app.session.active_sequence().is_some();
+        super::startup_workspace(&mut app, has_edit);
+        assert_eq!(app.ui.workspace, "Editing");
+        assert!(app.podcast.assembled);
+    }
 }
 
 /// Files copied in the file manager, else an image, on the system clipboard (Paste, #611).

@@ -23,6 +23,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         let max = ui.ctx().input(|i| i.viewport().maximized.unwrap_or(false));
         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(!max));
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if app.ui.workspace == "Podcast" && !app.podcast.assembled {
+        p.text(pos2(rect.min.x + 20., rect.center().y), egui::Align2::LEFT_CENTER, "YouCraft · Podcast", Tokens::ui(14.), t.text);
+        return;
+    }
     let mut x = rect.min.x + if app.integrated_titlebar { 104.0 } else { 14.0 };
     // Home
     let home = Rect::from_center_size(pos2(x + 10.0, rect.center().y), vec2(26.0, 26.0));

@@ -9,6 +9,8 @@ independent customized build based on FilmCraft by the ArtCraft team.
 **Development build. Windows execution, the RTX 3050 6 GB target, and the optional
 vision/transliteration model runtimes still need acceptance testing.**
 
+[Download for Windows](https://routsourav1729.github.io/youcraft/)
+
 ## The workflow
 
 Master audio → identify speakers → audition solo samples → lock host/guest →
@@ -18,7 +20,7 @@ export video and edited Odia SRT.
 
 | Reused from FilmCraft | Added for YouCraft |
 | --- | --- |
-| Native timeline, source/program monitors, linked edits and undo | Docked Podcast workspace and guided analysis stages |
+| Native timeline, source/program monitors, linked edits and undo | Guided Podcast workspace and analysis stages |
 | Effects, color tools, audio DSP and mixing | Master-audio sync and ordered camera shards |
 | Source transcript projection through timeline edits | Indic Core text correction, Romanized Odia spelling adapter |
 | Project format, media decoding and export | Speaker camera assembly and reaction review |
@@ -43,12 +45,18 @@ server. Final server export uses this fork's matching CLI and the edited project
 
 ## Local setup and AI control
 
-Run **YouCraft model setup** from Start to install speech models for CPU or NVIDIA.
-Weights and Torch are separate from the installer. See [model setup](ama-backend/docs/models.md).
-Run **YouCraft connect AI** to register your existing Codex or Claude Code client,
-then launch **YouCraft with AI**. The same MCP bridge now controls podcast imports,
-speaker roles, synchronization, correction and assembly as well as native editing.
-See [AI workflow](packaging/ama/AI-WORKFLOW.md). No embedded chat panel is included.
+First launch opens **Models**. Choose **Install · CPU** or **Install · NVIDIA**.
+Setup prepares a local Python runtime, speech dependencies, external media tools
+and pinned Hugging Face model weights. Progress, cancellation, retry and setup
+logs are visible in the app. Odia model access may require accepting its Hugging
+Face terms and supplying a read token. See [model setup](ama-backend/docs/models.md).
+
+**Connect AI** is visible at the top of the workflow. Register **Claude Desktop**,
+**Claude Code**, or **Codex**, restart that client, and use **Copy first prompt**.
+The local MCP bridge starts with YouCraft. It controls podcast imports, speaker
+roles, synchronization, correction, assembly and native edits.
+See [AI workflow](packaging/ama/AI-WORKFLOW.md). Browser connectors and an embedded
+chat panel are not included in this preview.
 
 ## Build on Windows
 

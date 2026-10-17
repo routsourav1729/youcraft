@@ -11,10 +11,14 @@ def main():
     from huggingface_hub import snapshot_download
     parser = argparse.ArgumentParser()
     parser.add_argument('--directory', type=Path, default=Path(__file__).resolve().parents[1] / 'models')
+    parser.add_argument('--pack', choices=[*MODELS, 'all'], default='all')
     args = parser.parse_args()
     args.directory.mkdir(parents=True, exist_ok=True)
-    manifest = {}
+    manifest_path = args.directory / 'manifest.json'
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.exists() else {}
     for name, (repo, revision) in MODELS.items():
+        if args.pack not in ('all', name):
+            continue
         print('Downloading', name, flush=True)
         path = snapshot_download(repo, revision=revision, cache_dir=str(args.directory / 'hf-cache'),
                                  ignore_patterns=['nemo/*', '*.nemo'], max_workers=2)

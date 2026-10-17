@@ -1,19 +1,19 @@
 # YouCraft local editing
 
-Close any open YouCraft window, then open **YouCraft with AI** from Start. Run **Connect AI.cmd** once to register the
-installed Codex or Claude Code client. Sign into that client's own account. MCP
-is the local control connection, not a model or a separate hosted editing service.
-The client handles AI login and usage; YouCraft does not collect those credentials.
-AI reasoning is online; processing and source media remain on this computer.
-Any transcript, screenshot or tool result requested by the AI is visible to that
-AI service. Do not request unnecessary media or transcript content.
+Open YouCraft and choose **Connect AI** at the top of the workflow. Select your
+installed **Claude Desktop**, **Claude Code**, or **Codex** client. Sign into that
+client with your existing account, restart it after registration, and keep YouCraft
+open. The local control connection starts with the app; no special launch shortcut
+or source-code search is needed. **Copy first prompt** supplies a starting prompt.
 
-Example prompt: “Read AI-WORKFLOW.md in my YouCraft installation. Import the test
-master, identify speakers, let me choose the host, then sync the two cameras.
-Explain each choice briefly. Save a new project before editing.”
+MCP lets the AI call YouCraft's editing tools. It is not an AI model. The client
+handles login and usage; YouCraft does not collect those account credentials.
+AI reasoning is online. Media processing stays on your computer; requested tool
+results, transcript text and screenshots are visible to the AI service.
 
-This connects the existing external AI client. There is no embedded chat panel.
-A plain browser conversation does not automatically gain access to local files.
+Browser chat cannot use this stdio connection directly. A browser connector or
+secure tunnel is separate work and is not included in this preview. Codex supports
+sign-in with your ChatGPT account. There is no embedded subscription-login chat.
 
 ## Tools for the AI
 
@@ -27,7 +27,7 @@ supported actions, without the helper authentication token.
    (`auto`, `cpu`, `cuda`) and `project_id`. To load an existing project, set
    project_id then call refresh before another operation.
 2. `podcast.action` with `{"action":"create"}` creates and imports master audio.
-   Then action `diarize`; poll inspect until `busy` is false; always check `error`.
+   Speaker identification follows automatically; poll inspect until `busy` is false; always check `error`.
    A queued response is not job completion. Stop on an error, explain it.
 3. Action `samples` gets long speaker examples. Action `sample` with
    `options:{start,end}` plays a sample in the existing Source monitor.

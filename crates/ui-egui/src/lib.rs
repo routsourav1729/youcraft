@@ -53,6 +53,8 @@ pub mod perf;
 pub mod play_ahead;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod podcast;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod podcast_setup;
 mod rtl;
 pub mod scrub;
 mod shuttle;
@@ -1402,6 +1404,11 @@ impl FilmcraftApp {
                 paths.push(p.to_string_lossy().to_string());
             }
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        if !paths.is_empty() && self.ui.workspace == "Podcast" && !self.podcast.assembled {
+            self.podcast.add_files(paths);
+            return;
+        }
         if !paths.is_empty() {
             let pointer = self.drop_pointer(ctx);
             let imported = self.session.execute("file.import", json!({"paths": paths, "bin": self.import_bin().0}));
@@ -1791,7 +1798,18 @@ impl FilmcraftApp {
         let status_h = if self.ui.show_status_bar { 20.0 } else { 0.0 };
         let body = egui::Rect::from_min_max(egui::pos2(full.min.x + 1.0, header.max.y + 1.0), egui::pos2(full.max.x - 1.0, full.max.y - status_h - 2.0));
         match self.ui.mode {
-            state::Mode::Edit => self.dock_area(ui, body),
+            state::Mode::Edit => {
+                #[cfg(not(target_arch = "wasm32"))]
+                if self.ui.workspace == "Podcast" && !self.podcast.assembled {
+                    let width = body.width().min(960.);
+                    let centered = egui::Rect::from_center_size(body.center(), egui::vec2(width, body.height()));
+                    crate::podcast::show(self, ui, centered);
+                } else {
+                    self.dock_area(ui, body);
+                }
+                #[cfg(target_arch = "wasm32")]
+                self.dock_area(ui, body);
+            }
             state::Mode::Import => panels::import_mode::show(self, ui, body),
             state::Mode::Export => panels::export_mode::show(self, ui, body),
         }

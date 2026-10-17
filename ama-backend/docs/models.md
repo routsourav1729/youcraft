@@ -1,18 +1,24 @@
 # Windows quick setup
 
-Install YouCraft, then run **YouCraft model setup** from Start. Install Python
-3.11 x64 with the Python launcher first. Choose CPU for a laptop without NVIDIA;
-choose NVIDIA for the RTX 3050. The helper creates a separate runtime and downloads
-pinned Nemotron diarization and Indic Transcribe Core weights under
-`%LOCALAPPDATA%\YouCraft`. It writes `models.json` where the app reads it.
-Restart YouCraft after setup. Model packs and Torch require several GB beyond the
-small installer (about 5 GiB of pinned speech weights, plus the runtime). Downloads happen explicitly during setup; inference is offline.
+Open **Models** in YouCraft. On first launch the setup page opens automatically.
+Choose **Install · CPU** for a CPU laptop or **Install · NVIDIA** for the RTX 3050.
+Setup checks Python 3.11 x64, downloads the signed official installer if needed,
+creates an isolated speech runtime, installs the pinned PyTorch and Transformers
+build, and verifies imports and GPU availability. FFmpeg/ffprobe are installed
+externally through Windows Package Manager when absent; they are not bundled.
+Missing Windows App Installer is reported as an actionable setup error.
 
-Indic Core requires accepting its Hugging Face access conditions and logging in
-with your own account. The helper prompts for login using the official HF client.
-It does not log or bundle credentials. Install external FFmpeg/ffprobe and add their
-bin folder to PATH; these are not shipped in YouCraft. CPU and NVIDIA runtimes use
-separate folders. A failed setup does not replace the working model configuration.
+The pinned Nemotron and Indic Core packs download from Hugging Face into
+`%LOCALAPPDATA%\YouCraft`. Several GB beyond the small installer are required.
+Setup progress, cancellation, retry, and **Setup log** are available in the app.
+The app reads the completed configuration without a restart. Inference is offline.
+
+The Odia model may require accepting its Hugging Face access conditions. Open
+**Odia model access**, grant access with your own account, and enter a read token
+in the setup page if needed. The token is passed only to that setup process,
+cleared from the UI, and excluded from workflow saves and MCP inspection.
+If Odia download fails, the already installed speaker model remains configured.
+CPU and NVIDIA runtimes use separate folders. Retries reuse cached downloads.
 
 Start with `cpu-smoke-60s/master.wav`. MP3, WAV and camera audio from MP4/MOV are
 converted internally to 16 kHz mono PCM WAV for speech models. Video containers
