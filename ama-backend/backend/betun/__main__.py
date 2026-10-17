@@ -9,7 +9,17 @@ def main():
     parser.add_argument('--data-dir', help='Writable project/cache directory outside executable')
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--open', action='store_true', help='Open the local review UI in your browser')
+    parser.add_argument('--check-mcp', help='Check the installed MCP executable and exit')
+    parser.add_argument('--tools-only', action='store_true', help='Check MCP without an open editor')
     args = parser.parse_args()
+    if args.check_mcp:
+        import json
+        from betun.mcp_check import check
+        try:
+            print(json.dumps(check(args.check_mcp, args.tools_only)))
+        except Exception as error:
+            parser.exit(1, f'{error}\n')
+        return
     if args.data_dir:
         os.environ['BETUN_DATA_DIR'] = args.data_dir
     import uvicorn

@@ -48,6 +48,17 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count) { throw ($errors | Out-String) }
           }
+      - name: MCP preflight before compilation
+        shell: pwsh
+        run: |
+          $baseline = Join-Path $env:RUNNER_TEMP 'youcraft-baseline.exe'
+          Invoke-WebRequest 'https://github.com/routsourav1729/youcraft/releases/download/v0.1.2-preview.1/YouCraft-Setup-x64.exe' -OutFile $baseline
+          if ((Get-FileHash $baseline -Algorithm SHA256).Hash.ToLowerInvariant() -ne '9fc1896a8fdce6cd74d9a0b807fd9070bf72a02ef73c8b9ae8c1498f02ee2f79') { throw 'Baseline checksum mismatch' }
+          $folder = Join-Path $env:RUNNER_TEMP 'youcraft-baseline'
+          $setup = Start-Process $baseline -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$folder`"") -PassThru -Wait
+          if ($setup.ExitCode -ne 0) { throw 'Baseline install failed' }
+          & ama-backend/dist/BetunBackend/BetunBackend.exe --check-mcp "$folder/filmcraft-cli.exe" --tools-only
+          if ($LASTEXITCODE -ne 0) { throw 'MCP preflight failed before compilation' }
       - name: First-run setup and AI registration
         shell: pwsh
         run: |
@@ -76,6 +87,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          cache-workspace-crates: true
       - name: Build editor and MCP CLI
         run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
       - name: Assemble application
@@ -179,6 +191,7 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'MCP could not inspect the installed editor podcast workflow' }
           } finally { if (-not $editor.HasExited) { taskkill /PID $editor.Id /T /F | Out-Null } }
       - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('release/YouCraft-Setup-x64.exe') != ''
         with:
           name: YouCraft-Windows
           path: release/YouCraft-Setup-x64.exe
