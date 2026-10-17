@@ -53,10 +53,10 @@ try {
     & $python -m pip install 'https://github.com/huggingface/transformers/archive/536ecc007387a50e77603bb5d92100e9b07514cc.zip' soundfile sentencepiece librosa einops
     CheckExit 'Speech dependencies failed to install.'
     Report 'Checking speech runtime'
-    & $python -c 'import torch, torchaudio, soundfile; from transformers import AutoModelForAudioFrameClassification, AutoProcessor; print("CUDA available:", torch.cuda.is_available())'
+    & $python -c 'import torch, torchaudio, soundfile; from transformers import AutoModelForAudioFrameClassification, AutoProcessor; print(torch.cuda.is_available())'
     CheckExit 'Speech runtime check failed.'
     if ($Mode -eq 'nvidia') {
-        & $python -c 'import torch; assert torch.cuda.is_available(), "NVIDIA driver unavailable; update it or select CPU"'
+        & $python -c 'import torch; assert torch.cuda.is_available()'
         CheckExit 'NVIDIA GPU unavailable. Update its driver or choose CPU setup.'
     }
     if ($RuntimeOnly) { Report 'Runtime ready' 'succeeded'; exit 0 }
