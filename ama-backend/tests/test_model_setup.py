@@ -80,3 +80,6 @@ def test_media_tools_installed_after_app_start_are_found(tmp_path, monkeypatch):
     executable.write_bytes(b'test fixture')
     (folder/'media-tools.json').write_text(json.dumps({'ffmpeg':str(executable)}))
     assert binary('ffmpeg') == str(executable)
+    # A stale system FFmpeg must not override the application's verified copy.
+    monkeypatch.setattr('betun.media.shutil.which', lambda _: '/stale/system/ffmpeg')
+    assert binary('ffmpeg') == str(executable)

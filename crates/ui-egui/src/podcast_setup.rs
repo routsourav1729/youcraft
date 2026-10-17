@@ -106,8 +106,9 @@ fn launch(script: &str, option: &str, value: &str, token: &str) -> Result<Task, 
     }
     let root = std::env::var_os("LOCALAPPDATA").map(PathBuf::from).ok_or("Windows app data folder missing")?.join("YouCraft");
     std::fs::create_dir_all(&root).map_err(|e| e.to_string())?;
-    let status = root.join("setup-status.json");
-    let log = root.join("setup.log");
+    let is_model = script.file_name().is_some_and(|name| name == "Setup-models.ps1");
+    let status = root.join(if is_model { "setup-status.json" } else { "ai-status.json" });
+    let log = root.join(if is_model { "setup.log" } else { "ai-setup.log" });
     let _ = std::fs::remove_file(&status);
     let mut command = Command::new("powershell.exe");
     command
@@ -163,6 +164,10 @@ fn spawn(mut command: Command, status: PathBuf, log: &Path) -> Result<Task, Stri
         let _ = tx.send(result);
     });
     Ok(Task { result: rx, stop, status })
+}
+
+pub fn log_path() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_default().join("YouCraft/setup.log")
 }
 
 #[cfg(test)]

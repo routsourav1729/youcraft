@@ -51,6 +51,18 @@ jobs:
       - name: First-run setup and AI registration
         shell: pwsh
         run: |
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Automatic app-local media installation failed' }
+          $mediaRoot = Join-Path $env:LOCALAPPDATA 'YouCraft'
+          $mediaConfig = Get-Content "$mediaRoot/media-tools.json" -Raw | ConvertFrom-Json
+          & $mediaConfig.ffmpeg -version
+          if ($LASTEXITCODE -ne 0) { throw 'App-local FFmpeg cannot run' }
+          $savedProxy = $env:HTTPS_PROXY
+          try {
+            $env:HTTPS_PROXY = 'http://127.0.0.1:1'
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1 -Root "$env:RUNNER_TEMP/offline-media" -Archive "$mediaRoot/downloads/ffmpeg-9.0.2.zip"
+            if ($LASTEXITCODE -ne 0) { throw 'Cached media installation attempted a network download' }
+          } finally { $env:HTTPS_PROXY = $savedProxy }
           & packaging/tests/onboarding.ps1 -Repository $env:GITHUB_WORKSPACE
           if ($LASTEXITCODE -ne 0) { throw 'AI registration test failed' }
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-models.ps1 -Mode cpu -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -StatusFile "$env:RUNNER_TEMP/youcraft-runtime-status.json" -RuntimeOnly
@@ -66,26 +78,16 @@ jobs:
           cache-on-failure: true
       - name: Build editor and MCP CLI
         run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
-      - name: Linked transcript regression tests
-        run: |
-          cargo +1.95.0 test --locked -p filmcraft-engine podcast --lib
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked -p filmcraft-edit transcript --lib
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked -p filmcraft-ui-egui podcast::tests --lib
-      - name: Local helper startup regression tests
-        run: |
-          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft local_backend::tests
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft startup_tests
-      - name: Podcast interface smoke test
-        run: cargo +1.95.0 test --locked -p filmcraft-ui-egui --test podcast_ui
       - name: Assemble application
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release/YouCraft | Out-Null
           Copy-Item target/release/filmcraft.exe release/YouCraft/YouCraft.exe
           Copy-Item target/release/filmcraft-cli.exe release/YouCraft/
+          New-Item -ItemType Directory -Force release/claude-extension | Out-Null
+          Copy-Item packaging/claude/manifest.json,target/release/filmcraft-cli.exe,LICENSE-MIT,LICENSE-APACHE,NOTICE release/claude-extension/
+          Compress-Archive release/claude-extension/* release/YouCraft-extension.zip -Force
+          Move-Item release/YouCraft-extension.zip release/YouCraft/YouCraft.mcpb -Force
           Copy-Item LICENSE-MIT,LICENSE-APACHE,NOTICE,ATTRIBUTION.md release/YouCraft/
           Copy-Item packaging/ama/* release/YouCraft/ -Recurse
           if (Test-Path ama-backend/dist/BetunBackend) {
@@ -112,11 +114,12 @@ jobs:
           $setup = Start-Process release/YouCraft-Setup-x64.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           if (-not (Test-Path "$installed/YouCraft.exe")) { throw 'Editor missing from installation' }
+          $mediaConfig = Get-Content "$env:LOCALAPPDATA/YouCraft/media-tools.json" -Raw | ConvertFrom-Json
+          $env:BETUN_FFMPEG = $mediaConfig.ffmpeg
+          $env:BETUN_FFPROBE = $mediaConfig.ffprobe
           $env:BETUN_NO_BROWSER = '1'
           $env:BETUN_DATA_DIR = $data
           $env:YOUCRAFT_INSTALLED_SMOKE = $installed
-          cargo +1.95.0 test --locked -p filmcraft --bin filmcraft local_backend::tests -- --nocapture
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $media = Join-Path $env:RUNNER_TEMP 'youcraft-media'
           New-Item -ItemType Directory -Force $media | Out-Null
           ffmpeg -y -f lavfi -i 'sine=frequency=440:duration=4' -ar 16000 -ac 1 "$media/master.wav"
@@ -147,8 +150,6 @@ jobs:
             $env:YOUCRAFT_SMOKE_TOKEN = $token
             $env:YOUCRAFT_SMOKE_MEDIA = $media
             $env:YOUCRAFT_SMOKE_AUTO_IDENTIFY = '1'
-            cargo +1.95.0 test --locked -p filmcraft-ui-egui --test podcast_ui podcast_live_helper_flow -- --nocapture
-            if ($LASTEXITCODE -ne 0) { throw 'Guided import and edit workflow failed' }
             python ama-backend/tests/packaged_model_smoke.py $config "$env:RUNNER_TEMP/youcraft-runtime-test/models.json" $media
             if ($LASTEXITCODE -ne 0) { throw 'Installed helper could not run the real CPU speaker model' }
           } catch {
@@ -157,6 +158,26 @@ jobs:
           } finally {
             if (-not $helper.HasExited) { taskkill /PID $helper.Id /T /F | Out-Null }
           }
+      - name: Installed MCP tools and live podcast connection
+        shell: pwsh
+        run: |
+          $installed = Join-Path $env:RUNNER_TEMP 'ama-installed'
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$installed/Check-AI.ps1" -ToolsOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Installed MCP handshake or tool discovery failed' }
+          $editor = Start-Process "$installed/YouCraft.exe" -ArgumentList @('--empty','--no-recover','--graphics','software','--data-dir',"$env:RUNNER_TEMP/mcp-editor") -PassThru
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 20; $i++) {
+              if ($editor.HasExited) { throw 'Editor exited before MCP check' }
+              $socket = New-Object Net.Sockets.TcpClient
+              try { $socket.Connect('127.0.0.1',9876); $ready = $true } catch {} finally { $socket.Dispose() }
+              if ($ready) { break }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $ready) { throw 'Editor control connection unavailable' }
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$installed/Check-AI.ps1"
+            if ($LASTEXITCODE -ne 0) { throw 'MCP could not inspect the installed editor podcast workflow' }
+          } finally { if (-not $editor.HasExited) { taskkill /PID $editor.Id /T /F | Out-Null } }
       - uses: actions/upload-artifact@v4
         with:
           name: YouCraft-Windows

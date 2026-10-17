@@ -15,6 +15,8 @@ type Reply = Result<Value, String>;
 pub struct State {
     #[serde(skip)]
     pub setup: crate::podcast_setup::State,
+    #[serde(skip)]
+    pub ai_setup: crate::podcast_setup::State,
     pub endpoint: String,
     #[serde(skip)]
     pub token: String,
@@ -67,6 +69,7 @@ impl Default for State {
     fn default() -> Self {
         Self {
             setup: Default::default(),
+            ai_setup: Default::default(),
             endpoint: "http://127.0.0.1:8765".into(),
             token: String::new(),
             remote: false,
@@ -701,6 +704,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
             let mut updated: State = serde_json::from_value(state).map_err(|e| e.to_string())?;
             updated.token = s.token.clone();
             updated.setup = std::mem::take(&mut s.setup);
+            updated.ai_setup = std::mem::take(&mut s.ai_setup);
             updated.error.clear();
             *s = updated;
         }
@@ -805,6 +809,7 @@ pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
     }
     poll(app, &mut s);
     let setup_finished = s.setup.poll();
+    s.ai_setup.poll();
     let initial_setup = std::mem::take(&mut s.setup.check_on_start);
     if initial_setup {
         s.setup.advance_on_ready = true;
@@ -818,7 +823,7 @@ pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
             c.get("/v1/capabilities")
         });
     }
-    if s.busy() || s.setup.busy() {
+    if s.busy() || s.setup.busy() || s.ai_setup.busy() {
         ctx.request_repaint_after(Duration::from_millis(100));
     }
     app.podcast = s;
@@ -864,6 +869,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.horizontal(|ui| {
             ui.spinner();
             ui.label(&s.setup.stage);
+            if button(app, ui, "live_setup_log", "Setup log") {
+                open_path(app, &mut s, &crate::podcast_setup::log_path());
+            }
             if button(app, ui, "cancel_setup", "Cancel setup") {
                 s.setup.cancel();
             }
@@ -939,28 +947,51 @@ fn open_path(app: &mut FilmcraftApp, s: &mut State, path: &Path) {
 fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.group(|ui| {
         ui.strong("Connect AI");
-        ui.label("Choose your installed client. Sign in there with your existing account.");
-        ui.add_enabled_ui(!s.setup.busy(), |ui| {
+        ui.label("Claude Desktop: install the extension, then enable YouCraft in your chat.");
+        ui.add_enabled_ui(!s.ai_setup.busy(), |ui| {
             ui.horizontal_wrapped(|ui| {
-                for (id, label) in [("desktop", "Claude Desktop"), ("claude", "Claude Code"), ("codex", "Codex")] {
-                    if button(app, ui, &format!("ai.{id}"), label) {
-                        s.setup.start("Connect-AI.ps1", "-Client", id);
+                if button(app, ui, "ai.desktop", "Claude Desktop") {
+                    match std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("YouCraft.mcpb"))) {
+                        Some(path) if path.is_file() => open_path(app, s, &path),
+                        _ => s.ai_setup.error = "Claude extension missing. Reinstall YouCraft.".into(),
                     }
+                }
+                for (id, label) in [("claude", "Claude Code CLI"), ("codex", "Codex CLI")] {
+                    if button(app, ui, &format!("ai.{id}"), label) {
+                        s.ai_setup.start("Connect-AI.ps1", "-Client", id);
+                    }
+                }
+                if button(app, ui, "ai.check", "Check tools") {
+                    s.ai_setup.start("Check-AI.ps1", "-Client", "desktop");
                 }
             });
         });
-        if !s.setup.stage.is_empty() {
-            ui.label(&s.setup.stage);
-        }
-        ui.label("Restart the client after connecting. Keep YouCraft open.");
+        if s.ai_setup.busy() { ui.spinner(); }
+        if !s.ai_setup.stage.is_empty() { ui.label(&s.ai_setup.stage); }
+        if !s.ai_setup.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &s.ai_setup.error); }
+        ui.label("Keep YouCraft open. Claude chat: + > Connectors > YouCraft.");
+        ui.collapsing("Connection help", |ui| {
+            ui.label("If the extension does not open: Claude Settings > Extensions > Advanced settings > Install Extension.");
+            if button(app, ui, "ai.folder", "Extension folder")
+                && let Ok(path) = std::env::current_exe()
+                && let Some(folder) = path.parent()
+            {
+                open_path(app, s, folder);
+            }
+            ui.label("Check tools verifies the local app connection; Claude must still enable the extension.");
+            ui.label("Browser chats cannot use this local extension.");
+            if button(app, ui, "ai.log", "AI log") {
+                let path = crate::podcast_setup::log_path().with_file_name("ai-setup.log");
+                open_path(app, s, &path);
+            }
+        });
         if button(app, ui, "ai_prompt", "Copy first prompt") {
-            ui.ctx().copy_text("Use the youcraft MCP tools. Inspect the current podcast workflow, explain the next step, and help me edit this episode. Ask me to choose the host before assigning cameras. Save before editing.".into());
+            ui.ctx().copy_text("Use the enabled YouCraft tools. Call ui_control with method podcast.inspect and params {}. Explain the current step. If ui_control is unavailable, stop and tell me to enable the YouCraft desktop extension in this chat; do not search the connector directory. Ask me to choose the host before assigning cameras. Save before editing.".into());
             s.status = "Prompt copied".into();
         }
-        ui.label("Browser chat needs a separate connection; it cannot use this local link directly.");
-        ui.hyperlink_to("Client connection help", "https://github.com/routsourav1729/youcraft/blob/ama-bartalap/packaging/ama/AI-WORKFLOW.md");
     });
 }
+
 fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Set up models");
     ui.label("Local processing · CPU or NVIDIA");
@@ -1031,6 +1062,7 @@ fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 Ok(mut restored) => {
                     restored.token = s.token.clone();
                     restored.setup = std::mem::take(&mut s.setup);
+                    restored.ai_setup = std::mem::take(&mut s.ai_setup);
                     if !s.remote && !restored.remote {
                         restored.endpoint = s.endpoint.clone();
                     }

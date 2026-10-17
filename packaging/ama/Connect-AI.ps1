@@ -28,7 +28,7 @@ try {
         Move-Item "$path.tmp" $path -Force
         Report 'Registered. Restart Claude Desktop.' 'succeeded'
     } else {
-        if (-not (Get-Command $Client -ErrorAction SilentlyContinue)) { throw "$Client is not installed. Install and sign into that client, then retry." }
+        if (-not (Get-Command $Client -ErrorAction SilentlyContinue)) { throw "$Client CLI command was not found. For the Claude Desktop app, use the Claude Desktop extension button instead." }
         if ($Client -eq 'codex') {
             & codex mcp add youcraft -- $cli mcp --bridge 127.0.0.1:9876
         } else {

@@ -1,0 +1,19 @@
+{
+  "manifest_version": "0.3",
+  "name": "youcraft",
+  "display_name": "YouCraft",
+  "version": "0.1.3",
+  "description": "Inspect and edit the podcast open in YouCraft. Keep YouCraft running.",
+  "author": {"name": "YouCraft contributors"},
+  "server": {
+    "type": "binary",
+    "entry_point": "filmcraft-cli.exe",
+    "mcp_config": {
+      "command": "${__dirname}/filmcraft-cli.exe",
+      "args": ["mcp", "--bridge", "127.0.0.1:9876"]
+    }
+  },
+  "tools_generated": true,
+  "compatibility": {"platforms": ["win32"]},
+  "license": "MIT OR Apache-2.0"
+}

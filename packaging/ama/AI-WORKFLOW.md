@@ -1,10 +1,23 @@
 # YouCraft local editing
 
-Open YouCraft and choose **Connect AI** at the top of the workflow. Select your
-installed **Claude Desktop**, **Claude Code**, or **Codex** client. Sign into that
-client with your existing account, restart it after registration, and keep YouCraft
-open. The local control connection starts with the app; no special launch shortcut
-or source-code search is needed. **Copy first prompt** supplies a starting prompt.
+Open YouCraft and choose **Connect AI**. **Claude Desktop** opens the included
+`YouCraft.mcpb` extension. Approve its installation in Claude. If Windows does not
+open it, use Claude Settings > Extensions > Advanced settings > Install Extension,
+and select `YouCraft.mcpb` in the YouCraft installation folder. The app's
+**Connection help > Extension folder** opens that folder.
+
+In a Claude chat, use **+ > Connectors > YouCraft** to enable the tools. Restart
+Claude completely if the new extension is not listed. YouCraft is a private local
+extension; searching the public connector directory will not find it.
+
+**Check tools** verifies MCP initialization, tool discovery and `podcast.inspect`
+against the running YouCraft app. It does not claim that Claude enabled the tools
+in your current chat. **Copy first prompt** supplies the exact tool call.
+
+Claude Code and Codex buttons register the command with those installed clients.
+Sign in through the client. AI setup works independently while model setup runs.
+Keep YouCraft open while using its tools. No server URL is needed for this local
+extension.
 
 MCP lets the AI call YouCraft's editing tools. It is not an AI model. The client
 handles login and usage; YouCraft does not collect those account credentials.

@@ -601,7 +601,7 @@ fn cache_hints(context: &rmcp::service::RequestContext<rmcp::RoleServer>, ttl_ms
 impl ServerHandler for FilmcraftMcp {
     fn get_info(&self) -> rmcp::model::ServerConfig {
         rmcp::model::ServerConfig::new(rmcp::model::ServerCapabilities::builder().enable_tools().enable_resources().build())
-            .with_server_info(rmcp::model::Implementation::new("filmcraft", env!("CARGO_PKG_VERSION")))
+            .with_server_info(rmcp::model::Implementation::new("youcraft", env!("CARGO_PKG_VERSION")))
             .with_instructions(INSTRUCTIONS.to_string())
     }
 
@@ -784,7 +784,7 @@ mod tests {
     async fn tools_are_titled_and_annotated() {
         let mut c = Client::start(demo());
         let init = c.init().await;
-        assert_eq!(init["result"]["serverInfo"]["name"], "filmcraft");
+        assert_eq!(init["result"]["serverInfo"]["name"], "youcraft");
         let tools = c.ask(json!({"jsonrpc":"2.0","id":1,"method":"tools/list"})).await["result"]["tools"].as_array().cloned().unwrap();
         for t in &tools {
             assert!(t["title"].is_string(), "{} has no title", t["name"]);

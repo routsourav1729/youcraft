@@ -46,13 +46,15 @@ server. Final server export uses this fork's matching CLI and the edited project
 ## Local setup and AI control
 
 First launch opens **Models**. Choose **Install · CPU** or **Install · NVIDIA**.
-Setup prepares a local Python runtime, speech dependencies, external media tools
-and pinned Hugging Face model weights. Progress, cancellation, retry and setup
+Setup installs checksum-verified media tools in the app data folder without winget
+or PATH edits, then prepares Python, speech dependencies and pinned model weights. Progress, cancellation, retry and setup
 logs are visible in the app. Odia model access may require accepting its Hugging
 Face terms and supplying a read token. See [model setup](ama-backend/docs/models.md).
 
-**Connect AI** is visible at the top of the workflow. Register **Claude Desktop**,
-**Claude Code**, or **Codex**, restart that client, and use **Copy first prompt**.
+**Connect AI** is visible at the top of the workflow. **Claude Desktop** opens the
+included desktop extension: approve installation, then enable YouCraft in your
+chat. **Check tools** tests MCP discovery and the running editor connection.
+Claude Code and Codex register with their installed clients. Use **Copy first prompt**.
 The local MCP bridge starts with YouCraft. It controls podcast imports, speaker
 roles, synchronization, correction, assembly and native edits.
 See [AI workflow](packaging/ama/AI-WORKFLOW.md). Browser connectors and an embedded

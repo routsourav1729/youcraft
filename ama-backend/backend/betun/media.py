@@ -50,11 +50,14 @@ def external_process(args, **kwargs):
 
 def binary(name):
     configured = os.environ.get('BETUN_' + name.upper())
-    path = configured or shutil.which(name)
+    path = configured
     if not path and os.environ.get('LOCALAPPDATA'):
         settings = Path(os.environ['LOCALAPPDATA']) / 'YouCraft/media-tools.json'
         if settings.is_file():
-            path = json.loads(settings.read_text(encoding='utf-8')).get(name)
+            candidate = json.loads(settings.read_text(encoding='utf-8')).get(name)
+            if candidate and Path(candidate).is_file():
+                path = candidate
+    path = path or shutil.which(name)
     if not path or not Path(path).is_file():
         raise RuntimeError(f"{name} unavailable; install it or set BETUN_{name.upper()} to its executable")
     return str(path)

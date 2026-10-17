@@ -17,6 +17,11 @@ function Report([string]$Stage, [string]$State = 'running', [string]$Problem = '
 }
 function CheckExit([string]$Message) { if ($LASTEXITCODE -ne 0) { throw $Message } }
 try {
+    if (-not $RuntimeOnly) {
+        Report 'Preparing media tools'
+        & "$ScriptsDirectory/Setup-media.ps1" -Root $Root -StatusFile $StatusFile
+        CheckExit 'Media setup failed. Open Setup log for details.'
+    }
     Report 'Preparing Python'
     $basePython = Join-Path $Root 'python311/python.exe'
     if (-not (Test-Path $basePython)) {
@@ -60,24 +65,6 @@ try {
         CheckExit 'NVIDIA GPU unavailable. Update its driver or choose CPU setup.'
     }
     if ($RuntimeOnly) { Report 'Runtime ready' 'succeeded'; exit 0 }
-    Report 'Checking media tools'
-    $ffmpeg = (Get-Command ffmpeg -ErrorAction SilentlyContinue).Source
-    $ffprobe = (Get-Command ffprobe -ErrorAction SilentlyContinue).Source
-    if (-not $ffmpeg -or -not $ffprobe) {
-        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Windows App Installer is missing. Install it from Microsoft Store, then retry setup.' }
-        Report 'Installing media tools'
-        & winget install --id Gyan.FFmpeg --exact --silent --accept-source-agreements --accept-package-agreements --disable-interactivity
-        CheckExit 'Media tool installation failed. See setup.log for the installer error.'
-        $packages = Join-Path $env:LOCALAPPDATA 'Microsoft/WinGet/Packages'
-        $ffmpeg = Get-ChildItem "$packages/Gyan.FFmpeg*" -Recurse -Filter ffmpeg.exe | Select-Object -First 1 -ExpandProperty FullName
-        $ffprobe = Get-ChildItem "$packages/Gyan.FFmpeg*" -Recurse -Filter ffprobe.exe | Select-Object -First 1 -ExpandProperty FullName
-        if (-not $ffmpeg -or -not $ffprobe) { throw 'Media tools were installed but could not be found. Restart Windows and retry setup.' }
-    }
-    & $ffmpeg -version
-    CheckExit 'FFmpeg cannot run.'
-    & $ffprobe -version
-    CheckExit 'ffprobe cannot run.'
-    [IO.File]::WriteAllText((Join-Path $Root 'media-tools.json'), (@{ffmpeg=$ffmpeg;ffprobe=$ffprobe} | ConvertTo-Json), (New-Object Text.UTF8Encoding($false)))
     $models = Join-Path $Root 'models'
     $device = if ($Mode -eq 'nvidia') { 'auto' } else { 'cpu' }
     foreach ($pack in @('nemotron','indic-core')) {
