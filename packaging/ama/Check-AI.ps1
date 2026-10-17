@@ -26,16 +26,21 @@ try {
     if (-not $process.Start()) { throw 'Cannot start MCP executable.' }
     $started = $true
     $errors = $process.StandardError.ReadToEndAsync()
+    function Send($Message) {
+        # Write BOM-free UTF-8 directly: Windows console encodings can add a preamble.
+        $bytes = [Text.Encoding]::UTF8.GetBytes($Message + "`n")
+        $process.StandardInput.BaseStream.Write($bytes, 0, $bytes.Length)
+        $process.StandardInput.BaseStream.Flush()
+    }
     function Ask($Id, $Method, $Params) {
-        $process.StandardInput.WriteLine((@{jsonrpc='2.0';id=$Id;method=$Method;params=$Params} | ConvertTo-Json -Depth 20 -Compress))
-        $process.StandardInput.Flush()
+        Send (@{jsonrpc='2.0';id=$Id;method=$Method;params=$Params} | ConvertTo-Json -Depth 20 -Compress)
         for ($i=0; $i -lt 30; $i++) {
             $line = $process.StandardOutput.ReadLineAsync()
             if (-not $line.Wait(15000)) { throw "MCP did not answer $Method. Keep YouCraft open and retry." }
             if ($null -eq $line.Result) { throw 'MCP executable stopped before replying.' }
             $reply = $line.Result | ConvertFrom-Json
+            if ($reply.error) { throw ($reply.error | ConvertTo-Json -Compress) }
             if ($reply.id -eq $Id) {
-                if ($reply.error) { throw ($reply.error | ConvertTo-Json -Compress) }
                 return $reply.result
             }
         }
@@ -43,8 +48,7 @@ try {
     }
     $hello = Ask 1 'initialize' @{protocolVersion='2025-03-26';capabilities=@{};clientInfo=@{name='youcraft-check';version='0.1.3'}}
     if (-not $hello.serverInfo.name) { throw 'MCP initialization failed.' }
-    $process.StandardInput.WriteLine('{"jsonrpc":"2.0","method":"notifications/initialized"}')
-    $process.StandardInput.Flush()
+    Send '{"jsonrpc":"2.0","method":"notifications/initialized"}'
     $tools = Ask 2 'tools/list' @{}
     if ('ui_control' -notin $tools.tools.name) { throw 'Podcast control tool is missing.' }
     if (-not $ToolsOnly) {
