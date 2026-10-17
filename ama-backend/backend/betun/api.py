@@ -105,7 +105,7 @@ def create_app(root=None, token=None):
                 fd = os.open(token_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(fd, 'w') as f:
                     f.write(secrets.token_urlsafe(32))
-            token = token_path.read_text().strip()
+            token = token_path.read_text(encoding='utf-8').strip()
     if not token or len(token) < 16:
         raise ValueError('API token must have at least 16 characters')
     queue = Queue(store)
@@ -275,7 +275,7 @@ def create_app(root=None, token=None):
         path = store.directory(pid) / 'baseline.json'
         if not path.is_file():
             raise KeyError('baseline')
-        return Project.model_validate_json(path.read_text())
+        return Project.model_validate_json(path.read_text(encoding='utf-8'))
 
     @app.get('/v1/projects/{pid}/speaker-samples')
     def samples(pid: str):

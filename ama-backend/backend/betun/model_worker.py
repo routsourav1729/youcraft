@@ -14,7 +14,7 @@ def main(request_path, result_path):
     os.environ.setdefault('MKL_NUM_THREADS', '4')
     os.environ.setdefault('HF_HUB_OFFLINE', '1')
     os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
-    request = json.loads(Path(request_path).read_text())
+    request = json.loads(Path(request_path).read_text(encoding='utf-8'))
     config, payload, task = request['config'], request['payload'], request['task']
     provider = config['provider']
     model = Path(config.get('model_path', '.')).resolve()
@@ -94,7 +94,7 @@ def main(request_path, result_path):
         if not (model / 'transformer' / 'indicxlit.pt').is_file():
             raise ValueError('IndicXlit model_path must contain transformer/indicxlit.pt and corpus-bin')
         engine = XlitEngineTransformer_En2Indic.__new__(XlitEngineTransformer_En2Indic)
-        engine._all_supported_langs = set((model.parent / 'lang_list.txt').read_text().split()) - {'en'}
+        engine._all_supported_langs = set((model.parent / 'lang_list.txt').read_text(encoding='utf-8').split()) - {'en'}
         engine._tgt_langs = {'or'}
         BaseEngineTransformer.__init__(engine, str(model), beam_width=5, rescore=False)
         candidates = engine.translit_word(payload['text'], topk=5)['or']

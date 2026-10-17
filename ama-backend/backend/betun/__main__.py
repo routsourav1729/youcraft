@@ -20,7 +20,7 @@ def main():
         import threading, time, webbrowser
         def open_browser():
             time.sleep(1.5)
-            token = os.environ.get('BETUN_TOKEN') or (data_root() / 'api-token').read_text().strip()
+            token = os.environ.get('BETUN_TOKEN') or (data_root() / 'api-token').read_text(encoding='utf-8').strip()
             webbrowser.open(f'http://127.0.0.1:{args.port}/#token={token}')
         threading.Thread(target=open_browser, daemon=True).start()
     uvicorn.run(app, host='127.0.0.1', port=args.port, workers=1, access_log=False)

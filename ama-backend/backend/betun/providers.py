@@ -9,7 +9,7 @@ from .media import run
 
 def configuration():
     path = os.environ.get('BETUN_MODEL_CONFIG')
-    return json.loads(Path(path).read_text()) if path else {}
+    return json.loads(Path(path).read_text(encoding='utf-8')) if path else {}
 
 
 def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
@@ -25,7 +25,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
     digest = hashlib.sha256(json.dumps(dict(task=task, payload=payload, config=config), sort_keys=True).encode()).hexdigest()
     destination = directory / f'model-{digest}.json'
     if destination.exists():
-        return json.loads(destination.read_text())
+        return json.loads(destination.read_text(encoding='utf-8'))
     request = directory / f'request-{digest}.json'
     partial = directory / f'model-{digest}.partial.json'
     request.write_text(json.dumps(dict(task=task, payload=payload, config=config)))
@@ -51,7 +51,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
             retry = dict(config, device='cpu')
             request.write_text(json.dumps(dict(task=task, payload=payload, config=retry)))
             run([*command, str(request), str(partial)], cancel, timeout=86400)
-        result = json.loads(partial.read_text())
+        result = json.loads(partial.read_text(encoding='utf-8'))
         if not isinstance(result, dict):
             raise ValueError('Worker result must be a JSON object')
         result['_execution'] = dict(worker_exited=True, cpu_fallback=fallback)

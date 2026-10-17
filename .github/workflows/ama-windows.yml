@@ -75,6 +75,36 @@ jobs:
           }
           & $compiler "/DRepoRoot=$env:GITHUB_WORKSPACE" packaging/ama-installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install and check the packaged local helper
+        shell: pwsh
+        run: |
+          $installed = Join-Path $env:RUNNER_TEMP 'ama-installed'
+          $data = Join-Path $env:RUNNER_TEMP 'ama-smoke-data'
+          $setup = Start-Process release/AmaBartalap-Setup-x64.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
+          if (-not (Test-Path "$installed/AmaBartalap.exe")) { throw 'Editor missing from installation' }
+          $env:BETUN_NO_BROWSER = '1'
+          $helper = Start-Process "$installed/BetunBackend/BetunBackend.exe" -ArgumentList @('--port', '18765', '--data-dir', "`"$data`"") -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP/ama-helper.log" -RedirectStandardError "$env:RUNNER_TEMP/ama-helper-error.log"
+          try {
+            $ready = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              if ($helper.HasExited) { throw 'Packaged helper exited during startup' }
+              try {
+                $health = Invoke-RestMethod http://127.0.0.1:18765/health -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw 'Packaged helper did not become ready' }
+            $token = (Get-Content "$data/api-token" -Raw -Encoding utf8).Trim()
+            $body = [Text.Encoding]::UTF8.GetBytes((@{name='ନମସ୍କାର'} | ConvertTo-Json))
+            $episode = Invoke-RestMethod http://127.0.0.1:18765/v1/projects -Method Post -Headers @{Authorization="Bearer $token"} -ContentType 'application/json; charset=utf-8' -Body $body
+            if ($episode.name -ne 'ନମସ୍କାର') { throw 'Odia text did not round-trip through the packaged helper' }
+          } catch {
+            Get-Content "$env:RUNNER_TEMP/ama-helper-error.log" -Tail 40 -ErrorAction SilentlyContinue
+            throw
+          } finally {
+            if (-not $helper.HasExited) { taskkill /PID $helper.Id /T /F | Out-Null }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: AmaBartalap-Windows

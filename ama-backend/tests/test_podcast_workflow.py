@@ -197,3 +197,29 @@ def test_reference_preview_validates_shard_bounds_before_decoding(tmp_path,monke
     monkeypatch.setattr('betun.pipeline.media.fingerprint',lambda _: 'changed')
     with pytest.raises(ValueError,match='Source changed'):
         process(store,p,'reference_frame',dict(clip_id='host',time=10),out,lambda:False,lambda _:None)
+
+
+def test_odia_worker_results_and_cache_ignore_windows_default_encoding(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    from betun import providers
+    original_read = Path.read_text
+    def windows_read(path, encoding=None, errors=None):
+        return original_read(path, encoding=encoding or 'cp1252', errors=errors)
+    monkeypatch.setattr(Path, 'read_text', windows_read)
+    config = tmp_path / 'models.json'
+    config.write_text(json.dumps({'transcribe': dict(provider='fake', revision='fixture',
+        model_path='ଓଡ଼ିଆ', command=['worker'])}, ensure_ascii=False), encoding='utf-8')
+    monkeypatch.setenv('BETUN_MODEL_CONFIG', str(config))
+    assert providers.configuration()['transcribe']['model_path'] == 'ଓଡ଼ିଆ'
+    calls = []
+    text = 'ନମସ୍କାର ଓଡ଼ିଶା'
+    def run(args, cancel, timeout):
+        calls.append(True)
+        Path(args[-1]).write_text(json.dumps(dict(captions=[dict(id='1', text=text)]),
+            ensure_ascii=False), encoding='utf-8')
+    monkeypatch.setattr(providers, 'run', run)
+    for _ in range(2):
+        result = providers.invoke('transcribe', dict(audio='fixture'), tmp_path)
+        assert result['captions'][0]['text'] == text
+    assert len(calls) == 1

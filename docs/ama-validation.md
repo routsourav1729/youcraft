@@ -63,10 +63,16 @@ The editor/Windows overhead was not part of the worker memory measurement.
 
 `cargo xtask ci` completed successfully: formatting, workspace Clippy, native
 workspace tests (3,499 passed, 44 ignored), dependency layers, asset attribution,
-and WASM compilation (49 crates). The backend suite passed all 33 tests.
+and WASM compilation (49 crates). The backend suite passed all 34 tests.
 A separate Windows MSVC target compiler check passed. The native seven-step UI
 harness also rendered all screens using software OpenGL after the label cleanup.
 The staged source passed its asset and dependency-layer checks.
 
 Actual Windows installation/playback and Lenovo GPU acceptance remain separate
 from these Linux-hosted checks. Consult the Windows Actions run for the installer.
+
+The UTF-8 regression test simulates a non-UTF-8 Windows default for Odia worker
+results, model configuration and cached results. The Windows workflow also installs
+its generated installer and checks an Odia project through the packaged helper.
+The native headless MCP smoke test listed 17 tools, exposed all three podcast
+commands, and created/inspected a sequence without an AI provider.
