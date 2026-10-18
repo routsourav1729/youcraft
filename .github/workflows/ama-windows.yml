@@ -5,6 +5,9 @@ on:
     branches: [ama-bartalap]
   pull_request:
     branches: [ama-bartalap]
+concurrency:
+  group: youcraft-windows-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:

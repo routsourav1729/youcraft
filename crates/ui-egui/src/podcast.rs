@@ -1865,6 +1865,14 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 app.auto.add_response(&format!("podcast.reference.time.{id}"), &r, "Reference time");
             });
             let time = *reference;
+            if s.review_active && button(app, ui, &format!("reference.current.{id}"), "Use current frame") {
+                let local = (app.session.playhead().seconds() - number(&clip, "offset")) / number(&clip, "rate");
+                if local.is_finite() && local >= 0. && local < number(&clip, "duration") {
+                    s.references.insert(id.clone(), local);
+                } else {
+                    s.error = "Playhead is outside this recording".into();
+                }
+            }
             if button(app, ui, &format!("reference.{id}"), "View reference") {
                 s.job("reference_frame", json!({"clip_id":id,"time":time}));
             }

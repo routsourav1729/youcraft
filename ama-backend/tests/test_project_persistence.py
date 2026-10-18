@@ -39,3 +39,33 @@ def test_cannot_delete_project_with_pending_job(tmp_path):
     Queue(store).submit(p.id,'transcribe',{})
     with pytest.raises(ValueError,match='Finish or cancel'): store.delete(p.id,p.revision)
     assert store.get(p.id).id == p.id
+
+
+def test_progress_file_lock_does_not_fail_processing(tmp_path, monkeypatch):
+    import time
+    from pathlib import Path
+    store = Store(tmp_path)
+    project = store.create(Project(name='Progress lock'))
+    original = Path.replace
+    def replace(path, target):
+        if path.name == 'progress.tmp':
+            raise PermissionError('Windows reader temporarily holds progress.json')
+        return original(path, target)
+    monkeypatch.setattr(Path, 'replace', replace)
+    def process(store, project, kind, options, directory, cancel, progress):
+        progress({'stage':'Transcribing', 'fraction':.5})
+        return {'ok':True}
+    monkeypatch.setattr('betun.jobs.process', process)
+    queue = Queue(store)
+    queue.start()
+    try:
+        job = queue.submit(project.id, 'transcribe', {})
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            job = queue.get(job['id'])
+            if job['state'] not in ('queued','running'):
+                break
+            time.sleep(.02)
+        assert job['state'] == 'succeeded', job
+    finally:
+        queue.stop()

@@ -110,8 +110,13 @@ class Queue:
                 if isinstance(value, dict):
                     status = directory / 'progress.json'
                     temporary = status.with_suffix('.tmp')
-                    temporary.write_text(json.dumps(value), encoding='utf-8')
-                    temporary.replace(status)
+                    try:
+                        temporary.write_text(json.dumps(value), encoding='utf-8')
+                        temporary.replace(status)
+                    except OSError:
+                        # A Windows status reader can briefly prevent replacement.
+                        # Losing one progress update must never abort a model job.
+                        pass
                     value = value.get('fraction')
                 if value is not None:
                     with self.store.connect() as db:

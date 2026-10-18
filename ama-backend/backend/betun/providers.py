@@ -26,7 +26,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
         converted = sanscript.transliterate(text, sanscript.ITRANS, sanscript.ORIYA)
         return dict(text=converted, candidates=[converted], method='phonetic-itrans')
     if not config:
-        raise ValueError(f'No {task} provider configured; set BETUN_MODEL_CONFIG (see docs/models.md)')
+        raise ValueError('Open Models → Install reactions first' if task == 'reactions' else 'Open Models and finish speech setup first' if task in ('diarize', 'transcribe') else f'{task.title()} is not installed in this version')
     if device not in ('auto', 'cpu', 'cuda'):
         raise ValueError('Choose Auto, CPU or GPU')
     if device != 'auto':
