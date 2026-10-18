@@ -30,6 +30,10 @@ class ReviewFile(Model):
     audio: str | None = None
 
 
+class StorageFolder(Model):
+    path: str = Field(min_length=1, max_length=32768)
+
+
 class Revision(Model):
     revision: int = Field(ge=0)
 
@@ -101,7 +105,7 @@ def data_root():
 
 
 def create_app(root=None, token=None):
-    store = Store(Path(root) if root else data_root())
+    store = Store(Path(root) if root else data_root(), user_folders=root is None and not os.environ.get("BETUN_DATA_DIR"))
     token_path = store.root / 'api-token'
     if token is None:
         token = os.environ.get('BETUN_TOKEN')
@@ -297,6 +301,18 @@ def create_app(root=None, token=None):
             raise KeyError('baseline')
         return Project.model_validate_json(path.read_text(encoding='utf-8'))
 
+    @app.get('/v1/projects/{pid}/storage')
+    def project_storage(pid: str):
+        return store.storage(pid)
+
+    @app.post('/v1/projects/{pid}/storage')
+    def move_project_storage(pid: str, body: StorageFolder):
+        return store.move_directory(pid, body.path)
+
+    @app.delete('/v1/projects/{pid}')
+    def delete_project(pid: str, body: Revision):
+        return store.delete(pid, body.revision)
+
     @app.get('/v1/projects/{pid}/speaker-samples')
     def samples(pid: str):
         from .podcast import speaker_samples
@@ -306,6 +322,11 @@ def create_app(root=None, token=None):
     def filmcraft(pid: str):
         from .podcast import manifest
         return manifest(store.get(pid))
+
+    @app.get('/v1/projects/{pid}/review-plan')
+    def review_plan(pid: str, edit: bool = False):
+        from .podcast import review_manifest
+        return review_manifest(store.get(pid), edit)
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):

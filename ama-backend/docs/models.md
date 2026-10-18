@@ -161,3 +161,13 @@ completion, and saving results. Model loading and monolithic diarization do not
 claim a fabricated percentage. Synced camera previews use the master recording,
 with start/middle/end checks before confirmation. Final reaction choices are saved
 when opening the existing Filmcraft editor and linked transcript workflow.
+
+
+### Built-in Odia typing
+
+The packaged backend includes indic-transliteration 2.3.75 (MIT) for offline
+ITRANS-to-Odia phonetic typing. No GPU, token or model download is required.
+For example, `namaskaara` becomes `ନମସ୍କାର`. This is spelling conversion, not
+an ML prediction of colloquial Romanized Odia. Preview and edit the result before
+replacing a word or phrase. An explicitly configured transliteration provider
+still takes precedence. Package source: https://github.com/indic-transliteration/indic_transliteration_py.

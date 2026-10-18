@@ -4,6 +4,7 @@ Speech/transliteration weights use configured local directories/files. Prepare t
 optional upstream vision runtime and its detector cache before offline inference.
 """
 import json
+import hashlib
 import os
 from pathlib import Path
 import sys
@@ -100,7 +101,23 @@ def main(request_path, result_path):
         chunks = payload['chunks']
         for index, chunk in enumerate(chunks):
             progress('Transcribing', completed=index, total=len(chunks), fraction=index / max(1, len(chunks)))
-            captions.append(dict(id=chunk['id'], text=transcribe_long(asr, chunk['audio'], lang='or')))
+            key = hashlib.sha256(json.dumps(dict(config=config, chunk=chunk,
+                fingerprint=payload.get('audio_fingerprint')), sort_keys=True).encode()).hexdigest()
+            checkpoint = Path(request_path).parent / f'asr-segment-{key}.json'
+            saved = None
+            if checkpoint.is_file():
+                try:
+                    saved = json.loads(checkpoint.read_text(encoding='utf-8'))
+                except (OSError, ValueError):
+                    pass
+            if not isinstance(saved, dict) or saved.get('id') != chunk['id'] or not isinstance(saved.get('text'), str):
+                saved = dict(id=chunk['id'], text=transcribe_long(asr, chunk['audio'], lang='or'))
+                if not isinstance(saved['text'], str):
+                    raise ValueError('Transcription did not return text')
+                temporary = checkpoint.with_suffix('.partial')
+                temporary.write_text(json.dumps(saved, ensure_ascii=False), encoding='utf-8')
+                temporary.replace(checkpoint)
+            captions.append(saved)
         progress('Transcription complete', completed=len(chunks), total=len(chunks), fraction=1.)
         result = dict(captions=captions)
     elif task == 'reactions' and provider in ('mediapipe-l2cs', 'mediapipe-reference'):

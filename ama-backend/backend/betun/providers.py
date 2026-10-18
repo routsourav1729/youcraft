@@ -18,6 +18,13 @@ def configuration():
 
 def invoke(task, payload, directory, cancel=lambda: False, device='auto', progress=lambda _: None):
     config = configuration().get(task)
+    if not config and task == 'transliterate':
+        from indic_transliteration import sanscript
+        text = payload.get('text', '')
+        if not isinstance(text, str) or not text.strip() or len(text) > 10000:
+            raise ValueError('Enter a word or phrase to convert')
+        converted = sanscript.transliterate(text, sanscript.ITRANS, sanscript.ORIYA)
+        return dict(text=converted, candidates=[converted], method='phonetic-itrans')
     if not config:
         raise ValueError(f'No {task} provider configured; set BETUN_MODEL_CONFIG (see docs/models.md)')
     if device not in ('auto', 'cpu', 'cuda'):

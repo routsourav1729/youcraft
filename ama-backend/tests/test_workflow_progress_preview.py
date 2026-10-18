@@ -36,10 +36,10 @@ def test_transcription_reports_loading_and_completed_chunks(tmp_path, monkeypatc
     class ASR:
         @staticmethod
         def from_pretrained(*args, **kwargs):
-            events.append(json.loads(status.read_text()))
+            events.append(json.loads(status.read_text(encoding="utf-8")))
             return object()
     def transcribe(*args, **kwargs):
-        events.append(json.loads(status.read_text()))
+        events.append(json.loads(status.read_text(encoding="utf-8")))
         return 'ନମସ୍କାର'
     monkeypatch.setitem(sys.modules, 'indic_transcribe', SimpleNamespace(IndicTranscribe=ASR))
     monkeypatch.setitem(sys.modules, 'long_form', SimpleNamespace(transcribe_long=transcribe))
@@ -49,8 +49,8 @@ def test_transcription_reports_loading_and_completed_chunks(tmp_path, monkeypatc
     main(str(request), str(tmp_path / 'result.json'))
     assert events[0]['stage'] == 'Loading model'
     assert [e['completed'] for e in events[1:]] == [0, 1]
-    assert json.loads(status.read_text())['fraction'] == 1.
-    assert len(json.loads((tmp_path / 'result.json').read_text())['captions']) == 2
+    assert json.loads(status.read_text(encoding="utf-8"))['fraction'] == 1.
+    assert len(json.loads((tmp_path / 'result.json').read_text(encoding="utf-8"))['captions']) == 2
 
 
 def test_lightweight_reactions_do_not_import_torch(tmp_path, monkeypatch):
@@ -60,4 +60,4 @@ def test_lightweight_reactions_do_not_import_torch(tmp_path, monkeypatch):
     request = tmp_path / 'request.json'
     request.write_text(json.dumps(dict(task='reactions', payload={}, config=dict(provider='mediapipe-reference', model_path=str(tmp_path), device='cpu'))))
     main(str(request), str(tmp_path / 'result.json'))
-    assert json.loads((tmp_path / 'result.json').read_text()) == {'candidates':[]}
+    assert json.loads((tmp_path / 'result.json').read_text(encoding="utf-8")) == {'candidates':[]}

@@ -223,3 +223,43 @@ def test_odia_worker_results_and_cache_ignore_windows_default_encoding(tmp_path,
         result = providers.invoke('transcribe', dict(audio='fixture'), tmp_path)
         assert result['captions'][0]['text'] == text
     assert len(calls) == 1
+
+
+def test_native_review_has_both_cameras_without_approving_or_mutating_project():
+    from betun.podcast import review_manifest
+    p = episode()
+    p.clips[1].sync_reviewed = False
+    p.captions[0].reviewed = False
+    before = p.model_dump()
+    plan = review_manifest(p)
+    assert plan['review'] is True
+    assert plan['master'] == 'master'
+    assert {v['asset'] for v in plan['clips'][0]['video']} == {'host', 'guest'}
+    assert p.model_dump() == before
+
+
+def test_edit_review_shows_kept_reaction_and_preserves_rejected_guest_shot():
+    from betun.podcast import review_manifest
+    p = episode()
+    p.reactions = [Reaction(start=20, end=24, clip_id='host', score=.9, decision='keep'),
+                   Reaction(start=30, end=34, clip_id='host', score=.8, decision='reject')]
+    plan = review_manifest(p, edit=True)
+    keep = next(c for c in plan['clips'] if c['start'] == 20*TICKS)
+    reject = next(c for c in plan['clips'] if c['start'] == 30*TICKS)
+    assert next(v['asset'] for v in keep['video'] if v['side']=='review-top-full') == 'host'
+    assert next(v['asset'] for v in reject['video'] if v['side']=='review-top-full') == 'guest'
+    assert len(keep['video']) == 3
+
+
+def test_review_preserves_camera_gaps_and_shard_clock():
+    from betun.podcast import review_manifest
+    p = episode()
+    p.clips[1].offset = 10
+    p.clips[2].offset = 10
+    p.clips[1].rate = 1.01
+    plan = review_manifest(p)
+    assert plan['clips'][0]['start'] == 0
+    assert plan['clips'][0]['end'] == 10*TICKS
+    assert plan['clips'][0]['video'] == []
+    assert plan['clips'][1]['video'][0]['source_in'] == 0
+    assert plan['clips'][1]['video'][0]['speed'] == 1/1.01

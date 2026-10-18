@@ -32,6 +32,8 @@ fn default_fps() -> f64 {
 
 #[derive(Deserialize)]
 struct Plan {
+    #[serde(default)]
+    review: bool,
     #[serde(default = "default_fps")]
     fps: f64,
     version: u32,
@@ -56,11 +58,21 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let mut end = 0;
     for span in &plan.clips {
-        if span.start != end || span.end <= span.start || span.end > 254_016_000_000_i64 * 86400 || span.video.is_empty() || span.video.len() > 2 {
+        if span.start != end
+            || span.end <= span.start
+            || span.end > 254_016_000_000_i64 * 86400
+            || (!plan.review && span.video.is_empty())
+            || span.video.len() > if plan.review { 4 } else { 2 }
+        {
             return Err(bad("podcast.assemble", "cuts must continuously cover the recording with one or two cameras"));
         }
         for v in &span.video {
-            if v.source_in < 0 || !v.speed.is_finite() || !(0.98..=1.03).contains(&v.speed) || !["A", "B", "full"].contains(&v.side.as_str()) {
+            if v.source_in < 0
+                || !v.speed.is_finite()
+                || !(0.98..=1.03).contains(&v.speed)
+                || !(["A", "B", "full"].contains(&v.side.as_str())
+                    || (plan.review && ["review-bottom-A", "review-bottom-B", "review-top-A", "review-top-B", "review-top-full"].contains(&v.side.as_str())))
+            {
                 return Err(bad("podcast.assemble", "invalid camera timing/layout"));
             }
         }
@@ -89,8 +101,10 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
             ids.insert(asset.id.clone(), id);
         }
         let master = *ids.get(&plan.master).ok_or_else(|| bad("podcast.assemble", "master missing"))?;
-        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":1080,"fps":plan.fps,"video":2,"audio":1}))?;
-        s.execute("transcript.set", json!({"item":master,"transcript":plan.transcript}))?;
+        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":1080,"fps":plan.fps,"video":if plan.review {4}else{2},"audio":1}))?;
+        if !plan.review {
+            s.execute("transcript.set", json!({"item":master,"transcript":plan.transcript}))?;
+        }
         for span in &plan.clips {
             let rate = s.sequence_rate();
             let start = rate.snap_nearest(Tick(span.start));
@@ -121,7 +135,21 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                     }
                     Ok(())
                 })?;
-                if picture.side != "full" {
+                if picture.side.starts_with("review-") {
+                    let full = picture.side == "review-top-full";
+                    let x = if full {
+                        960.0
+                    } else if picture.side.ends_with('A') {
+                        640.0
+                    } else {
+                        1280.0
+                    };
+                    let y = if picture.side.starts_with("review-bottom-") { 900.0 } else { 360.0 };
+                    for id in &clips {
+                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":if full {66.666667}else{33.333333}}))?;
+                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"position","value":[x,y]}))?;
+                    }
+                } else if picture.side != "full" {
                     for id in &clips {
                         s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":50.0}))?;
                         s.execute(

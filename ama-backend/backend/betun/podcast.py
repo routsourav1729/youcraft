@@ -148,3 +148,47 @@ def manifest(project):
                 assets=[dict(id=c.id, path=c.path, fingerprint=c.fingerprint) for c in project.clips],
                 transcript=dict(language='or', source='indic-core; estimated word timing from reviewed segments',
                     speakers=[dict(name=('Host' if s == project.settings.host_speaker else 'Guest') + ' · ' + s) for s in speakers], words=words))
+
+
+def review_manifest(project, edit=False):
+    """Unsaved native review sequence: one clock, master audio, all camera shards.
+
+    Reviewing never marks sync, captions or reactions as approved.
+    """
+    master = next((c for c in project.clips if c.camera == 'master'), None)
+    cameras = [c for c in project.clips if c.camera in ('A', 'B') and c.has_video]
+    if master is None or not cameras or project.duration <= 0:
+        raise ValueError('Add master audio and camera recordings first')
+    boundaries = {0., project.duration}
+    for clip in cameras:
+        boundaries.update((max(0., clip.offset), min(project.duration, clip.offset + clip.duration * clip.rate)))
+    if edit:
+        for item in [*project.shots, *project.reactions]:
+            boundaries.update((item.start, item.end))
+    spans = sorted(t for t in boundaries if 0 <= t <= project.duration)
+    clips = []
+    for start, end in zip(spans, spans[1:]):
+        mid = (start + end) / 2
+        sources = {camera: next((c for c in cameras if c.camera == camera and c.offset <= start + 1e-6
+                   and c.offset + c.duration * c.rate >= end - 1e-6), None) for camera in ('A', 'B')}
+        video = []
+        def picture(camera, side):
+            source = sources[camera]
+            if source:
+                video.append(dict(asset=source.id, source_in=round((start-source.offset)/source.rate*TICKS),
+                                  speed=1/source.rate, side=side))
+        for camera in ('A', 'B'):
+            picture(camera, 'review-bottom-' + camera if edit else camera)
+        if edit:
+            shot = next((s for s in project.shots if s.start <= mid < s.end), None)
+            layout = shot.layout if shot else 'both'
+            if any(r.decision == 'keep' and r.start <= mid < r.end for r in project.reactions):
+                layout = project.settings.speaker_camera.get(project.settings.host_speaker, layout)
+            for camera in ('A', 'B') if layout == 'both' else (layout,):
+                if camera in sources:
+                    picture(camera, 'review-top-' + (camera if layout == 'both' else 'full'))
+        clips.append(dict(start=round(start*TICKS), end=round(end*TICKS), video=video))
+    return dict(version=1, review=True, name=project.name + (' · Edit review' if edit else ' · Camera review'),
+                fps=cameras[0].frame_rate or 25, master=master.id, clips=clips,
+                assets=[dict(id=c.id, path=c.path, fingerprint=c.fingerprint) for c in project.clips],
+                transcript=dict(language='or', source='review', speakers=[], words=[]))
