@@ -1,12 +1,12 @@
 # Run with PyInstaller on the target OS. Never include model packs or user data.
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, copy_metadata
 root = Path(SPECPATH).parent
 analysis = Analysis([str(root / 'backend/betun/__main__.py')],
     pathex=[str(root / 'backend')],
     datas=[(str(root / 'backend/betun/ui'), 'betun/ui'),
            (str(root / 'backend/betun/model_worker.py'), 'betun'),
-           (str(root / 'backend/betun/vision_worker.py'), 'betun')] + collect_data_files('indic_transliteration'),
+           (str(root / 'backend/betun/vision_worker.py'), 'betun')] + collect_data_files('indic_transliteration') + copy_metadata('indic-transliteration'),
     hiddenimports=['betun.api', 'uvicorn.logging', 'uvicorn.loops.auto',
                    'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto',
                    'uvicorn.lifespan.on'],

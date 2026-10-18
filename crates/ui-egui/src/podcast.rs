@@ -2080,7 +2080,7 @@ mod tests {
                 {"asset":"host","source_in":0,"speed":1.0,"side":"review-top-full"}]}],
             "transcript":{"language":"or","source":"test","speakers":[],"words":[]}});
         let project = json!({"id":"review-test","name":"Review fixture","revision":1,"settings":{},
-            "clips":[],"captions":[{"id":"caption","start":0,"end":4,"speaker":"host","text":"ନମସ୍କାର","reviewed":true}]});
+            "clips":[],"activity":[],"shots":[],"reactions":[],"captions":[{"id":"caption","start":0,"end":4,"speaker":"host","text":"ନମସ୍କାର","reviewed":true}]});
         let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
         app.set_workspace("Podcast");
         let mut state =
