@@ -1174,11 +1174,17 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
     if matches!(s.step, 2 | 3 | 4 | 5) {
-        ui.columns(2, |columns| {
-            egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut columns[0], |ui| {
+        {
+            let bounds = ui.available_rect_before_wrap();
+            let split = bounds.left() + bounds.width() * if s.step == 4 { 0.42 } else { 0.34 };
+            let left = Rect::from_min_max(bounds.min, egui::pos2(split - 8., bounds.bottom()));
+            let right = Rect::from_min_max(egui::pos2(split + 8., bounds.top()), bounds.max);
+            let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(left));
+            egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| {
                 workflow_step(app, ui, &mut s);
             });
-            let ui = &mut columns[1];
+            let mut monitor = ui.new_child(egui::UiBuilder::new().max_rect(right));
+            let ui = &mut monitor;
             ui.heading(if s.step == 5 { "Edit review" } else { "Preview" });
             if matches!(s.step, 3 | 4 | 5) && !s.busy() && button(app, ui, "review_playback", "Load review") {
                 s.review_preview(s.step == 5);
@@ -1206,7 +1212,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     egui::Color32::GRAY,
                 );
             }
-        });
+        }
     } else {
         egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| workflow_step(app, ui, &mut s));
     }
@@ -1651,6 +1657,14 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     }
 }
 fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    let mut save = false;
+    let mut accept = false;
+    ui.horizontal_wrapped(|ui| {
+        save = button(app, ui, "save_review", "Save");
+        if !rows(&s.project, "captions").is_empty() {
+            accept = button(app, ui, "accept_transcript", "Accept transcript");
+        }
+    });
     ui.collapsing("Speaker segments", |ui| {
         let mut activity = rows(&s.project, "activity");
         let mut remove = None;
@@ -1797,16 +1811,13 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         }
     }
     set_rows(s, "captions", captions);
-    if button(app, ui, "save_review", "Save corrections") {
+    if save {
         s.save();
     }
-    if button(app, ui, "accept_transcript", "Accept transcript") {
+    if accept {
         for caption in s.project["captions"].as_array_mut().into_iter().flatten() {
             caption["reviewed"] = json!(true);
         }
-        s.job("shots", json!({}));
-    }
-    if button(app, ui, "base_shots", "Create cuts") {
         s.job("shots", json!({}));
     }
 }
