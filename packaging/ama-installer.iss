@@ -5,7 +5,7 @@
 [Setup]
 AppId={{E996DDC0-7724-41A0-A889-FBC9277A7432}
 AppName=YouCraft
-AppVersion=0.1.4
+AppVersion=0.1.5
 AppPublisher=YouCraft contributors
 DefaultDirName={localappdata}\Programs\YouCraft
 DefaultGroupName=YouCraft

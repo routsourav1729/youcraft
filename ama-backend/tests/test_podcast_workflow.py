@@ -67,7 +67,7 @@ def test_remote_export_relinks_snapshot_without_changing_edit(tmp_path,monkeypat
     cli=tmp_path/'filmcraft-cli';cli.touch()
     monkeypatch.setenv('BETUN_FILMCRAFT_CLI',str(cli))
     monkeypatch.setattr('betun.remote_media.media.fingerprint',lambda path:next(c.fingerprint for c in p.clips if c.path==path))
-    def run(args,cancel,timeout):
+    def run(args,cancel,timeout,on_poll=None):
         snapshot=json.loads((tmp_path/'snapshot.fcproj').read_text())['project']
         assert snapshot['items']['3']['kind']['Media']['media']['File']['path']=='host.mp4'
         assert snapshot['custom_edit']=='retained'
@@ -95,7 +95,7 @@ def test_provider_cpu_retry_starts_after_gpu_worker_has_exited(tmp_path,monkeypa
     from betun.providers import invoke
     monkeypatch.setattr('betun.providers.configuration',lambda:{'diarize':dict(provider='fake',revision='fixture',device='cuda',allow_cpu_fallback=True,command=['worker'])})
     devices=[]
-    def run(args,cancel,timeout):
+    def run(args,cancel,timeout,on_poll=None):
         config=json.loads(Path(args[-2]).read_text())['config']
         devices.append(config['device'])
         if config['device']=='cuda':raise RuntimeError('CUDA out of memory')
@@ -113,7 +113,7 @@ def test_cpu_choice_overrides_gpu_config_and_uses_a_separate_cache(tmp_path, mon
     config = dict(provider='fake', revision='fixture', device='cuda', command=['worker'])
     monkeypatch.setattr(providers, 'configuration', lambda: {'diarize': config})
     devices = []
-    def run(args, cancel, timeout):
+    def run(args, cancel, timeout, on_poll=None):
         device = json.loads(Path(args[-2]).read_text())['config']['device']
         devices.append(device)
         Path(args[-1]).write_text(json.dumps(dict(activity=[])))
@@ -175,7 +175,7 @@ def test_gpu_budget_resolves_current_cuda_index(tmp_path, monkeypatch, device):
         set_per_process_memory_fraction=lambda fraction, selected: limited.append((fraction, selected)))
     monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(cuda=cuda,
         set_num_threads=lambda _: None, device=lambda _: SimpleNamespace(index=None)))
-    def analyze(payload, config):
+    def analyze(payload, config, progress=None):
         assert config['device'] == 'cuda:2'
         return {'candidates': []}
     monkeypatch.setitem(sys.modules, 'vision_worker', SimpleNamespace(analyze=analyze))
@@ -214,7 +214,7 @@ def test_odia_worker_results_and_cache_ignore_windows_default_encoding(tmp_path,
     assert providers.configuration()['transcribe']['model_path'] == 'ଓଡ଼ିଆ'
     calls = []
     text = 'ନମସ୍କାର ଓଡ଼ିଶା'
-    def run(args, cancel, timeout):
+    def run(args, cancel, timeout, on_poll=None):
         calls.append(True)
         Path(args[-1]).write_text(json.dumps(dict(captions=[dict(id='1', text=text)]),
             ensure_ascii=False), encoding='utf-8')

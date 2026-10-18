@@ -16,12 +16,22 @@ def main(request_path, result_path):
     os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
     request = json.loads(Path(request_path).read_text(encoding='utf-8'))
     config, payload, task = request['config'], request['payload'], request['task']
+    def progress(stage, **details):
+        if request.get('progress_path'):
+            destination = Path(request['progress_path'])
+            temporary = destination.with_suffix('.tmp')
+            try:
+                temporary.write_text(json.dumps(dict(stage=stage, **details)), encoding='utf-8')
+                temporary.replace(destination)
+            except OSError:
+                pass  # Progress must not abort inference if a Windows reader holds the file.
+    progress('Loading runtime')
     provider = config['provider']
     model = Path(config.get('model_path', '.')).resolve()
     if not model.exists():
         raise ValueError('Configured model files are missing')
     device = config.get('device', 'cpu')
-    if task in ('diarize', 'transcribe', 'reactions'):
+    if task in ('diarize', 'transcribe') or (task == 'reactions' and provider == 'mediapipe-l2cs'):
         import torch
         torch.set_num_threads(int(config.get('cpu_threads', 4)))
         if device == 'auto':
@@ -37,11 +47,13 @@ def main(request_path, result_path):
             torch.cuda.set_per_process_memory_fraction(fraction, device)
         config = dict(config, device=device)
 
+    progress('Loading model')
     if task == 'diarize' and provider == 'pyannote':
         import torch
         from pyannote.audio import Pipeline
         pipeline = Pipeline.from_pretrained(str(model))
         pipeline.to(torch.device(device))
+        progress('Identifying speakers')
         output = pipeline(payload['audio'], num_speakers=2)
         annotation = getattr(output, 'speaker_diarization', output)
         rows = [dict(start=float(t.start), end=float(t.end), speaker=str(s)) for t, _, s in annotation.itertracks(yield_label=True)]
@@ -55,7 +67,9 @@ def main(request_path, result_path):
             raise ValueError('Nemotron requires the prepared 16 kHz mono copy')
         processor = AutoProcessor.from_pretrained(str(model), local_files_only=True)
         diarizer = AutoModelForAudioFrameClassification.from_pretrained(str(model), local_files_only=True).to(device).eval()
+        progress('Preparing speech features')
         inputs = processor(audio, sampling_rate=rate).to(device, dtype=diarizer.dtype)
+        progress('Identifying speakers')
         with torch.inference_mode():
             logits = diarizer(**inputs).logits
         segments = processor.extract_speaker_dict(logits, inputs.attention_mask)[0]
@@ -82,10 +96,16 @@ def main(request_path, result_path):
         from indic_transcribe import IndicTranscribe
         from long_form import transcribe_long
         asr = IndicTranscribe.from_pretrained(str(model), device=device)
-        result = dict(captions=[dict(id=c['id'], text=transcribe_long(asr, c['audio'], lang='or')) for c in payload['chunks']])
-    elif task == 'reactions' and provider == 'mediapipe-l2cs':
+        captions = []
+        chunks = payload['chunks']
+        for index, chunk in enumerate(chunks):
+            progress('Transcribing', completed=index, total=len(chunks), fraction=index / max(1, len(chunks)))
+            captions.append(dict(id=chunk['id'], text=transcribe_long(asr, chunk['audio'], lang='or')))
+        progress('Transcription complete', completed=len(chunks), total=len(chunks), fraction=1.)
+        result = dict(captions=captions)
+    elif task == 'reactions' and provider in ('mediapipe-l2cs', 'mediapipe-reference'):
         from vision_worker import analyze
-        result = analyze(payload, config)
+        result = analyze(payload, config, progress)
     elif task == 'transliterate' and provider == 'indicxlit':
         # Initialize the upstream engine from an explicit local bundle; no implicit downloads.
         os.environ['CUDA_VISIBLE_DEVICES'] = ''

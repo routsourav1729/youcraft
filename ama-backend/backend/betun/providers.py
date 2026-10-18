@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 from .media import run
 
 
@@ -15,7 +16,7 @@ def configuration():
     return json.loads(Path(path).read_text(encoding='utf-8')) if path else {}
 
 
-def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
+def invoke(task, payload, directory, cancel=lambda: False, device='auto', progress=lambda _: None):
     config = configuration().get(task)
     if not config:
         raise ValueError(f'No {task} provider configured; set BETUN_MODEL_CONFIG (see docs/models.md)')
@@ -31,7 +32,26 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
         return json.loads(destination.read_text(encoding='utf-8'))
     request = directory / f'request-{digest}.json'
     partial = directory / f'model-{digest}.partial.json'
-    request.write_text(json.dumps(dict(task=task, payload=payload, config=config)))
+    status_path = directory / f'progress-{digest}.json'
+    status_path.unlink(missing_ok=True)
+    request.write_text(json.dumps(dict(task=task, payload=payload, config=config, progress_path=str(status_path))))
+    last_status = None
+    last_poll = 0.
+    def report():
+        nonlocal last_status, last_poll
+        now = time.monotonic()
+        if now - last_poll < .5:
+            return
+        last_poll = now
+        try:
+            text = status_path.read_text(encoding='utf-8')
+            if text != last_status:
+                value = json.loads(text)
+                progress(value)
+                last_status = text
+        except (OSError, ValueError):
+            pass
+    progress(dict(stage='Starting model worker'))
     # Commands are administrator configuration, never supplied through the HTTP API.
     command = config.get('command')
     if command is None:
@@ -45,15 +65,18 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
     try:
         fallback = False
         try:
-            run([*command, str(request), str(partial)], cancel, timeout=86400)
+            run([*command, str(request), str(partial)], cancel, timeout=86400, on_poll=report)
         except RuntimeError as exc:
             # The failed GPU process has been reaped by run() before this CPU retry starts.
             if not config.get('allow_cpu_fallback', False) or not any(x in str(exc) for x in ('CUDA out of memory', 'OutOfMemoryError')):
                 raise
             fallback = True
             retry = dict(config, device='cpu')
-            request.write_text(json.dumps(dict(task=task, payload=payload, config=retry)))
-            run([*command, str(request), str(partial)], cancel, timeout=86400)
+            progress(dict(stage='Releasing GPU memory · retrying on CPU'))
+            request.write_text(json.dumps(dict(task=task, payload=payload, config=retry, progress_path=str(status_path))))
+            run([*command, str(request), str(partial)], cancel, timeout=86400, on_poll=report)
+        report()
+        progress(dict(stage='Saving results'))
         result = json.loads(partial.read_text(encoding='utf-8'))
         if not isinstance(result, dict):
             raise ValueError('Worker result must be a JSON object')
@@ -62,5 +85,6 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto'):
         partial.replace(destination)
         return result
     finally:
+        status_path.unlink(missing_ok=True)
         request.unlink(missing_ok=True)
         partial.unlink(missing_ok=True)

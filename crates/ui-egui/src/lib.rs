@@ -1801,7 +1801,7 @@ impl FilmcraftApp {
             state::Mode::Edit => {
                 #[cfg(not(target_arch = "wasm32"))]
                 if self.ui.workspace == "Podcast" && !self.podcast.assembled {
-                    let width = body.width().min(960.);
+                    let width = body.width();
                     let centered = egui::Rect::from_center_size(body.center(), egui::vec2(width, body.height()));
                     crate::podcast::show(self, ui, centered);
                 } else {

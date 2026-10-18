@@ -35,7 +35,7 @@ class Revision(Model):
 
 
 class JobRequest(Model):
-    kind: Literal['import', 'attach_cameras', 'sample', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
+    kind: Literal['import', 'attach_cameras', 'sample', 'sync_preview', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'reference_suggestions', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
     options: dict = Field(default_factory=dict)
 
 
@@ -73,8 +73,13 @@ class ReferenceOptions(Model):
     time: float = Field(ge=0)
 
 
+class SyncPreviewOptions(Model):
+    clip_id: str
+    position: float = Field(default=0.5, ge=0, le=1)
+
+
 class ReactionOptions(Model):
-    references: dict[str, float]
+    references: dict[str, float] = Field(default_factory=dict)
     tolerance: float = Field(default=10, gt=0, le=45)
     interval: float = Field(default=60, ge=10, le=600)
     spacing: float = Field(default=15, ge=0, le=120)
@@ -193,8 +198,10 @@ def create_app(root=None, token=None):
                 model = Path(entry.get('model_path', ''))
                 installed[task] = bool(entry.get('model_path') and model.is_dir()
                     and (model / 'config.json').is_file() and Path(entry.get('python', '')).is_file())
-        return dict(media=tools, installed_providers=installed,
-                    ready=all(tools.values()) and all(installed.values()),
+        vision = configured.get('reactions', {})
+        installed['reactions'] = bool(vision.get('face_model') and Path(vision['face_model']).is_file() and Path(vision.get('python', '')).is_file())
+        return dict(media=tools, installed_providers=installed, reaction_provider=vision.get('provider'),
+                    ready=all(tools.values()) and all(installed.get(task, False) for task in ('diarize', 'transcribe')),
                     configured_providers={k: v.get('provider', 'external-command') for k, v in configured.items()},
                     model_status='configured does not mean installed or validated', remote_inference=False)
 
@@ -371,7 +378,7 @@ def create_app(root=None, token=None):
 
     @app.post('/v1/projects/{pid}/jobs', status_code=202)
     def submit(pid: str, body: JobRequest):
-        options_class = {'import': ImportOptions, 'attach_cameras': CameraOptions, 'sample': PreviewOptions, 'preview': PreviewOptions, 'diarize': DiarizeOptions, 'transliterate': TextOptions, 'reactions': ReactionOptions, 'filmcraft_export': FilmcraftExportOptions, 'reaction_preview': ReactionPreviewOptions, 'reference_frame': ReferenceOptions}.get(body.kind, Model)
+        options_class = {'import': ImportOptions, 'attach_cameras': CameraOptions, 'sample': PreviewOptions, 'preview': PreviewOptions, 'diarize': DiarizeOptions, 'transliterate': TextOptions, 'reactions': ReactionOptions, 'reference_suggestions': ReactionOptions, 'filmcraft_export': FilmcraftExportOptions, 'reaction_preview': ReactionPreviewOptions, 'reference_frame': ReferenceOptions, 'sync_preview': SyncPreviewOptions}.get(body.kind, Model)
         options = options_class.model_validate(body.options).model_dump()
         if body.kind in ('preview', 'sample') and options['end'] is not None and options['end'] <= options['start']:
             raise ValueError('Preview end must be after start')

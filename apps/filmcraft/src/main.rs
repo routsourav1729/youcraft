@@ -163,8 +163,9 @@ fn native_options(agent: bool) -> eframe::NativeOptions {
     eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("YouCraft")
-            .with_inner_size([1600.0, 980.0])
-            .with_min_inner_size([900.0, 560.0])
+            .with_inner_size([1280.0, 720.0])
+            .with_maximized(true)
+            .with_min_inner_size([960.0, 600.0])
             .with_drag_and_drop(true)
             .with_fullsize_content_view(true)
             .with_titlebar_shown(false)

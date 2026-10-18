@@ -319,7 +319,10 @@ impl State {
         self.job_kind = kind.clone();
         self.project["settings"]["compute_device"] = json!(self.compute_device);
         let project = self.project.clone();
-        let save_first = matches!(kind.as_str(), "import" | "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "proxies" | "attach_cameras");
+        let save_first = matches!(
+            kind.as_str(),
+            "import" | "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "proxies" | "attach_cameras" | "sync_preview" | "reference_suggestions"
+        );
         self.start("job", move |c| {
             let saved = if save_first { c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))? } else { Value::Null };
             // Preserve the saved revision even if the job submission fails.
@@ -540,11 +543,19 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                 }
                 "poll" => {
                     let state = string(&value, "state");
-                    s.status = format!("{} · {} · {:.0}%", job_label(&s.job_kind), state, number(&value, "progress") * 100.);
+                    let detail = &value["detail"];
+                    let stage = detail["stage"].as_str().unwrap_or_else(|| job_label(&s.job_kind));
+                    s.status = if let (Some(done), Some(total)) = (detail["completed"].as_u64(), detail["total"].as_u64()) {
+                        format!("{stage} · {done}/{total} {} · {:.0}%", detail["units"].as_str().unwrap_or("segments"), number(&value, "progress") * 100.)
+                    } else if state == "running" {
+                        stage.into()
+                    } else {
+                        format!("{stage} · {state}")
+                    };
                     if ["succeeded", "failed", "cancelled", "interrupted"].contains(&state.as_str()) {
                         let jid = s.job.take().unwrap_or_default();
                         if state == "succeeded" {
-                            if matches!(s.job_kind.as_str(), "sample" | "reaction_preview" | "reference_frame") {
+                            if matches!(s.job_kind.as_str(), "sample" | "reaction_preview" | "sync_preview" | "reference_frame") {
                                 let filename = match s.job_kind.as_str() {
                                     "sample" => "voice-sample.wav",
                                     "reference_frame" => "reference.png",
@@ -555,6 +566,15 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                     c.download(&format!("/v1/jobs/{jid}/files/{filename}"), &dest)?;
                                     Ok(json!({"path":dest}))
                                 });
+                            } else if s.job_kind == "reference_suggestions" {
+                                if let Some(references) = value["result"]["references"].as_object() {
+                                    for (id, time) in references {
+                                        if let Some(time) = time.as_f64() {
+                                            s.references.insert(id.clone(), time);
+                                        }
+                                    }
+                                }
+                                s.status = "References suggested · Preview before analysis".into();
                             } else if s.job_kind == "filmcraft_export" {
                                 s.output_job = jid;
                                 s.status = "Export ready".into();
@@ -623,7 +643,7 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     }) {
                         Ok(_) => {
                             app.show_panel(PanelKind::Source);
-                            app.source_playback.clock.looping = s.job_kind == "reaction_preview";
+                            app.source_playback.clock.looping = false;
                             if s.job_kind != "reference_frame"
                                 && let Err(e) = app.play_source()
                             {
@@ -650,6 +670,7 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                 app.ui.mode = Mode::Edit;
                                 app.ui.text_tab = "Transcript".into();
                                 s.status = "Edit ready".into();
+                                app.set_workspace("Editing");
                             }
                             Err(e) => s.error = e.to_string(),
                         }
@@ -675,7 +696,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
             "compute_device":s.compute_device,"samples":s.samples,"job":s.job,
             "setup":{"ready":s.setup.ready(),"busy":s.setup.busy(),"stage":s.setup.stage,"error":s.setup.error},
             "job_kind":s.job_kind,"status":s.status,"error":s.error,"assembled":s.assembled,
-            "actions":["create","refresh","samples","save","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","sample","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
+            "actions":["create","refresh","samples","save","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","reference_suggestions","sample","sync_preview","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
     }
     if s.busy() && !(method == "podcast.action" && p["action"] == "cancel") {
         return Err("Podcast is busy; poll podcast.inspect or cancel the job".into());
@@ -755,9 +776,17 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
                     s.save();
                 }
                 "attach_cameras" => s.job(action, json!({"A":s.camera_a,"B":s.camera_b})),
-                "diarize" | "sync" | "transcribe" | "shots" | "reactions" | "sample" | "reference_frame" | "reaction_preview" | "transliterate" => {
-                    s.job(action, options)
-                }
+                "diarize"
+                | "sync"
+                | "transcribe"
+                | "shots"
+                | "reactions"
+                | "reference_suggestions"
+                | "sample"
+                | "sync_preview"
+                | "reference_frame"
+                | "reaction_preview"
+                | "transliterate" => s.job(action, options),
                 "open_edit" => {
                     let id = s.project_id.clone();
                     let project = s.project.clone();
@@ -850,6 +879,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(35, 43, 55);
     }
     ui.horizontal(|ui| {
+        if let Some(logo) = crate::brand::wordmark(ui.ctx(), true) {
+            ui.add(
+                egui::Image::new(&logo).uv(egui::Rect::from_min_max(egui::pos2(0.28, 0.20), egui::pos2(0.72, 0.62))).fit_to_exact_size(egui::vec2(44., 44.)),
+            );
+        }
         ui.label(egui::RichText::new("YouCraft").size(if guided { 26. } else { 18. }).strong());
         if button(app, ui, "models", "Models") {
             s.step = 0;
@@ -858,7 +892,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         if button(app, ui, "connect_ai", "Connect AI") {
             s.setup.ai_open = !s.setup.ai_open;
         }
-        if button(app, ui, "editor", "Editor") {
+        if s.assembled && button(app, ui, "editor", "Editor") {
             app.set_workspace("Editing");
         }
     });
@@ -923,36 +957,56 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     if !s.error.is_empty() {
         ui.colored_label(egui::Color32::LIGHT_RED, &s.error);
     }
-    if s.busy() {
-        ui.spinner();
-        if s.job.is_some() && s.pending.is_none() && button(app, ui, "cancel", "Cancel") {
-            let id = s.job.clone().unwrap_or_default();
-            s.start("cancel", move |c| c.post(&format!("/v1/jobs/{id}/cancel"), json!({})));
-        }
+    if s.pending.is_some() || s.job.is_some() {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.add_enabled_ui(s.job.is_some() && s.pending.is_none(), |ui| {
+                if button(app, ui, "cancel", "Cancel") {
+                    let id = s.job.clone().unwrap_or_default();
+                    s.start("cancel", move |c| c.post(&format!("/v1/jobs/{id}/cancel"), json!({})));
+                }
+            });
+        });
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
-    egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| {
-        ui.add_enabled_ui(!s.busy() && (!s.setup.busy() || s.step == 0), |ui| match s.step {
-            0 => connect(app, ui, &mut s),
-            1 => audio(app, ui, &mut s),
-            2 => speakers(app, ui, &mut s),
-            3 => cameras(app, ui, &mut s),
-            4 => review(app, ui, &mut s),
-            5 => reactions(app, ui, &mut s),
-            _ => editing(app, ui, &mut s),
+    if matches!(s.step, 2 | 3 | 5) {
+        ui.columns(2, |columns| {
+            egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut columns[0], |ui| {
+                workflow_step(app, ui, &mut s);
+            });
+            let ui = &mut columns[1];
+            ui.heading(if s.step == 3 { "Sync preview · Master audio" } else { "Preview" });
+            let width = ui.available_width();
+            let height = (width * 9. / 16. + 70.).min(ui.available_height().max(180.));
+            let (_, preview) = ui.allocate_space(egui::vec2(width, height));
+            if app.session.state.source_item.is_some() {
+                crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Source);
+            } else {
+                ui.painter().rect_filled(preview, 8., egui::Color32::from_rgb(12, 16, 23));
+                ui.painter().text(
+                    preview.center(),
+                    egui::Align2::CENTER_CENTER,
+                    if s.step == 2 { "Play a speaker sample" } else { "Choose a preview" },
+                    egui::FontId::proportional(16.),
+                    egui::Color32::GRAY,
+                );
+            }
         });
-    });
-    if app.session.state.source_item.is_some() && s.step != 0 {
-        let mut preview = true;
-        egui::Window::new("Listen / preview").default_size(egui::vec2(620., 300.)).open(&mut preview).show(ui.ctx(), |ui| {
-            let rect = ui.available_rect_before_wrap();
-            crate::panels::monitor::show(app, ui, rect, crate::panels::monitor::Which::Source);
-        });
-        if !preview {
-            let _ = app.session.execute("source.close", json!({}));
-        }
+    } else {
+        egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| workflow_step(app, ui, &mut s));
     }
     app.podcast = s;
+}
+fn workflow_step(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    ui.add_enabled_ui(s.pending.is_none() && s.job.is_none() && (!s.setup.busy() || s.step == 0), |ui| match s.step {
+        0 => connect(app, ui, s),
+        1 => audio(app, ui, s),
+        2 => speakers(app, ui, s),
+        3 => cameras(app, ui, s),
+        4 => review(app, ui, s),
+        5 => reactions(app, ui, s),
+        _ => editing(app, ui, s),
+    });
 }
 fn open_path(app: &mut FilmcraftApp, s: &mut State, path: &Path) {
     if let Some(open) = app.hooks.open_path.as_mut() {
@@ -1021,7 +1075,13 @@ fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let media_ready = s.setup.capabilities["media"]["ffmpeg"] == true && s.setup.capabilities["media"]["ffprobe"] == true;
     ui.label(format!("{}  Media tools", if media_ready { "✓" } else { "○" }));
     ui.label("Downloads require internet and several GB of space.");
-    ui.label("Reactions · model setup not included yet");
+    let vision_ready = s.setup.capabilities["installed_providers"]["reactions"] == true;
+    ui.label(if vision_ready { "✓  Reaction model" } else { "○  Reaction model · CPU" });
+    ui.add_enabled_ui(!s.setup.busy(), |ui| {
+        if button(app, ui, "setup_vision", "Install reactions") {
+            s.setup.start("Setup-vision.ps1", "-Mode", "cpu");
+        }
+    });
     if button(app, ui, "model_access", "Odia model access") {
         if let Some(open) = app.hooks.open_url.as_mut() {
             if let Err(error) = open("https://huggingface.co/bodhan-ai/indic-transcribe-core") {
@@ -1211,21 +1271,38 @@ fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         let id = s.project_id.clone();
         s.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
     }
-    for row in s.samples.clone() {
-        let speaker = string(&row, "speaker");
-        ui.group(|ui| {
-            ui.strong(&speaker);
-            if button(app, ui, &format!("listen.{speaker}"), "Listen") {
-                sample(s, number(&row, "start"), number(&row, "end"));
-            }
+    ui.heading("Who is the host?");
+    ui.weak("Listen, choose the host, then add each camera.");
+    let samples = s.samples.clone();
+    ui.columns(2, |columns| {
+        for (index, row) in samples.iter().enumerate() {
+            let ui = &mut columns[index % 2];
+            let speaker = string(row, "speaker");
             let host = s.project["settings"]["host_speaker"].as_str() == Some(speaker.as_str());
-            let r = ui.radio(host, "Host");
-            app.auto.add_response(&format!("podcast.host.{speaker}"), &r, "Choose host");
-            if r.clicked() {
-                s.project["settings"]["host_speaker"] = json!(speaker);
-            }
-        });
-    }
+            egui::Frame::group(ui.style()).inner_margin(20.).show(ui, |ui| {
+                ui.set_min_width((ui.available_width() - 8.).max(120.));
+                ui.heading(format!("Speaker {}", index + 1));
+                ui.label(if host {
+                    "Host"
+                } else if string(&s.project["settings"], "host_speaker").is_empty() {
+                    "Not assigned"
+                } else {
+                    "Guest"
+                });
+                ui.add_space(12.);
+                ui.label(format!("{:.0}–{:.0}s", number(row, "start"), number(row, "end")));
+                if button(app, ui, &format!("listen.{speaker}"), "Play sample") {
+                    sample(s, number(row, "start"), number(row, "end"));
+                }
+                let r = ui.selectable_label(host, "Choose as host");
+                app.auto.add_response(&format!("podcast.host.{speaker}"), &r, "Choose host");
+                if r.clicked() {
+                    s.project["settings"]["host_speaker"] = json!(speaker);
+                }
+            });
+            ui.add_space(12.);
+        }
+    });
     if button(app, ui, "lock_roles", "Confirm speakers") {
         let host = string(&s.project["settings"], "host_speaker");
         match lock_roles(s, &host) {
@@ -1264,46 +1341,85 @@ fn shard_list(app: &mut FilmcraftApp, ui: &mut egui::Ui, paths: &mut Vec<String>
     }
 }
 fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
-    picker(app, ui, s);
-    ui.strong("A · Host");
-    shard_list(app, ui, &mut s.camera_a, "a");
-    ui.strong("B · Guest");
-    shard_list(app, ui, &mut s.camera_b, "b");
-    if button(app, ui, "attach", "Add recordings") {
-        s.job("attach_cameras", json!({"A":s.camera_a,"B":s.camera_b}));
-    }
-    if button(app, ui, "sync", "Sync") {
-        s.job("sync", json!({}));
-    }
+    ui.heading("Cameras & sync");
+    ui.horizontal_wrapped(|ui| {
+        if button(app, ui, "attach", "Add recordings") {
+            s.job("attach_cameras", json!({"A":s.camera_a,"B":s.camera_b}));
+        }
+        if button(app, ui, "sync", "Sync audio") {
+            s.job("sync", json!({}));
+        }
+        if button(app, ui, "save_sync", "Save sync") {
+            s.save();
+        }
+        let cameras = rows(&s.project, "clips");
+        let ready = cameras.iter().any(|c| c["camera"] != "master") && cameras.iter().filter(|c| c["camera"] != "master").all(|c| c["sync_reviewed"] == true);
+        ui.add_enabled_ui(ready, |ui| {
+            if button(app, ui, "transcribe", "Continue · Transcript") {
+                s.job("transcribe", json!({}));
+            }
+        });
+    });
+    ui.weak("Preview with master audio before confirming each recording.");
+    egui::CollapsingHeader::new("Add camera files").default_open(!rows(&s.project, "clips").iter().any(|c| c["camera"] != "master")).show(ui, |ui| {
+        picker(app, ui, s);
+        ui.columns(2, |columns| {
+            columns[0].strong("Host camera");
+            shard_list(app, &mut columns[0], &mut s.camera_a, "a");
+            columns[1].strong("Guest camera");
+            shard_list(app, &mut columns[1], &mut s.camera_b, "b");
+        });
+    });
     let mut clips = rows(&s.project, "clips");
+    let mut preview = None;
     for clip in &mut clips {
         if clip["camera"] == "master" {
             continue;
         }
-        let sync_id = format!("sync.{}", string(clip, "id"));
+        let id = string(clip, "id");
+        let sync_id = format!("sync.{id}");
+        let original_offset = clip["offset"].clone();
+        let original_rate = clip["rate"].clone();
         ui.group(|ui| {
-            ui.label(format!("{} · {}", string(clip, "camera"), string(clip, "path")));
-            ui.label(format!("Confidence: {:?} · {}", clip["sync_score"], clip["warnings"]));
-            ui.horizontal(|ui| {
-                ui.label("Offset (s)");
-                numeric(app, ui, clip, "offset", &sync_id);
-                ui.label("Clock drift");
-                numeric(app, ui, clip, "rate", &sync_id);
+            ui.set_min_width((ui.available_width() - 8.).max(120.));
+            let path = string(clip, "path");
+            let name = Path::new(&path).file_name().unwrap_or_default().to_string_lossy();
+            ui.strong(format!("{} · {name}", if clip["camera"] == "A" { "Host" } else { "Guest" }));
+            ui.horizontal_wrapped(|ui| {
+                for (position, label) in [(0., "Preview start"), (0.5, "Preview middle"), (1., "Preview end")] {
+                    if button(app, ui, &format!("sync.preview.{id}.{position}"), label) {
+                        preview = Some(json!({"clip_id":id,"position":position}));
+                    }
+                }
+                let mut reviewed = clip["sync_reviewed"] == true;
+                let r = ui.checkbox(&mut reviewed, "Sync confirmed");
+                app.auto.add_response(&format!("podcast.sync.reviewed.{id}"), &r, "Sync confirmed");
+                if r.changed() {
+                    clip["sync_reviewed"] = json!(reviewed);
+                }
             });
-            let mut reviewed = clip["sync_reviewed"] == true;
-            let r = ui.checkbox(&mut reviewed, "Sync reviewed");
-            app.auto.add_response(&format!("podcast.sync.reviewed.{}", string(clip, "id")), &r, "Sync reviewed");
-            if r.changed() {
-                clip["sync_reviewed"] = json!(reviewed);
+            if let Some(score) = clip["sync_score"].as_f64() {
+                ui.small(format!("Match confidence: {score:.2}"));
+            }
+            for warning in clip["warnings"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                ui.colored_label(egui::Color32::YELLOW, warning);
+            }
+            ui.collapsing("Adjust timing", |ui| {
+                ui.horizontal(|ui| {
+                    ui.label("Offset (s)");
+                    numeric(app, ui, clip, "offset", &sync_id);
+                    ui.label("Clock drift");
+                    numeric(app, ui, clip, "rate", &sync_id);
+                });
+            });
+            if clip["offset"] != original_offset || clip["rate"] != original_rate {
+                clip["sync_reviewed"] = json!(false);
             }
         });
     }
     set_rows(s, "clips", clips);
-    if button(app, ui, "save_sync", "Save sync") {
-        s.save();
-    }
-    if button(app, ui, "transcribe", "Transcribe") {
-        s.job("transcribe", json!({}));
+    if let Some(options) = preview {
+        s.job("sync_preview", options);
     }
 }
 fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
@@ -1455,6 +1571,17 @@ fn replace_word(text: &str, selected: Option<usize>, expected: &str, replacement
 }
 
 fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    ui.heading("Host reactions");
+    ui.horizontal_wrapped(|ui| {
+        if button(app, ui, "suggest_references", "Suggest references") {
+            s.job("reference_suggestions", json!({}));
+        }
+        if button(app, ui, "reaction_models", "Model setup") {
+            s.step = 0;
+            s.start("capabilities", |c| c.get("/v1/capabilities"));
+        }
+    });
+    ui.weak("Preview each reference, then find reactions.");
     let host = string(&s.project["settings"], "host_speaker");
     let camera = s.project["settings"]["speaker_camera"][&host].clone();
     for clip in rows(&s.project, "clips") {
@@ -1473,7 +1600,8 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             }
         }
     }
-    let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0).text("Gaze tolerance °"));
+    let tolerance_label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance · % eye width" };
+    let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0).text(tolerance_label));
     app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
     let r = ui.add(egui::Slider::new(&mut s.interval, 15.0..=180.0).text("Interval (s)"));
     app.auto.add_response("podcast.reaction_interval", &r, "Review interval");
@@ -1527,10 +1655,10 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if button(app, ui, "save_reactions", "Save choices") {
         s.save();
     }
-    if s.remote && button(app, ui, "open_editor", "Open edit") {
+    if s.remote && button(app, ui, "open_editor", "Open editor") {
         s.job("proxies", json!({}));
     }
-    if !s.remote && button(app, ui, "open_originals", "Open edit") {
+    if !s.remote && button(app, ui, "open_originals", "Open editor") {
         let id = s.project_id.clone();
         let project = s.project.clone();
         s.start("assemble", move |c| {

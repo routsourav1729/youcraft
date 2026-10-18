@@ -62,6 +62,12 @@ class Queue:
             raise KeyError(job_id)
         data = dict(row)
         data.pop('payload')
+        status = self.store.directory(data['project_id']) / 'jobs' / job_id / 'progress.json'
+        try:
+            detail = json.loads(status.read_text(encoding='utf-8'))
+            data['detail'] = detail
+        except (OSError, ValueError):
+            data['detail'] = {}
         if data['result']:
             data['result'] = json.loads(data['result'])
         return data
@@ -101,8 +107,15 @@ class Queue:
             def cancelled():
                 return self.stopping.is_set() or self.get(jid)['state'] == 'cancelling'
             def progress(value):
-                with self.store.connect() as db:
-                    db.execute('UPDATE jobs SET progress=? WHERE id=?', (value, jid))
+                if isinstance(value, dict):
+                    status = directory / 'progress.json'
+                    temporary = status.with_suffix('.tmp')
+                    temporary.write_text(json.dumps(value), encoding='utf-8')
+                    temporary.replace(status)
+                    value = value.get('fraction')
+                if value is not None:
+                    with self.store.connect() as db:
+                        db.execute('UPDATE jobs SET progress=? WHERE id=?', (max(0., min(1., value)), jid))
             try:
                 payload = json.loads(row['payload'])
                 project = Project.model_validate(payload['project'])

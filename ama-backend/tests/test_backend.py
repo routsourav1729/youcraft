@@ -112,7 +112,7 @@ def test_setup_status_distinguishes_configured_from_installed(client, tmp_path, 
     monkeypatch.setattr(api, 'configuration', lambda: {'diarize':dict(model_path=str(model), python=sys.executable)})
     status = client.get('/v1/capabilities').json()
     assert status['configured_providers'] == {'diarize':'external-command'}
-    assert status['installed_providers'] == {'diarize':False,'transcribe':False}
+    assert status['installed_providers'] == {'diarize':False,'transcribe':False,'reactions':False}
     assert not status['ready']
     model.mkdir()
     (model/'config.json').write_text('{}')

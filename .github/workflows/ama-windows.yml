@@ -88,6 +88,17 @@ jobs:
           } finally { $env:HTTPS_PROXY = $savedProxy }
           & "$env:RUNNER_TEMP/youcraft-runtime-test/speech-cpu/Scripts/python.exe" ama-backend/tests/windows_model_smoke.py "$env:RUNNER_TEMP/youcraft-runtime-test"
           if ($LASTEXITCODE -ne 0) { throw 'Downloaded CPU speaker model failed inference' }
+      - name: Reaction runtime and verified model
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-vision.ps1 -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -ScriptsDirectory "$env:GITHUB_WORKSPACE/ama-backend/scripts" -StatusFile "$env:RUNNER_TEMP/vision-status.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Reaction model setup failed' }
+          $savedProxy = $env:HTTPS_PROXY
+          try {
+            $env:HTTPS_PROXY = 'http://127.0.0.1:1'
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-vision.ps1 -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -ScriptsDirectory "$env:GITHUB_WORKSPACE/ama-backend/scripts"
+            if ($LASTEXITCODE -ne 0) { throw 'Reaction pack did not reuse installed files offline' }
+          } finally { $env:HTTPS_PROXY = $savedProxy }
       - name: Rust toolchain
         run: rustup toolchain install 1.95.0 --profile minimal
       - uses: Swatinem/rust-cache@v2
@@ -96,6 +107,17 @@ jobs:
           cache-workspace-crates: true
       - name: Build editor and MCP CLI
         run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
+      - name: Laptop workflow layout
+        shell: pwsh
+        run: |
+          $env:FILMCRAFT_UI_SNAPSHOT_DIR = "$env:GITHUB_WORKSPACE/release/ui-preview"
+          cargo +1.95.0 test --workspace --release --test podcast_ui podcast_workspace_renders_every_step_before_opening_native_editor -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('release/ui-preview/*.png') != ''
+        with:
+          name: YouCraft-UI-preview
+          path: release/ui-preview/*.png
       - name: Assemble application
         shell: pwsh
         run: |
@@ -113,7 +135,7 @@ jobs:
           }
           Copy-Item ama-backend/packaging/models-3050.example.json release/YouCraft/
           Copy-Item ama-backend/docs/models.md release/YouCraft/MODEL-SETUP.md
-          Copy-Item ama-backend/scripts/download_models.py,ama-backend/scripts/configure_local_models.py release/YouCraft/
+          Copy-Item ama-backend/scripts/download_models.py,ama-backend/scripts/configure_local_models.py,ama-backend/scripts/setup_vision.py release/YouCraft/
       - name: Build Windows installer
         shell: pwsh
         run: |

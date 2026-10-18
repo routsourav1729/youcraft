@@ -143,8 +143,9 @@ def process(store, project, kind, options, directory, cancel, progress):
         output.write_text(json.dumps(media.waveform(path)))
         return dict(files=[output.name])
     if kind == 'diarize':
+        progress(dict(stage='Preparing audio'))
         audio = media.audio_copy(master, cache, cancel=cancel)
-        response = providers.invoke('diarize', dict(audio=str(audio)), cache, cancel, device=project.settings.compute_device)
+        response = providers.invoke('diarize', dict(audio=str(audio)), cache, cancel, device=project.settings.compute_device, progress=progress)
         from .podcast import clean_activity
         turns, removed = clean_activity(response['activity'], project.duration)
         if not turns:
@@ -177,16 +178,30 @@ def process(store, project, kind, options, directory, cancel, progress):
         media.run([media.binary('ffmpeg'), '-v', 'error', '-nostdin', '-y', '-ss', str(options['time']),
                    '-i', clip.path, '-frames:v', '1', '-vf', 'scale=960:-2', directory/'reference.png'], cancel)
         return dict(files=['reference.png'])
-    if kind == 'reaction_preview':
-        reaction = next((r for r in project.reactions if r.id == options['reaction_id']), None)
-        if reaction is None:
-            raise ValueError('Reaction no longer exists')
-        clip = next(c for c in project.clips if c.id == reaction.clip_id)
+    if kind in ('reaction_preview', 'sync_preview'):
+        if kind == 'reaction_preview':
+            reaction = next((r for r in project.reactions if r.id == options['reaction_id']), None)
+            if reaction is None:
+                raise ValueError('Reaction no longer exists')
+            clip = next(c for c in project.clips if c.id == reaction.clip_id)
+            start, end = reaction.start, reaction.end
+        else:
+            clip = next((c for c in project.clips if c.id == options['clip_id'] and c.camera != 'master' and c.has_video), None)
+            if clip is None:
+                raise ValueError('Choose a camera recording')
+            first, last = max(0., clip.offset), min(project.duration, clip.offset + clip.duration * clip.rate)
+            start = first + max(0., last - first - 12.) * options.get('position', .5)
+            end = min(last, start + 12.)
+        if end <= start:
+            raise ValueError('Camera and master audio do not overlap; correct the offset first')
+        if media.fingerprint(clip.path) != clip.fingerprint:
+            raise ValueError('Source changed; reimport before previewing')
+        progress(dict(stage='Preparing synced preview'))
         destination = directory / 'reaction.mp4'
-        length = reaction.end - reaction.start
+        length = end - start
         media.run([media.binary('ffmpeg'), '-v','error','-nostdin','-y',
-            '-ss', str((reaction.start-clip.offset)/clip.rate), '-i', clip.path,
-            '-ss', str(reaction.start), '-i', master.path,
+            '-ss', str((start-clip.offset)/clip.rate), '-i', clip.path,
+            '-ss', str(start), '-i', master.path,
             '-filter_complex', f'[0:v]setpts={clip.rate}*(PTS-STARTPTS),scale=640:-2[v]',
             '-map','[v]','-map','1:a:0','-t',str(length),'-c:v','libx264','-preset','fast',
             '-c:a','aac','-movflags','+faststart',destination],cancel)
@@ -194,7 +209,7 @@ def process(store, project, kind, options, directory, cancel, progress):
     if kind == 'proxies':
         from .remote_media import make_proxies
         return make_proxies(project, cache, directory, cancel, progress)
-    if kind == 'reactions':
+    if kind in ('reactions', 'reference_suggestions'):
         from .podcast import suggestions
         if not project.settings.roles_locked or not project.shots:
             raise ValueError('Lock speakers, review sync and generate base cuts first')
@@ -204,11 +219,13 @@ def process(store, project, kind, options, directory, cancel, progress):
             raise ValueError('Review host camera synchronization before reaction analysis')
         for clip in clips:
             reference = options['references'].get(clip.id)
-            if reference is None or not 0 <= reference < clip.duration:
+            if kind == 'reactions' and (reference is None or not 0 <= reference < clip.duration):
                 raise ValueError('Choose a reference frame within every host camera shard')
             if media.fingerprint(clip.path) != clip.fingerprint:
                 raise ValueError('Host source changed; reimport before analysis')
-        response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], **options), cache, cancel, device=project.settings.compute_device)
+        response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], reference_only=kind == 'reference_suggestions', **options), cache, cancel, device=project.settings.compute_device, progress=progress)
+        if kind == 'reference_suggestions':
+            return dict(references=response['references'])
         project.reactions = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'])
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
@@ -218,6 +235,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         store.save(project, base_revision)
         return dict(revision=base_revision + 1, shots=len(project.shots))
     if kind == 'transcribe':
+        progress(dict(stage='Preparing speech segments'))
         if not project.activity:
             raise ValueError('Diarize or enter speaker activity first')
         audio_paths = {None: media.audio_copy(master, cache, cancel=cancel)}
@@ -225,7 +243,7 @@ def process(store, project, kind, options, directory, cancel, progress):
             audio_paths[channel] = media.audio_copy(master, cache, channel=channel, cancel=cancel)
         chunks, captions = chunk_turns(project, audio_paths, cache)
         if chunks:
-            response = providers.invoke('transcribe', dict(chunks=chunks, audio_fingerprint=master.fingerprint), cache, cancel, device=project.settings.compute_device)
+            response = providers.invoke('transcribe', dict(chunks=chunks, audio_fingerprint=master.fingerprint), cache, cancel, device=project.settings.compute_device, progress=progress)
             rows = response['captions']
             by_id = {row['id']: row['text'] for row in rows}
             if len(by_id) != len(rows) or set(by_id) != {c['id'] for c in chunks}:

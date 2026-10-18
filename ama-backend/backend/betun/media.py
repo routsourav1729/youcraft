@@ -63,7 +63,7 @@ def binary(name):
     return str(path)
 
 
-def run(args, cancel=lambda: False, timeout=3600):
+def run(args, cancel=lambda: False, timeout=3600, on_poll=None):
     # File-backed output prevents pipe deadlocks and unbounded RAM for noisy tools.
     import tempfile
     with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
@@ -73,6 +73,8 @@ def run(args, cancel=lambda: False, timeout=3600):
             started = time.monotonic()
             try:
                 while process.poll() is None:
+                    if on_poll:
+                        on_poll()
                     if cancel():
                         raise Cancelled('Job cancelled')
                     if time.monotonic() - started > timeout:

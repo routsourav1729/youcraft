@@ -19,7 +19,7 @@ fn podcast_workspace_renders_every_step_before_opening_native_editor() {
     });
     app.podcast.samples = vec![serde_json::json!({"speaker":"SPEAKER_00","start":0,"end":8}), serde_json::json!({"speaker":"SPEAKER_01","start":8,"end":20})];
     let screenshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
-    let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1600., 1000.)).with_max_steps(10000);
+    let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 768.)).with_max_steps(10000);
     if screenshots.is_some() {
         builder = builder.wgpu();
     }

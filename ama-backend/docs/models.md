@@ -133,3 +133,31 @@ updates its manifest. A validated runtime marker avoids reinstalling dependencie
 on every retry. Changing CPU/NVIDIA mode uses the corresponding separate runtime
 and shared model cache. Upgrading from an older installer performs one validation
 pass to create these records. Runtime dependency changes must bump the marker.
+
+## 0.1.5 reaction pack and workflow
+
+The guided **Install reactions** action installs a separate CPU runtime with
+MediaPipe 0.10.21, NumPy 1.26.4 and OpenCV contrib 4.11.0.86. It downloads Google's
+versioned Face Landmarker float16/v1 model (3,758,596 bytes), verifies SHA-256
+`64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`, and validates
+that the model can be loaded before writing the reactions provider configuration.
+Partial model downloads resume; complete models and validated runtimes are reused.
+
+This default `mediapipe-reference` provider compares iris positions normalized by
+eye width with a chosen reference and gates head yaw within 20 degrees. Its eye
+tolerance is a percentage of eye width, **not calibrated gaze degrees**. Smile
+scores and temporal pitch changes rank matching intervals. It samples at 8 fps,
+rejects ambiguous/multiple faces and blinks, and limits inference input width to
+960 pixels. Suggested reference times represent common visible eye positions;
+the user must preview and adjust them to establish the intended look direction.
+The existing `mediapipe-l2cs` adapter remains an advanced, separately configured
+angle-based option. Neither is claimed to be current research SOTA or validated
+for every lighting/camera/glasses condition. Suggestions remain editor-reviewed.
+
+Speech and reaction inference use sequential disposable processes. No concurrent
+ASR/diarization preloading occurs during CPU/disk-heavy sync. Progress distinguishes
+runtime loading, model loading, speech feature preparation, measured ASR chunk
+completion, and saving results. Model loading and monolithic diarization do not
+claim a fabricated percentage. Synced camera previews use the master recording,
+with start/middle/end checks before confirmation. Final reaction choices are saved
+when opening the existing Filmcraft editor and linked transcript workflow.

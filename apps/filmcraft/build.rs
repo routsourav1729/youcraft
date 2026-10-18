@@ -7,7 +7,7 @@
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../../assets/app-icon/filmcraft.ico");
+    println!("cargo:rerun-if-changed=../../assets/youcraft/logo.ico");
     println!("cargo:rerun-if-env-changed=FILMCRAFT_REQUIRE_WINRES");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
@@ -19,6 +19,7 @@ fn main() {
 mod windows {
     pub fn embed_resources() {
         let mut res = winresource::WindowsResource::new();
+        res.set_icon("../../assets/youcraft/logo.ico");
         res.set("ProductName", "YouCraft")
             .set("FileDescription", "YouCraft podcast editor")
             .set("LegalCopyright", "Copyright (c) the FilmCraft contributors. MIT OR Apache-2.0.")
