@@ -1190,7 +1190,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 s.review_preview(s.step == 5);
             }
             let width = ui.available_width();
-            let height = (width * 9. / 16. + 70.).min(ui.available_height().max(180.));
+            let caption_space = if matches!(s.step, 4 | 5) { 64. } else { 0. };
+            let height = (width * 9. / 16. + 70.).min((ui.available_height() - caption_space).max(120.));
             let (_, preview) = ui.allocate_space(egui::vec2(width, height));
             if s.review_active && matches!(s.step, 3 | 4 | 5) || app.session.state.source_item.is_some() {
                 let which =
