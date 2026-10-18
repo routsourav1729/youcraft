@@ -39,6 +39,9 @@ jobs:
           python -m pytest -q tests
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/betun.spec --noconfirm
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & dist/BetunBackend/BetunBackend.exe --check-typing
+          if ($LASTEXITCODE -ne 0) { throw 'Bundled Odia typing is incomplete' }
       - name: Validate setup helpers
         shell: pwsh
         run: |
@@ -107,6 +110,8 @@ jobs:
           cache-workspace-crates: true
       - name: Build editor and MCP CLI
         run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
+      - name: Native review timeline
+        run: cargo +1.95.0 test --release -p filmcraft-engine podcast::tests::review_sequence_keeps_master_audio_through_gaps_and_three_views
       - name: Laptop workflow layout
         shell: pwsh
         run: |

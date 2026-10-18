@@ -9,9 +9,16 @@ def main():
     parser.add_argument('--data-dir', help='Writable project/cache directory outside executable')
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--open', action='store_true', help='Open the local review UI in your browser')
+    parser.add_argument('--check-typing', action='store_true', help='Verify bundled offline Odia typing and exit')
     parser.add_argument('--check-mcp', help='Check the installed MCP executable and exit')
     parser.add_argument('--tools-only', action='store_true', help='Check MCP without an open editor')
     args = parser.parse_args()
+    if args.check_typing:
+        from indic_transliteration import sanscript
+        if sanscript.transliterate('namaskaara', sanscript.ITRANS, sanscript.ORIYA) != 'ନମସ୍କାର':
+            parser.exit(1, 'Bundled Odia typing failed\n')
+        print('Bundled Odia typing ready')
+        return
     if args.check_mcp:
         import json
         from betun.mcp_check import check

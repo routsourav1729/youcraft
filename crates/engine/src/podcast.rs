@@ -289,6 +289,27 @@ mod tests {
         (root, plan)
     }
     #[test]
+    fn review_sequence_keeps_master_audio_through_gaps_and_three_views() {
+        let (root, mut plan) = fixture();
+        plan["review"] = json!(true);
+        plan["clips"][0]["video"] = json!([]);
+        plan["clips"][1]["video"] = json!([
+            {"asset":"camera","source_in":0,"speed":1.0,"side":"review-bottom-A"},
+            {"asset":"camera","source_in":0,"speed":1.0,"side":"review-bottom-B"},
+            {"asset":"camera","source_in":0,"speed":1.0,"side":"review-top-full"}
+        ]);
+        let mut session = Session::default();
+        session.execute("podcast.assemble", plan).unwrap();
+        let sequence = session.active_sequence().unwrap();
+        sequence.check().unwrap();
+        assert_eq!(sequence.audio_tracks[0].items.len(), 2);
+        assert_eq!(sequence.video_tracks.iter().map(|track| track.items.len()).sum::<usize>(), 3);
+        assert_eq!(sequence.duration(), Tick::from_seconds_f64(4.));
+        assert!(crate::transcript::sequence_words(&session).is_empty());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn podcast_assemble_links_text_and_exports_after_ripple_delete() {
         let (root, plan) = fixture();
         let mut s = Session::default();

@@ -73,6 +73,8 @@ pub struct State {
     #[serde(skip)]
     review_item: Option<u64>,
     #[serde(skip)]
+    review_active: bool,
+    #[serde(skip)]
     review_seek: f64,
     #[serde(skip)]
     storage: Value,
@@ -135,6 +137,7 @@ impl Default for State {
             edited_at: None,
             episodes: Vec::new(),
             review_item: None,
+            review_active: false,
             review_seek: 0.,
             storage: Value::Null,
             confirm_delete: false,
@@ -729,6 +732,8 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     }
                 }
                 "play" => {
+                    s.review_active = false;
+                    app.stop();
                     let result = app.session.execute("file.import", json!({"paths":[value["path"]]}));
                     match result.and_then(|v| {
                         let item = v["items"]
@@ -764,8 +769,9 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                         match app.session.execute("podcast.assemble", value["plan"].clone()).and_then(|result| {
                             let item = result["sequence"].as_u64().ok_or_else(|| filmcraft_engine::EngineError::Other("Review sequence missing".into()))?;
                             s.review_item = Some(item);
-                            app.session.execute("source.open", json!({"item":item}))?;
-                            app.session.execute("source.setPlayhead", json!({"seconds":s.review_seek}))
+                            s.review_active = true;
+                            app.stop_source();
+                            app.session.execute("playhead.set", json!({"seconds":s.review_seek}))
                         }) {
                             Ok(_) => s.status = "Review ready · Master audio".into(),
                             Err(error) => s.error = error.to_string(),
@@ -814,7 +820,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
             "compute_device":s.compute_device,"samples":s.samples,"job":s.job,
             "setup":{"ready":s.setup.ready(),"busy":s.setup.busy(),"stage":s.setup.stage,"error":s.setup.error},
             "job_kind":s.job_kind,"status":s.status,"error":s.error,"assembled":s.assembled,
-            "actions":["create","refresh","samples","save","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","reference_suggestions","sample","sync_preview","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
+            "actions":["create","refresh","samples","save","review_playback","accept_transcript","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","reference_suggestions","sample","sync_preview","reference_frame","reaction_preview","transliterate","open_edit","cancel"]}));
     }
     if s.busy() && !(method == "podcast.action" && p["action"] == "cancel") {
         return Err("Podcast is busy; poll podcast.inspect or cancel the job".into());
@@ -884,6 +890,13 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
                 }
                 "refresh" => s.refresh(),
                 "save" => s.save(),
+                "review_playback" => s.review_preview(options["edit"].as_bool().unwrap_or(false)),
+                "accept_transcript" => {
+                    for caption in s.project["captions"].as_array_mut().into_iter().flatten() {
+                        caption["reviewed"] = json!(true);
+                    }
+                    s.job("shots", json!({}));
+                }
                 "samples" => {
                     let id = s.project_id.clone();
                     s.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
@@ -1173,10 +1186,12 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             let width = ui.available_width();
             let height = (width * 9. / 16. + 70.).min(ui.available_height().max(180.));
             let (_, preview) = ui.allocate_space(egui::vec2(width, height));
-            if app.session.state.source_item.is_some() {
-                crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Source);
+            if s.review_active && matches!(s.step, 3 | 4 | 5) || app.session.state.source_item.is_some() {
+                let which =
+                    if s.review_active && matches!(s.step, 3 | 4 | 5) { crate::panels::monitor::Which::Program } else { crate::panels::monitor::Which::Source };
+                crate::panels::monitor::show(app, ui, preview, which);
                 if matches!(s.step, 4 | 5) && s.review_item.is_some() {
-                    let time = app.session.state.source_playhead.seconds();
+                    let time = app.session.playhead().seconds();
                     for caption in rows(&s.project, "captions").iter().filter(|c| number(c, "start") <= time && time < number(c, "end")) {
                         ui.label(egui::RichText::new(string(caption, "text")).size(20.));
                     }
@@ -1197,6 +1212,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     if s.project != before_edit && !s.project_id.is_empty() && !s.busy() {
         s.edited_at = Some(Instant::now());
+        if s.review_active && (s.project["clips"] != before_edit["clips"] || s.project["reactions"] != before_edit["reactions"]) {
+            app.stop();
+            s.review_seek = app.session.playhead().seconds();
+            s.follow_up = "review".into();
+        }
         s.status = "Unsaved changes".into();
         ui.ctx().request_repaint_after(Duration::from_secs(1));
     }
@@ -1656,8 +1676,8 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         set_rows(s, "activity", activity);
     });
     let mut captions = rows(&s.project, "captions");
-    let play_time = app.session.state.source_playhead.seconds();
-    let playing = s.review_item.is_some() && app.source_playback.clock.playing;
+    let play_time = app.session.playhead().seconds();
+    let playing = s.review_active && app.playback.playing;
     if playing && let Some(index) = captions.iter().position(|c| number(c, "start") <= play_time && play_time < number(c, "end")) {
         s.review_page = index / 40;
     }
@@ -1679,13 +1699,14 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                     numeric(app, ui, c, "end", &format!("caption.{i}"));
                     if button(app, ui, &format!("caption.play.{i}"), "Play") {
                         if let Some(item) = s.review_item {
-                            let result = app.session.execute("source.open", json!({"item":item})).and_then(|_| {
-                                app.session.execute("source.setPlayhead", json!({"time":filmcraft_time::Tick::from_seconds_f64(number(c, "start")).0}))
+                            let result = app.session.execute("sequence.open", json!({"item":item})).and_then(|_| {
+                                app.session.execute("playhead.set", json!({"time":filmcraft_time::Tick::from_seconds_f64(number(c, "start")).0}))
                             });
                             if let Err(error) = result {
                                 s.error = error.to_string();
-                            } else if let Err(error) = app.play_source() {
-                                s.error = error;
+                            } else {
+                                s.review_active = true;
+                                app.play(1.);
                             }
                         } else {
                             s.error = "Load review to play both cameras".into();
@@ -1699,10 +1720,10 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 let r = ui.add(egui::TextEdit::multiline(&mut text).desired_width(ui.available_width()));
                 app.auto.add_response(&format!("podcast.caption.text.{i}"), &r, "Odia text");
                 if r.gained_focus() {
-                    app.source_playback.clock.playing = false;
+                    app.stop();
                 }
                 if r.changed() {
-                    app.source_playback.clock.playing = false;
+                    app.stop();
                     c["text"] = json!(text);
                     c["reviewed"] = json!(false);
                 }
@@ -1713,7 +1734,7 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                     r.scroll_to_me(Some(egui::Align::Center));
                 }
                 if button(app, ui, &format!("caption.roman.{i}"), "Romanized Odia") {
-                    app.source_playback.clock.playing = false;
+                    app.stop();
                     s.caption_id = string(c, "id");
                     s.target_word_index = None;
                     s.target_word.clear();
