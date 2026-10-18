@@ -24,6 +24,7 @@ pub struct State {
     pub compute_device: String,
     pub monitor_volume_db: f64,
     pub monitor_muted: bool,
+    pub focus_video: bool,
     pub project_id: String,
     pub name: String,
     pub project: Value,
@@ -91,6 +92,7 @@ impl Default for State {
             endpoint: "http://127.0.0.1:8765".into(),
             monitor_volume_db: 0.,
             monitor_muted: false,
+            focus_video: false,
             token: String::new(),
             remote: false,
             compute_device: "auto".into(),
@@ -1021,20 +1023,20 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     if guided {
         ui.painter().rect_filled(rect.shrink(8.), 12., egui::Color32::from_rgb(20, 25, 33));
     }
-    let inset = if guided { 28. } else { 12. };
+    let inset = if guided { 16. } else { 12. };
     let mut child = ui.new_child(egui::UiBuilder::new().max_rect(rect.shrink(inset)).layout(egui::Layout::top_down(egui::Align::Min)));
     let ui = &mut child;
     if guided {
         ui.style_mut().override_font_id = Some(egui::FontId::proportional(15.));
-        ui.spacing_mut().item_spacing = egui::vec2(10., 10.);
-        ui.spacing_mut().button_padding = egui::vec2(12., 7.);
+        ui.spacing_mut().item_spacing = egui::vec2(8., 6.);
+        ui.spacing_mut().button_padding = egui::vec2(10., 5.);
         ui.spacing_mut().text_edit_width = 520.;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(35, 43, 55);
     }
     ui.horizontal(|ui| {
         if let Some(logo) = crate::brand::wordmark(ui.ctx(), true) {
             ui.add(
-                egui::Image::new(&logo).uv(egui::Rect::from_min_max(egui::pos2(0.28, 0.20), egui::pos2(0.72, 0.62))).fit_to_exact_size(egui::vec2(44., 44.)),
+                egui::Image::new(&logo).uv(egui::Rect::from_min_max(egui::pos2(0.28, 0.20), egui::pos2(0.72, 0.62))).fit_to_exact_size(egui::vec2(36., 36.)),
             );
         }
         ui.label(egui::RichText::new("YouCraft").size(if guided { 26. } else { 18. }).strong());
@@ -1191,12 +1193,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
     });
     ui.separator();
-    if !s.project_id.is_empty() {
-        ui.small(format!("Episode · {}", string(&s.project, "name")));
-    }
-    if !s.status.is_empty() {
-        ui.label(&s.status);
-    }
+    ui.horizontal_wrapped(|ui| {
+        if !s.project_id.is_empty() {
+            ui.small(string(&s.project, "name"));
+        }
+        if !s.status.is_empty() {
+            ui.weak(&s.status);
+        }
+    });
     if !s.error.is_empty() {
         ui.colored_label(egui::Color32::LIGHT_RED, &s.error);
     }
@@ -1214,13 +1218,15 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     if matches!(s.step, 2 | 3 | 4 | 5) {
         let bounds = ui.available_rect_before_wrap();
-        let height = (bounds.height() * 0.64).max(270.).min((bounds.height() - 110.).max(180.));
+        let height = if s.focus_video { bounds.height() } else { (bounds.height() * 0.78).max(330.).min((bounds.height() - 110.).max(220.)) };
         let top = Rect::from_min_max(bounds.min, egui::pos2(bounds.right(), bounds.top() + height));
         let bottom = Rect::from_min_max(egui::pos2(bounds.left(), top.bottom() + 8.), bounds.max);
         let mut preview = ui.new_child(egui::UiBuilder::new().max_rect(top));
         review_player(app, &mut preview, &mut s);
-        let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(bottom));
-        egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| workflow_step(app, ui, &mut s));
+        if !s.focus_video {
+            let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(bottom));
+            egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| workflow_step(app, ui, &mut s));
+        }
     } else {
         egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| workflow_step(app, ui, &mut s));
     }
@@ -1239,6 +1245,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
 fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.horizontal_wrapped(|ui| {
         ui.strong(if s.step == 5 { "Edit review" } else { "Host · Guest" });
+        ui.toggle_value(&mut s.focus_video, "Focus video");
         if !s.busy() && button(app, ui, "review_playback", "Reload") {
             s.review_preview(s.step == 5);
         }
