@@ -26,6 +26,7 @@ pub struct State {
     pub hf_token: String,
     pub stage: String,
     pub error: String,
+    pub progress: Value,
     task: Option<Task>,
 }
 struct Task {
@@ -60,6 +61,7 @@ impl State {
                 self.task = Some(task);
                 self.stage = "Starting…".into();
                 self.error.clear();
+                self.progress = Value::Null;
             }
             Err(error) => self.error = error,
         }
@@ -74,6 +76,7 @@ impl State {
             {
                 self.stage = value["stage"].as_str().unwrap_or("Installing…").into();
                 self.error = value["error"].as_str().unwrap_or("").into();
+                self.progress = value;
             }
         }
         match task.result.try_recv() {

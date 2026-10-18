@@ -396,6 +396,21 @@ fn clipboard_media() -> Option<filmcraft_ui_egui::ClipboardMedia> {
 /// Open a file in its default application, or reveal it in the file manager (Edit Original,
 /// Reveal Log Files).
 fn open_path(path: &str, reveal: bool) -> Result<(), String> {
+    if !std::path::Path::new(path).exists() {
+        return Err(format!("File not found: {path}"));
+    }
+    if !reveal {
+        #[cfg(windows)]
+        {
+            let native = path.replace('/', "\\");
+            if std::path::Path::new(path).extension().is_some_and(|ext| ext == "log") {
+                return std::process::Command::new("notepad.exe").arg(native).spawn().map(|_| ()).map_err(|e| e.to_string());
+            }
+            return open::that_detached(native).map_err(|e| e.to_string());
+        }
+        #[cfg(not(windows))]
+        return open::that_detached(path).map_err(|e| e.to_string());
+    }
     let mut cmd = if cfg!(target_os = "macos") {
         let mut c = std::process::Command::new("open");
         if reveal {

@@ -49,14 +49,23 @@ try {
         & $basePython -m venv $runtime
         CheckExit 'Could not create the speech runtime.'
     }
-    Report 'Installing speech runtime'
-    & $python -m pip install --upgrade pip
-    CheckExit 'pip setup failed.'
-    $index = if ($Mode -eq 'nvidia') { 'https://download.pytorch.org/whl/cu128' } else { 'https://download.pytorch.org/whl/cpu' }
-    & $python -m pip install 'torch==2.11.0' 'torchaudio==2.11.0' --index-url $index
-    CheckExit 'PyTorch installation failed. Check your connection and retry.'
-    & $python -m pip install 'https://github.com/huggingface/transformers/archive/536ecc007387a50e77603bb5d92100e9b07514cc.zip' soundfile sentencepiece librosa einops
-    CheckExit 'Speech dependencies failed to install.'
+    $runtimeStamp = Join-Path $runtime 'youcraft-runtime-v2.ready'
+    if (Test-Path $runtimeStamp) {
+        & $python -c 'import torch, torchaudio, soundfile, sentencepiece, librosa, einops; from transformers import AutoModelForAudioFrameClassification, AutoProcessor'
+        if ($LASTEXITCODE -ne 0) { Remove-Item $runtimeStamp -Force }
+    }
+    if (-not (Test-Path $runtimeStamp)) {
+        Report 'Installing speech runtime'
+        & $python -m pip install --upgrade pip
+        CheckExit 'pip setup failed.'
+        $index = if ($Mode -eq 'nvidia') { 'https://download.pytorch.org/whl/cu128' } else { 'https://download.pytorch.org/whl/cpu' }
+        & $python -m pip install 'torch==2.11.0' 'torchaudio==2.11.0' --index-url $index
+        CheckExit 'PyTorch installation failed. Check your connection and retry.'
+        & $python -m pip install 'https://github.com/huggingface/transformers/archive/536ecc007387a50e77603bb5d92100e9b07514cc.zip' soundfile sentencepiece librosa einops
+        CheckExit 'Speech dependencies failed to install.'
+    } else {
+        Report 'Speech runtime ready'
+    }
     Report 'Checking speech runtime'
     & $python -c 'import torch, torchaudio, soundfile; from transformers import AutoModelForAudioFrameClassification, AutoProcessor; print(torch.cuda.is_available())'
     CheckExit 'Speech runtime check failed.'
@@ -64,14 +73,20 @@ try {
         & $python -c 'import torch; assert torch.cuda.is_available()'
         CheckExit 'NVIDIA GPU unavailable. Update its driver or choose CPU setup.'
     }
+    [IO.File]::WriteAllText($runtimeStamp, $Mode)
     if ($RuntimeOnly) { Report 'Runtime ready' 'succeeded'; exit 0 }
     $models = Join-Path $Root 'models'
     $device = if ($Mode -eq 'nvidia') { 'auto' } else { 'cpu' }
     foreach ($pack in @('nemotron','indic-core')) {
         Report $(if ($pack -eq 'nemotron') { 'Downloading speaker model' } else { 'Downloading Odia model' })
-        & $python "$ScriptsDirectory/download_models.py" --directory $models --pack $pack
+        $downloadArgs = @("$ScriptsDirectory/download_models.py", '--directory', $models, '--pack', $pack)
+        if ($StatusFile) { $downloadArgs += @('--status-file', $StatusFile) }
+        & $python @downloadArgs
         if ($LASTEXITCODE -ne 0) {
-            if ($pack -eq 'indic-core') { throw 'Odia model access/download failed. Accept its Hugging Face terms and enter a read token, then retry. The speaker model remains installed.' }
+            if ($StatusFile -and (Test-Path $StatusFile)) {
+                $downloadStatus = Get-Content $StatusFile -Raw | ConvertFrom-Json
+                if ($downloadStatus.error) { throw $downloadStatus.error }
+            }
             throw 'Speaker model download failed. Check your connection and retry.'
         }
         & $python "$ScriptsDirectory/configure_local_models.py" --directory $models --output "$Root/models.json" --device $device --partial

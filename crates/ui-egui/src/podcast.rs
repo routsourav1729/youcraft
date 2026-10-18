@@ -876,7 +876,26 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 s.setup.cancel();
             }
         });
-        ui.ctx().request_repaint_after(Duration::from_millis(100));
+        let progress = &s.setup.progress;
+        if let (Some(done), Some(total)) = (progress["downloaded_bytes"].as_f64(), progress["total_bytes"].as_f64())
+            && total > 0.
+        {
+            let speed = progress["bytes_per_second"].as_f64().unwrap_or(0.) / 1_048_576.;
+            ui.add(egui::ProgressBar::new((done / total).clamp(0., 1.) as f32).text(format!(
+                "{:.0}% · {:.1} / {:.1} GB · {:.1} MB/s",
+                done / total * 100.,
+                done / 1_073_741_824.,
+                total / 1_073_741_824.,
+                speed
+            )));
+            if let Some(file) = progress["file"].as_str() {
+                ui.small(file);
+            }
+            if progress["idle_seconds"].as_u64().unwrap_or(0) >= 30 && s.setup.stage.starts_with("Downloading") {
+                ui.label("Waiting for data · Retry keeps downloaded files");
+            }
+        }
+        ui.ctx().request_repaint_after(Duration::from_millis(500));
     }
     if !s.setup.error.is_empty() {
         ui.colored_label(egui::Color32::LIGHT_RED, &s.setup.error);
@@ -913,7 +932,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
     egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| {
-        ui.add_enabled_ui(!s.busy() && !s.setup.busy(), |ui| match s.step {
+        ui.add_enabled_ui(!s.busy() && (!s.setup.busy() || s.step == 0), |ui| match s.step {
             0 => connect(app, ui, &mut s),
             1 => audio(app, ui, &mut s),
             2 => speakers(app, ui, &mut s),
@@ -1002,7 +1021,16 @@ fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let media_ready = s.setup.capabilities["media"]["ffmpeg"] == true && s.setup.capabilities["media"]["ffprobe"] == true;
     ui.label(format!("{}  Media tools", if media_ready { "✓" } else { "○" }));
     ui.label("Downloads require internet and several GB of space.");
-    ui.hyperlink_to("Odia model access", "https://huggingface.co/bodhan-ai/indic-transcribe-core");
+    ui.label("Reactions · model setup not included yet");
+    if button(app, ui, "model_access", "Odia model access") {
+        if let Some(open) = app.hooks.open_url.as_mut() {
+            if let Err(error) = open("https://huggingface.co/bodhan-ai/indic-transcribe-core") {
+                s.error = error;
+            }
+        } else {
+            s.error = "Browser opening unavailable".into();
+        }
+    }
     ui.label("Hugging Face read token (if required)");
     let r = ui.add(egui::TextEdit::singleline(&mut s.setup.hf_token).password(true));
     app.auto.add_response("podcast.hf_token", &r, "Hugging Face token");

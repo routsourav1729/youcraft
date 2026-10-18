@@ -80,6 +80,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Clean speech-runtime setup failed' }
           $status = Get-Content "$env:RUNNER_TEMP/youcraft-runtime-status.json" -Raw | ConvertFrom-Json
           if ($status.state -ne 'succeeded') { throw 'Speech-runtime setup did not finish' }
+          $savedProxy = $env:HTTPS_PROXY
+          try {
+            $env:HTTPS_PROXY = 'http://127.0.0.1:1'
+            & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-models.ps1 -Mode cpu -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -RuntimeOnly
+            if ($LASTEXITCODE -ne 0) { throw 'Installed runtime was not reused offline' }
+          } finally { $env:HTTPS_PROXY = $savedProxy }
           & "$env:RUNNER_TEMP/youcraft-runtime-test/speech-cpu/Scripts/python.exe" ama-backend/tests/windows_model_smoke.py "$env:RUNNER_TEMP/youcraft-runtime-test"
           if ($LASTEXITCODE -ne 0) { throw 'Downloaded CPU speaker model failed inference' }
       - name: Rust toolchain

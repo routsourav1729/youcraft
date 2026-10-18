@@ -113,3 +113,23 @@ always be edited directly; Romanized spelling suggestions require this runtime.
 The default laptop configuration now selects Nemotron and Indic Core sequentially,
 with a 4.5 GiB allocation budget and optional fresh-process CPU retry. See the
 fork's `docs/ama-validation.md` for measured server GPU results and their limits.
+
+## Windows model setup (0.1.4)
+
+The guided installer includes media tools, Nemotron speaker diarization and Indic
+Transcribe Core ASR. It does not install the optional reaction or transliteration
+runtimes above. Translation and TTS remain future packs.
+
+Downloads report file, bytes, speed and waiting-for-data status. The access button
+opens the model page in the default browser; setup logs open in Notepad. Storage
+is derived from `%LOCALAPPDATA%/YouCraft`, never a developer's Windows username.
+
+Completed packs have pinned revisions and a file inventory. Unchanged complete
+packs are reused offline; incomplete packs reuse the Hugging Face cache and HTTP
+Range resume. Partial files are deliberately retained for retry, not marked ready.
+Downloaded weights are checked against upstream SHA-256 metadata. Damaged files
+are replaced; completed weights are not erased on failure. Only a complete pack
+updates its manifest. A validated runtime marker avoids reinstalling dependencies
+on every retry. Changing CPU/NVIDIA mode uses the corresponding separate runtime
+and shared model cache. Upgrading from an older installer performs one validation
+pass to create these records. Runtime dependency changes must bump the marker.
