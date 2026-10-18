@@ -110,6 +110,7 @@ def process(store, project, kind, options, directory, cancel, progress):
             existing.add(resolved)
             progress((index + 1) / len(groups))
         project.clips.extend(additions)
+        project.cuts = [cut for cut in project.cuts if not cut.id.startswith('gap-')]
         project.reactions = []
         # Source coverage changed; preserve deliberate manual edits only.
         project.shots = [shot for shot in project.shots if shot.locked]
@@ -117,15 +118,30 @@ def process(store, project, kind, options, directory, cancel, progress):
         return dict(revision=base_revision + 1, clips_added=len(additions))
     if kind == 'sync':
         from .sync import synchronize
+        project.cuts = [cut for cut in project.cuts if not cut.id.startswith('gap-')]
         project.reactions = []
         project.shots = [shot for shot in project.shots if shot.locked]
-        master_audio, sr = media.read_wav(media.audio_copy(master, cache, rate=2000, cancel=cancel))
+        progress(dict(stage='Preparing master playback'))
+        media.playback_audio(master, cache, cancel)
+        progress(dict(stage='Matching ordered camera shards'))
+        master_audio, sr = media.read_wav(media.audio_copy(master, cache, rate=8000, cancel=cancel))
         results = {}
-        cameras = [c for c in project.clips if c.camera != 'master' and not c.sync_locked]
+        cursors = {}
+        cameras = [c for camera in ('A', 'B') for c in project.clips if c.camera == camera]
         for index, clip in enumerate(cameras):
+            minimum = cursors.get(clip.camera)
+            if clip.sync_locked:
+                if minimum is not None and clip.offset < minimum-.05:
+                    raise ValueError('Locked shard conflicts with camera order')
+                cursors[clip.camera] = clip.offset + clip.duration*clip.rate - .25
+                continue
             try:
                 signal, _ = media.read_wav(media.audio_copy(clip, cache, rate=sr, cancel=cancel))
-                result = synchronize(master_audio, signal, sr)
+                result = synchronize(master_audio, signal, sr, directory=directory, minimum_offset=minimum, cancel=cancel,
+                                     on_progress=lambda value: progress(dict(stage='Matching ordered camera shards',
+                                         completed=index*5+round(value*5), total=len(cameras)*5, units='anchors',
+                                         fraction=(index+value)/max(1,len(cameras)))))
+                cursors[clip.camera] = result["offset"] + clip.duration*result["rate"] - .25
                 clip.offset, clip.rate, clip.sync_score = result['offset'], result['rate'], result['score']
                 clip.sync_reviewed = False
                 clip.warnings = result['warnings']

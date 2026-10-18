@@ -182,3 +182,26 @@ def waveform(path, bins=2000):
     stride = max(1, int(np.ceil(len(samples) / bins)))
     return dict(sample_rate=sr, seconds_per_bin=stride / sr,
                 peaks=[float(np.max(np.abs(samples[i:i + stride]))) for i in range(0, len(samples), stride)])
+
+
+def playback_audio(clip, directory, cancel=lambda: False):
+    """One canonical PCM copy for the native player, preserving stereo dialogue."""
+    with _playback_lock:
+        if fingerprint(clip.path) != clip.fingerprint:
+            raise ValueError('Master audio changed; relink the recording')
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / f'{clip.fingerprint}-playback-48000-stereo.wav'
+        if target.is_file():
+            return target
+        temporary = target.with_suffix('.partial.wav')
+        try:
+            run([binary('ffmpeg'), '-v', 'error', '-nostdin', '-y', '-i', clip.path,
+                 '-map', '0:a:0', '-vn', '-ac', '2', '-ar', '48000', '-c:a', 'pcm_s16le', temporary], cancel)
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return target
+
+
+_playback_lock = threading.Lock()

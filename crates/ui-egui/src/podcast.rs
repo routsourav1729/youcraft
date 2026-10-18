@@ -22,6 +22,8 @@ pub struct State {
     pub token: String,
     pub remote: bool,
     pub compute_device: String,
+    pub monitor_volume_db: f64,
+    pub monitor_muted: bool,
     pub project_id: String,
     pub name: String,
     pub project: Value,
@@ -87,6 +89,8 @@ impl Default for State {
             setup: Default::default(),
             ai_setup: Default::default(),
             endpoint: "http://127.0.0.1:8765".into(),
+            monitor_volume_db: 0.,
+            monitor_muted: false,
             token: String::new(),
             remote: false,
             compute_device: "auto".into(),
@@ -266,7 +270,8 @@ impl Client {
             self.wait_ready()?;
         }
         let token = if self.local && self.token.is_empty() { local_token() } else { self.token.clone() };
-        let mut req = self.http.request(method, format!("{}{path}", self.base)).bearer_auth(token).timeout(Duration::from_secs(60));
+        let timeout = if path.contains("review-plan") || path.ends_with("/filmcraft") { 900 } else { 60 };
+        let mut req = self.http.request(method, format!("{}{path}", self.base)).bearer_auth(token).timeout(Duration::from_secs(timeout));
         if let Some(body) = body {
             req = req.json(body);
         }
@@ -537,6 +542,9 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     s.project_id = string(&value, "id");
                     s.compute_device = value["settings"]["compute_device"].as_str().unwrap_or("auto").into();
                     s.project = value;
+                    if let Some(master) = rows(&s.project, "clips").iter().find(|c| c["camera"] == "master") {
+                        s.master = string(master, "path");
+                    }
                     s.saved_project = s.project.clone();
                     s.edited_at = None;
                     s.status = "Saved".into();
@@ -771,6 +779,12 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                             s.review_item = Some(item);
                             s.review_active = true;
                             app.stop_source();
+                            app.ui.program.zoom = None;
+                            if let Some(track) = app.session.active_sequence().and_then(|q| q.audio_tracks.first()) {
+                                let strip = track.id.0;
+                                app.session.execute("mixer.setStrip", json!({"strip":strip,"muted":s.monitor_muted}))?;
+                                app.session.execute("mixer.setValue", json!({"strip":strip,"lane":"volume","value":s.monitor_volume_db.clamp(-60.,6.)}))?;
+                            }
                             app.session.execute("playhead.set", json!({"seconds":s.review_seek}))
                         }) {
                             Ok(_) => s.status = "Review ready · Master audio".into(),
@@ -1043,59 +1057,74 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
     });
     if s.storage.is_object() {
-        ui.group(|ui| {
-            ui.label(string(&s.storage, "path"));
-            if s.storage["backup_current"] != true {
-                ui.colored_label(egui::Color32::LIGHT_RED, "Folder backup needs attention · Database copy is saved");
-            }
-            ui.horizontal_wrapped(|ui| {
-                if button(app, ui, "open_project_folder", "Open folder") {
-                    let path = PathBuf::from(string(&s.storage, "path"));
-                    open_path(app, &mut s, &path);
+        egui::Window::new("Project folder").default_width(560.).vscroll(true).show(ui.ctx(), |ui| {
+            ui.group(|ui| {
+                ui.label(string(&s.storage, "path"));
+                if s.storage["backup_current"] != true {
+                    ui.colored_label(egui::Color32::LIGHT_RED, "Folder backup needs attention · Database copy is saved");
                 }
-                if !s.busy()
-                    && button(app, ui, "change_project_folder", "Change folder")
-                    && let Some(path) = app.hooks.pick_folder.as_mut().and_then(|pick| pick())
-                {
+                ui.horizontal_wrapped(|ui| {
+                    if button(app, ui, "open_project_folder", "Open folder") {
+                        let path = PathBuf::from(string(&s.storage, "path"));
+                        open_path(app, &mut s, &path);
+                    }
+                    if !s.busy()
+                        && button(app, ui, "change_project_folder", "Change folder")
+                        && let Some(path) = app.hooks.pick_folder.as_mut().and_then(|pick| pick())
+                    {
+                        let id = s.project_id.clone();
+                        s.start("storage", move |c| c.post(&format!("/v1/projects/{id}/storage"), json!({"path":path})));
+                    }
+                    if button(app, ui, "close_project_folder", "Close") {
+                        s.storage = Value::Null;
+                    }
+                });
+                if let Some(previous) = s.storage["previous_path"].as_str() {
+                    ui.label(format!("Previous copy: {previous}"));
+                }
+                let response = ui.checkbox(&mut s.confirm_delete, "Delete project and generated files");
+                app.auto.add_response("podcast.confirm_delete", &response, "Confirm project deletion");
+                if s.confirm_delete && !s.busy() && button(app, ui, "delete_project", "Delete project") {
                     let id = s.project_id.clone();
-                    s.start("storage", move |c| c.post(&format!("/v1/projects/{id}/storage"), json!({"path":path})));
-                }
-                if button(app, ui, "close_project_folder", "Close") {
-                    s.storage = Value::Null;
+                    let revision = s.project["revision"].clone();
+                    s.start("deleted", move |c| c.request(reqwest::Method::DELETE, &format!("/v1/projects/{id}"), Some(&json!({"revision":revision}))));
                 }
             });
-            if let Some(previous) = s.storage["previous_path"].as_str() {
-                ui.label(format!("Previous copy: {previous}"));
-            }
-            let response = ui.checkbox(&mut s.confirm_delete, "Delete project and generated files");
-            app.auto.add_response("podcast.confirm_delete", &response, "Confirm project deletion");
-            if s.confirm_delete && !s.busy() && button(app, ui, "delete_project", "Delete project") {
-                let id = s.project_id.clone();
-                let revision = s.project["revision"].clone();
-                s.start("deleted", move |c| c.request(reqwest::Method::DELETE, &format!("/v1/projects/{id}"), Some(&json!({"revision":revision}))));
-            }
         });
     }
     if !s.episodes.is_empty() {
-        let mut selected = None;
-        for episode in &s.episodes {
-            if button(app, ui, &format!("episode.{}", string(episode, "id")), &string(episode, "name")) {
-                selected = Some(string(episode, "id"));
+        egui::Window::new("Projects").default_width(420.).vscroll(true).show(ui.ctx(), |ui| {
+            let mut selected = None;
+            for episode in &s.episodes {
+                if button(app, ui, &format!("episode.{}", string(episode, "id")), &string(episode, "name")) {
+                    selected = Some(string(episode, "id"));
+                }
             }
-        }
-        if let Some(id) = selected {
-            if s.edited_at.is_some() {
-                s.error = "Wait for Saved before opening another project".into();
-            } else if !s.busy() {
-                s.project_id = id;
+            if let Some(id) = selected {
+                if s.edited_at.is_some() {
+                    s.error = "Wait for Saved before opening another project".into();
+                } else if !s.busy() {
+                    s.project_id = id;
+                    s.episodes.clear();
+                    s.step = 4;
+                    s.refresh();
+                }
+            }
+            if button(app, ui, "close_projects", "Close") {
                 s.episodes.clear();
-                s.step = 4;
-                s.refresh();
             }
-        }
+        });
     }
     if s.setup.ai_open {
-        ai_connection(app, ui, &mut s);
+        let mut open = true;
+        egui::Window::new("Connect AI")
+            .open(&mut open)
+            .default_width(600.)
+            .max_width(rect.width() - 60.)
+            .max_height(rect.height() - 80.)
+            .vscroll(true)
+            .show(ui.ctx(), |ui| ai_connection(app, ui, &mut s));
+        s.setup.ai_open = open;
     }
     if s.setup.busy() {
         ui.horizontal(|ui| {
@@ -1147,7 +1176,17 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 if s.edited_at.is_some() && !s.busy() {
                     s.save();
                 }
+                let changed = s.step != i;
                 s.step = i;
+                if changed && matches!(i, 3 | 4 | 5) && s.review_item.is_some() {
+                    s.review_seek = app.session.playhead().seconds();
+                    app.stop();
+                    if s.busy() {
+                        s.follow_up = "review".into();
+                    } else {
+                        s.review_preview(i == 5);
+                    }
+                }
             }
         }
     });
@@ -1174,46 +1213,14 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.ctx().request_repaint_after(Duration::from_millis(100));
     }
     if matches!(s.step, 2 | 3 | 4 | 5) {
-        {
-            let bounds = ui.available_rect_before_wrap();
-            let split = bounds.left() + bounds.width() * if s.step == 4 { 0.42 } else { 0.34 };
-            let left = Rect::from_min_max(bounds.min, egui::pos2(split - 8., bounds.bottom()));
-            let right = Rect::from_min_max(egui::pos2(split + 8., bounds.top()), bounds.max);
-            let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(left));
-            egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| {
-                workflow_step(app, ui, &mut s);
-            });
-            let mut monitor = ui.new_child(egui::UiBuilder::new().max_rect(right));
-            let ui = &mut monitor;
-            ui.heading(if s.step == 5 { "Edit review" } else { "Preview" });
-            if matches!(s.step, 3 | 4 | 5) && !s.busy() && button(app, ui, "review_playback", "Load review") {
-                s.review_preview(s.step == 5);
-            }
-            let width = ui.available_width();
-            let caption_space = if matches!(s.step, 4 | 5) { 64. } else { 0. };
-            let height = (width * 9. / 16. + 70.).min((ui.available_height() - caption_space).max(120.));
-            let (_, preview) = ui.allocate_space(egui::vec2(width, height));
-            if s.review_active && matches!(s.step, 3 | 4 | 5) || app.session.state.source_item.is_some() {
-                let which =
-                    if s.review_active && matches!(s.step, 3 | 4 | 5) { crate::panels::monitor::Which::Program } else { crate::panels::monitor::Which::Source };
-                crate::panels::monitor::show(app, ui, preview, which);
-                if matches!(s.step, 4 | 5) && s.review_item.is_some() {
-                    let time = app.session.playhead().seconds();
-                    for caption in rows(&s.project, "captions").iter().filter(|c| number(c, "start") <= time && time < number(c, "end")) {
-                        ui.label(egui::RichText::new(string(caption, "text")).size(20.));
-                    }
-                }
-            } else {
-                ui.painter().rect_filled(preview, 8., egui::Color32::from_rgb(12, 16, 23));
-                ui.painter().text(
-                    preview.center(),
-                    egui::Align2::CENTER_CENTER,
-                    if s.step == 2 { "Play a speaker sample" } else { "Choose a preview" },
-                    egui::FontId::proportional(16.),
-                    egui::Color32::GRAY,
-                );
-            }
-        }
+        let bounds = ui.available_rect_before_wrap();
+        let height = (bounds.height() * 0.64).max(270.).min((bounds.height() - 110.).max(180.));
+        let top = Rect::from_min_max(bounds.min, egui::pos2(bounds.right(), bounds.top() + height));
+        let bottom = Rect::from_min_max(egui::pos2(bounds.left(), top.bottom() + 8.), bounds.max);
+        let mut preview = ui.new_child(egui::UiBuilder::new().max_rect(top));
+        review_player(app, &mut preview, &mut s);
+        let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(bottom));
+        egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| workflow_step(app, ui, &mut s));
     } else {
         egui::ScrollArea::vertical().id_salt("podcast-body").show(ui, |ui| workflow_step(app, ui, &mut s));
     }
@@ -1229,6 +1236,94 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     app.podcast = s;
 }
+fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    ui.horizontal_wrapped(|ui| {
+        ui.strong(if s.step == 5 { "Edit review" } else { "Host · Guest" });
+        if !s.busy() && button(app, ui, "review_playback", "Reload") {
+            s.review_preview(s.step == 5);
+        }
+        if s.review_active {
+            if let Some(track) = app.session.active_sequence().and_then(|q| q.audio_tracks.first()) {
+                let id = track.id.0;
+                let mut volume = track.volume_db;
+                let mut mute = track.muted;
+                if ui.checkbox(&mut mute, "Mute").changed() {
+                    s.monitor_muted = mute;
+                    if let Err(e) = app.session.execute("mixer.setStrip", json!({"strip":id,"muted":mute})) {
+                        s.error = e.to_string();
+                    }
+                }
+                if ui.add(egui::Slider::new(&mut volume, -60.0..=6.0).text("Volume dB")).changed() {
+                    s.monitor_volume_db = volume;
+                    if let Err(e) = app.session.execute("mixer.setValue", json!({"strip":id,"lane":"volume","value":volume})) {
+                        s.error = e.to_string();
+                    }
+                }
+            }
+            if button(app, ui, "audio_output", "Audio output") {
+                if let Err(e) = crate::panels::settings::open(app, "audioHardware") {
+                    s.error = e;
+                }
+            }
+            let meters = crate::panels::mixer::poll_meters(app, ui);
+            let peak = meters.get(&u64::MAX).into_iter().flatten().map(|m| m[0]).fold(-90.0_f32, f32::max);
+            ui.add(egui::ProgressBar::new(((peak + 60.) / 60.).clamp(0., 1.)).desired_width(100.).text(format!("{peak:.0} dBFS")));
+            if app.audio.is_none() || (app.playback.playing && app.playback.preroll.is_none() && !app.playback.audio_clock) {
+                ui.colored_label(egui::Color32::LIGHT_RED, "Audio output unavailable").on_hover_text(&app.ui.status);
+            }
+        }
+    });
+    if s.step == 5 {
+        let duration = number(&s.project, "duration").max(1.);
+        let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 20.), egui::Sense::hover());
+        ui.painter().rect_filled(bar, 3., egui::Color32::from_gray(35));
+        for r in rows(&s.project, "reactions") {
+            let a = bar.left() + (number(&r, "start") / duration) as f32 * bar.width();
+            let b = bar.left() + (number(&r, "end") / duration) as f32 * bar.width();
+            let region = Rect::from_min_max(egui::pos2(a, bar.top()), egui::pos2(b.max(a + 4.), bar.bottom()));
+            let color = match r["decision"].as_str() {
+                Some("keep") => egui::Color32::from_rgb(70, 180, 110),
+                Some("reject") => egui::Color32::from_gray(70),
+                _ => egui::Color32::from_rgb(230, 170, 60),
+            };
+            ui.painter().rect_filled(region, 2., color);
+            let response = ui.interact(region, ui.id().with(string(&r, "id")), egui::Sense::click());
+            if response.clicked() {
+                app.stop();
+                let _ = app.session.execute("playhead.set", json!({"seconds":number(&r,"start")}));
+            }
+            response.on_hover_text(format!("{:.1}–{:.1}s · {} · {}", number(&r, "start"), number(&r, "end"), string(&r, "decision"), r["cues"]));
+        }
+    }
+    let rect = ui.available_rect_before_wrap();
+    let caption_height = if matches!(s.step, 4 | 5) { 32. } else { 0. };
+    let preview = Rect::from_min_max(rect.min, egui::pos2(rect.right(), (rect.bottom() - caption_height).max(rect.top() + 130.)));
+    if s.review_active {
+        crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Program);
+        let time = app.session.playhead().seconds();
+        if let Some(c) = rows(&s.project, "captions").iter().find(|c| number(c, "start") <= time && time < number(c, "end")) {
+            ui.painter().text(
+                egui::pos2(rect.center().x, preview.bottom() + 6.),
+                egui::Align2::CENTER_TOP,
+                string(c, "text"),
+                egui::FontId::proportional(18.),
+                egui::Color32::WHITE,
+            );
+        }
+    } else if app.session.state.source_item.is_some() {
+        crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Source);
+    } else {
+        ui.painter().rect_filled(preview, 6., egui::Color32::from_rgb(10, 15, 20));
+        ui.painter().text(
+            preview.center(),
+            egui::Align2::CENTER_CENTER,
+            "Sync recordings to load both cameras",
+            egui::FontId::proportional(16.),
+            egui::Color32::GRAY,
+        );
+    }
+}
+
 fn workflow_step(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.add_enabled_ui(s.pending.is_none() && s.job.is_none() && (!s.setup.busy() || s.step == 0), |ui| match s.step {
         0 => connect(app, ui, s),
@@ -1470,6 +1565,14 @@ fn picker(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     }
 }
 fn audio(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    if let Some(master) = rows(&s.project, "clips").iter().find(|c| c["camera"] == "master") {
+        ui.heading("Episode audio");
+        ui.label(string(master, "path"));
+        if button(app, ui, "existing_speakers", "Speakers") {
+            s.step = 2;
+        }
+        return;
+    }
     ui.label("Episode");
     field(app, ui, "name", &mut s.name);
     ui.label("Master audio");
@@ -1572,6 +1675,41 @@ fn shard_list(app: &mut FilmcraftApp, ui: &mut egui::Ui, paths: &mut Vec<String>
 }
 fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Cameras & sync");
+    if let Some(master) = rows(&s.project, "clips").iter().find(|c| c["camera"] == "master") {
+        ui.label(format!("Episode audio · {}", Path::new(&string(master, "path")).file_name().unwrap_or_default().to_string_lossy()));
+    }
+    ui.weak("Each camera follows its own file order. Gaps stay on the audio timeline.");
+    let recordings = rows(&s.project, "clips");
+    let duration = number(&s.project, "duration");
+    let mut edges = vec![0., duration];
+    for c in recordings.iter().filter(|c| c["camera"] != "master") {
+        edges.push(number(c, "offset").clamp(0., duration));
+        edges.push((number(c, "offset") + number(c, "duration") * number(c, "rate")).clamp(0., duration));
+    }
+    edges.sort_by(f64::total_cmp);
+    edges.dedup();
+    let mut cuts = rows(&s.project, "cuts");
+    if recordings.iter().any(|c| c["camera"] != "master") && recordings.iter().filter(|c| c["camera"] != "master").all(|c| c["sync_reviewed"] == true) {
+        for pair in edges.windows(2) {
+            let (start, end) = (pair[0], pair[1]);
+            let mid = (start + end) / 2.;
+            if end - start > 0.05
+                && !recordings
+                    .iter()
+                    .any(|c| c["camera"] != "master" && number(c, "offset") <= mid && mid < number(c, "offset") + number(c, "duration") * number(c, "rate"))
+            {
+                let id = format!("gap-{:.0}-{:.0}", start * 1000., end * 1000.);
+                let mut approved = cuts.iter().any(|c| c["id"] == id && c["approved"] == true);
+                if ui.checkbox(&mut approved, format!("Remove camera gap · {start:.1}–{end:.1}s")).changed() {
+                    cuts.retain(|c| c["id"] != id);
+                    if approved && !cuts.iter().any(|c| number(c, "start") < end && number(c, "end") > start) {
+                        cuts.push(json!({"id":id,"start":start,"end":end,"approved":true}));
+                    }
+                }
+            }
+        }
+    }
+    set_rows(s, "cuts", cuts);
     ui.horizontal_wrapped(|ui| {
         if button(app, ui, "attach", "Add recordings") {
             s.job("attach_cameras", json!({"A":s.camera_a,"B":s.camera_b}));
@@ -1646,6 +1784,9 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             });
             if clip["offset"] != original_offset || clip["rate"] != original_rate {
                 clip["sync_reviewed"] = json!(false);
+                let mut cuts = rows(&s.project, "cuts");
+                cuts.retain(|cut| !string(cut, "id").starts_with("gap-"));
+                set_rows(s, "cuts", cuts);
             }
         });
     }
@@ -1873,7 +2014,15 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 }
             }
             if button(app, ui, &format!("reference.{id}"), "View reference") {
-                s.job("reference_frame", json!({"clip_id":id,"time":time}));
+                app.stop();
+                s.review_seek = number(&clip, "offset") + time * number(&clip, "rate");
+                if s.review_active {
+                    if let Err(error) = app.session.execute("playhead.set", json!({"seconds":s.review_seek})) {
+                        s.error = error.to_string();
+                    }
+                } else {
+                    s.review_preview(true);
+                }
             }
         }
     }
@@ -1888,6 +2037,28 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         s.job("reactions", json!({"references":s.references,"tolerance":s.tolerance,"interval":s.interval,"spacing":s.spacing}));
     }
     let mut reactions = rows(&s.project, "reactions");
+    if s.review_active && button(app, ui, "manual_reaction", "Add host shot here") {
+        app.stop();
+        let start = app.session.playhead().seconds();
+        let clip = rows(&s.project, "clips")
+            .into_iter()
+            .find(|c| c["camera"] == camera && number(c, "offset") <= start && start < number(c, "offset") + number(c, "duration") * number(c, "rate"));
+        let shot = rows(&s.project, "shots")
+            .into_iter()
+            .find(|q| number(q, "start") <= start && start < number(q, "end") && q["layout"] != camera && q["layout"] != "both");
+        if let (Some(clip), Some(shot)) = (clip, shot) {
+            let end = (start + 3.).min(number(&shot, "end")).min(number(&clip, "offset") + number(&clip, "duration") * number(&clip, "rate"));
+            if !reactions.iter().any(|r| r["decision"] != "reject" && number(r, "start") < end && number(r, "end") > start) {
+                let id = format!("manual-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
+                reactions.push(json!({"id":id,"clip_id":clip["id"],"start":start,"end":end,"score":1.0,"cues":["manual"],"decision":"keep"}));
+            } else {
+                s.error = "A reaction already covers this interval".into();
+            }
+        } else {
+            s.error = "Choose guest-only speech where the host camera is available".into();
+        }
+    }
+    let mut remove_reaction = None;
     let base_seconds: f64 = rows(&s.project, "shots")
         .iter()
         .filter(|shot| shot["layout"] == camera || shot["layout"] == "both")
@@ -1913,6 +2084,13 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         ui.group(|ui| {
             let cues = r["cues"].as_array().map(|values| values.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(" · ")).unwrap_or_default();
             ui.label(format!("{:.1}–{:.1}s · {cues}", number(r, "start"), number(r, "end")));
+            ui.horizontal_wrapped(|ui| {
+                numeric(app, ui, r, "start", &format!("reaction.{i}"));
+                numeric(app, ui, r, "end", &format!("reaction.{i}"));
+                if button(app, ui, &format!("reaction.delete.{i}"), "Delete") {
+                    remove_reaction = Some(i);
+                }
+            });
             if button(app, ui, &format!("reaction.preview.{i}"), "Preview") {
                 s.review_seek = number(r, "start");
                 s.review_preview(true);
@@ -1929,6 +2107,9 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             app.auto.add(&format!("podcast.reaction.{i}"), ui.min_rect(), "Reaction suggestion");
         });
     }
+    if let Some(i) = remove_reaction {
+        reactions.remove(i);
+    }
     set_rows(s, "reactions", reactions);
     if button(app, ui, "save_reactions", "Save choices") {
         s.save();
@@ -1936,7 +2117,7 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if s.remote && button(app, ui, "open_editor", "Open editor") {
         s.job("proxies", json!({}));
     }
-    if !s.remote && button(app, ui, "open_originals", "Open editor") {
+    if !s.remote && button(app, ui, "open_originals", "Continue · Editor & export") {
         let id = s.project_id.clone();
         let project = s.project.clone();
         s.start("assemble", move |c| {
@@ -2068,20 +2249,34 @@ mod tests {
         bytes.extend_from_slice(b"data");
         bytes.extend_from_slice(&size.to_le_bytes());
         bytes.resize(44 + size as usize, 0);
+        for i in 0..(size as usize / 2) {
+            let sample = (12000. * (i as f64 * 440. * std::f64::consts::TAU / 48000.).sin()) as i16;
+            bytes[44 + i * 2..46 + i * 2].copy_from_slice(&sample.to_le_bytes());
+        }
         std::fs::write(&wav, bytes).unwrap();
         let host = root.join("host.png");
         let guest = root.join("guest.png");
         image::RgbImage::from_pixel(320, 180, image::Rgb([210, 90, 50])).save(&host).unwrap();
         image::RgbImage::from_pixel(320, 180, image::Rgb([50, 110, 210])).save(&guest).unwrap();
-        let plan = json!({"version":1,"review":true,"name":"Reaction review","master":"master",
+        let (host, guest) = if let Some(media) = std::env::var_os("YOUCRAFT_UI_TEST_MEDIA") {
+            let media = PathBuf::from(media);
+            (media.join("camera-A.mp4"), media.join("camera-B.mov"))
+        } else {
+            (host, guest)
+        };
+        let plan = json!({"version":1,"review":true,"review_edit":true,"name":"Reaction review","master":"master",
             "assets":[{"id":"master","path":wav},{"id":"host","path":host},{"id":"guest","path":guest}],
             "clips":[{"start":0,"end":4*254_016_000_000_i64,"video":[
                 {"asset":"host","source_in":0,"speed":1.0,"side":"review-bottom-A"},
                 {"asset":"guest","source_in":0,"speed":1.0,"side":"review-bottom-B"},
                 {"asset":"host","source_in":0,"speed":1.0,"side":"review-top-full"}]}],
             "transcript":{"language":"or","source":"test","speakers":[],"words":[]}});
-        let project = json!({"id":"review-test","name":"Review fixture","revision":1,"settings":{},
-            "clips":[],"activity":[],"shots":[],"reactions":[],"captions":[{"id":"caption","start":0,"end":4,"speaker":"host","text":"ନମସ୍କାର","reviewed":true}]});
+        let project = json!({"id":"review-test","name":"Review fixture","duration":4,"revision":1,
+            "settings":{"host_speaker":"host","speaker_camera":{"host":"A","guest":"B"},"roles_locked":true},
+            "clips":[{"id":"master","camera":"master","path":wav,"duration":4},
+                     {"id":"host","camera":"A","path":host,"duration":4,"rate":1,"offset":0,"sync_reviewed":true},
+                     {"id":"guest","camera":"B","path":guest,"duration":4,"rate":1,"offset":0,"sync_reviewed":true}],
+            "activity":[],"shots":[],"reactions":[],"captions":[{"id":"caption","start":0,"end":4,"speaker":"host","text":"ନମସ୍କାର","reviewed":true}]});
         let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
         app.set_workspace("Podcast");
         let mut state =
@@ -2093,6 +2288,11 @@ mod tests {
         assert!(state.error.is_empty(), "{}", state.error);
         assert!(state.review_active);
         app.podcast = state;
+        let sequence = app.session.state.active_sequence.unwrap();
+        let mut mix = crate::playback_mix(&app.session, sequence, 48000);
+        let mut output = vec![0.0; 9600];
+        mix(0, &mut output, 2);
+        assert!(output.iter().any(|sample| sample.abs() > 0.1), "Review must mix non-silent master audio");
         app.play(1.);
         assert!(app.playback.playing);
         assert!(!app.source_playback.clock.playing);
@@ -2108,9 +2308,40 @@ mod tests {
             std::thread::sleep(Duration::from_millis(20));
         }
         assert!(harness.state().auto.find("program.scrubBar").is_some());
-        if let Some(directory) = screenshots {
-            std::fs::create_dir_all(&directory).unwrap();
+        let picture = harness.state().auto.find("program.picture").expect("Visible review video");
+        assert!(picture.rect[2] >= 400. && picture.rect[3] >= 200., "Review collapsed: {:?}", picture.rect);
+
+        if let Some(directory) = &screenshots {
+            std::fs::create_dir_all(directory).unwrap();
             harness.render().unwrap().save(directory.join("podcast-native-review.png")).unwrap();
+        }
+        // Opening utility dialogs must never steal height from the playback area.
+        harness.state_mut().podcast.setup.ai_open = true;
+        harness.state_mut().podcast.episodes = vec![json!({"id":"review-test","name":"Review fixture"})];
+        for _ in 0..3 {
+            harness.step();
+        }
+        let with_dialogs = harness.state().auto.find("program.picture").unwrap().rect;
+        assert!(with_dialogs[3] >= 200., "Utility dialogs collapsed the player");
+        harness.state_mut().podcast.setup.ai_open = false;
+        harness.state_mut().podcast.episodes.clear();
+        let mut camera_plan = plan.clone();
+        camera_plan["review_edit"] = json!(false);
+        camera_plan["clips"][0]["video"] = json!([
+            {"asset":"host","source_in":0,"speed":1.0,"side":"A"},
+            {"asset":"guest","source_in":0,"speed":1.0,"side":"B"}]);
+        harness.state_mut().session.execute("podcast.assemble", camera_plan).unwrap();
+        for step in [3, 4] {
+            harness.state_mut().podcast.step = step;
+            for _ in 0..20 {
+                harness.step();
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            let picture = harness.state().auto.find("program.picture").unwrap().rect;
+            assert!(picture[2] >= 600. && picture[3] >= 180., "Camera review collapsed: {picture:?}");
+            if let Some(directory) = &screenshots {
+                harness.render().unwrap().save(directory.join(format!("podcast-native-step-{step}.png"))).unwrap();
+            }
         }
         let _ = std::fs::remove_dir_all(root);
     }

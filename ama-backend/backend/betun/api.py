@@ -318,15 +318,26 @@ def create_app(root=None, token=None):
         from .podcast import speaker_samples
         return speaker_samples(store.get(pid))
 
+    def playback_plan(pid, plan):
+        from . import media
+        project = store.get(pid)
+        master = next(c for c in project.clips if c.camera == 'master')
+        path = media.playback_audio(master, store.directory(pid) / 'cache')
+        for asset in plan['assets']:
+            if asset['id'] == master.id:
+                asset['path'] = str(path)
+                asset['fingerprint'] = media.fingerprint(path)
+        return plan
+
     @app.get('/v1/projects/{pid}/filmcraft')
     def filmcraft(pid: str):
         from .podcast import manifest
-        return manifest(store.get(pid))
+        return playback_plan(pid, manifest(store.get(pid)))
 
     @app.get('/v1/projects/{pid}/review-plan')
     def review_plan(pid: str, edit: bool = False):
         from .podcast import review_manifest
-        return review_manifest(store.get(pid), edit)
+        return playback_plan(pid, review_manifest(store.get(pid), edit))
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):

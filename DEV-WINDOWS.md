@@ -17,7 +17,15 @@ ama-backend\.venv\Scripts\python.exe -m pip install -e .\ama-backend
 ama-backend\.venv\Scripts\python.exe -m betun
 ```
 
-Leave this terminal open and launch the installed YouCraft. It detects the local
+Native synchronization requires the matching CLI from this source version (the
+0.1.5 installer does not provide `sync-audio`). After building below, set this in
+the backend terminal **before** starting Python:
+
+```powershell
+$env:YOUCRAFT_CLI = (Resolve-Path target\debug\filmcraft-cli.exe).Path
+```
+
+Leave this terminal open and launch the matching YouCraft build. It detects the local
 helper on port 8765. Model packs and existing projects are reused from your user
 profile; no model reinstall is required. After Python edits, finish/cancel any
 active analysis and restart that terminal command. This avoids rebuilding the EXE.

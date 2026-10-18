@@ -113,15 +113,12 @@ jobs:
           cache-workspace-crates: true
       - name: Build editor and MCP CLI
         run: cargo +1.95.0 build --locked --release -p filmcraft -p filmcraft-cli
-      - name: Native review timeline
-        run: cargo +1.95.0 test --release -p filmcraft-engine podcast::tests::review_sequence_keeps_master_audio_through_gaps_and_three_views
-      - name: Laptop workflow layout
+      - name: Native podcast audio, timeline and laptop layout
         shell: pwsh
         run: |
           $env:FILMCRAFT_UI_SNAPSHOT_DIR = "$env:GITHUB_WORKSPACE/release/ui-preview"
-          cargo +1.95.0 test --release -p filmcraft-ui-egui --lib podcast::tests::native_review_uses_program_transport_and_three_views -- --nocapture
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo +1.95.0 test --workspace --release --test podcast_ui podcast_workspace_renders_every_step_before_opening_native_editor -- --nocapture
+          # Compile one test dependency graph, not separate engine/UI/workspace graphs.
+          cargo +1.95.0 test --release -p filmcraft-engine -p filmcraft-ui-egui --lib podcast::tests -- --nocapture
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: always() && hashFiles('release/ui-preview/*.png') != ''

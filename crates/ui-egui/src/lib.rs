@@ -1075,6 +1075,7 @@ impl FilmcraftApp {
             }
             Err(e) => {
                 log::warn!("audio output unavailable: {e}");
+                self.ui.status = format!("Audio output unavailable: {e}");
                 self.playback.audio_clock = false;
             }
         }

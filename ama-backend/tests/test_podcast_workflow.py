@@ -263,3 +263,42 @@ def test_review_preserves_camera_gaps_and_shard_clock():
     assert plan['clips'][0]['video'] == []
     assert plan['clips'][1]['video'][0]['source_in'] == 0
     assert plan['clips'][1]['video'][0]['speed'] == 1/1.01
+
+
+def test_gap_removal_only_after_approval_preserves_source_audio_time():
+    from betun.schema import Cut
+    p = episode()
+    for camera in p.clips[1:]:
+        camera.offset = 5
+        camera.duration = 55
+    with pytest.raises(ValueError, match='No camera covers'):
+        manifest(p)
+    p.cuts = [Cut(start=0, end=5, approved=False)]
+    with pytest.raises(ValueError, match='No camera covers'):
+        manifest(p)
+    p.cuts[0].approved = True
+    plan = manifest(p)
+    assert plan['source_duration'] == 60*TICKS
+    assert plan['clips'][0]['start'] == 0
+    assert plan['clips'][0]['source_start'] == 5*TICKS
+    assert plan['clips'][0]['video'][0]['source_in'] == 0
+    assert plan['clips'][-1]['end'] == 55*TICKS
+    assert plan['master'] == 'master'
+
+
+def test_overlapping_speech_keeps_both_speakers_text_for_native_editor():
+    p = episode()
+    p.captions.append(Caption(start=1,end=3,speaker='SPEAKER_01',text='ହଁ',reviewed=True))
+    words = manifest(p)['transcript']['words']
+    assert [w['text'] for w in words] == ['ନମସ୍କାର', 'ଓଡ଼ିଶା', 'ହଁ']
+    assert all(a['end'] <= b['start'] for a,b in zip(words, words[1:]))
+    assert p.captions[1].start == 1
+
+
+def test_subframe_camera_start_is_reviewable_without_false_gap_failure():
+    p = episode()
+    p.clips[1].offset = .013
+    p.clips[2].offset = .001
+    plan = manifest(p)
+    assert plan['clips'][0]['video'][0]['source_in'] == 0
+    assert plan['clips'][-1]['end'] == 60*TICKS

@@ -22,6 +22,8 @@ struct Picture {
 }
 #[derive(Deserialize)]
 struct Span {
+    #[serde(default)]
+    source_start: Option<i64>,
     start: i64,
     end: i64,
     video: Vec<Picture>,
@@ -34,8 +36,12 @@ fn default_fps() -> f64 {
 struct Plan {
     #[serde(default)]
     review: bool,
+    #[serde(default)]
+    review_edit: bool,
     #[serde(default = "default_fps")]
     fps: f64,
+    #[serde(default)]
+    source_duration: i64,
     version: u32,
     name: String,
     master: String,
@@ -61,6 +67,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
         if span.start != end
             || span.end <= span.start
             || span.end > 254_016_000_000_i64 * 86400
+            || span.source_start.is_some_and(|v| v < 0 || v > 254_016_000_000_i64 * 86400 - (span.end - span.start))
             || (!plan.review && span.video.is_empty())
             || span.video.len() > if plan.review { 4 } else { 2 }
         {
@@ -78,9 +85,13 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
         }
         end = span.end;
     }
+    if !(0..=254_016_000_000_i64 * 86400).contains(&plan.source_duration) {
+        return Err(bad("podcast.assemble", "invalid source duration"));
+    }
+    let source_end = end.max(plan.source_duration);
     if plan.transcript.speakers.len() > 32
         || plan.transcript.words.len() > 1_000_000
-        || plan.transcript.words.iter().any(|w| w.start.0 < 0 || w.end.0 > end || w.speaker.is_some_and(|i| i >= 32))
+        || plan.transcript.words.iter().any(|w| w.start.0 < 0 || w.end.0 > source_end || w.speaker.is_some_and(|i| i >= 32))
     {
         return Err(bad("podcast.assemble", "invalid transcript bounds"));
     }
@@ -101,7 +112,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
             ids.insert(asset.id.clone(), id);
         }
         let master = *ids.get(&plan.master).ok_or_else(|| bad("podcast.assemble", "master missing"))?;
-        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":1080,"fps":plan.fps,"video":if plan.review {4}else{2},"audio":1}))?;
+        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":if plan.review && !plan.review_edit {540}else{1080},"fps":plan.fps,"video":if plan.review {4}else{2},"audio":1}))?;
         if !plan.review {
             s.execute("transcript.set", json!({"item":master,"transcript":plan.transcript}))?;
         }
@@ -115,7 +126,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
             let duration = end - start;
             let audio = s.execute(
                 "timeline.place",
-                json!({"item":master,"track":"A1","time":start.0,"sourceIn":start.0,"duration":duration.0,"video":false,"audio":true}),
+                json!({"item":master,"track":"A1","time":start.0,"sourceIn":span.source_start.unwrap_or(span.start),"duration":duration.0,"video":false,"audio":true}),
             )?;
             let mut linked = clip_ids(&audio)?;
             for (index, picture) in span.video.iter().enumerate() {
@@ -144,17 +155,17 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                     } else {
                         1280.0
                     };
-                    let y = if picture.side.starts_with("review-bottom-") { 900.0 } else { 360.0 };
+                    let y = if picture.side.starts_with("review-bottom-") { 180.0 } else { 720.0 };
                     for id in &clips {
                         s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":if full {66.666667}else{33.333333}}))?;
                         s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"position","value":[x,y]}))?;
                     }
                 } else if picture.side != "full" {
                     for id in &clips {
-                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":50.0}))?;
+                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":if plan.review && !plan.review_edit {100.0}else{50.0}}))?;
                         s.execute(
                             "effects.setParam",
-                            json!({"clip":id.0,"effect":"motion","param":"position","value":[if picture.side=="A" {480.0}else{1440.0},540.0]}),
+                            json!({"clip":id.0,"effect":"motion","param":"position","value":[if picture.side=="A" {480.0}else{1440.0},if plan.review && !plan.review_edit {270.0}else{540.0}]}),
                         )?;
                     }
                 }
@@ -292,6 +303,7 @@ mod tests {
     fn review_sequence_keeps_master_audio_through_gaps_and_three_views() {
         let (root, mut plan) = fixture();
         plan["review"] = json!(true);
+        plan["review_edit"] = json!(true);
         plan["clips"][0]["video"] = json!([]);
         plan["clips"][1]["video"] = json!([
             {"asset":"camera","source_in":0,"speed":1.0,"side":"review-bottom-A"},
@@ -339,6 +351,26 @@ mod tests {
         assert!(s.project.transcripts.is_empty());
         let _ = std::fs::remove_dir_all(root);
     }
+    #[test]
+    fn podcast_approved_gap_projects_audio_and_text_from_original_time() {
+        let (root, mut plan) = fixture();
+        let sec = 254_016_000_000_i64;
+        plan["source_duration"] = json!(4 * sec);
+        let mut span = plan["clips"][1].clone();
+        span["start"] = json!(0);
+        span["end"] = json!(2 * sec);
+        span["source_start"] = json!(2 * sec);
+        plan["clips"] = json!([span]);
+        let mut session = Session::default();
+        session.execute("podcast.assemble", plan).unwrap();
+        let words = crate::transcript::sequence_words(&session);
+        assert_eq!(words.len(), 1);
+        assert_eq!(words[0].text, "ଓଡ଼ିଶା");
+        assert_eq!(words[0].start, Tick::from_seconds_f64(0.5));
+        assert_eq!(session.active_sequence().unwrap().duration(), Tick::from_seconds_f64(2.));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn podcast_failed_import_rolls_back_and_rejects_hostile_times() {
         let (root, mut plan) = fixture();

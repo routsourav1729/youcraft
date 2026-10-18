@@ -31,6 +31,7 @@ macro_rules! out {
 }
 
 mod args;
+mod podcast_sync;
 mod probe;
 
 use args::{Args, parse_value};
@@ -95,6 +96,7 @@ SUBCOMMANDS
                                 media info as JSON, with MXF / Ogg / BWF details; with
                                 --image-sequence <media> is the first numbered still of a sequence
   bench-decode <media> [--frames N]
+  sync-audio request.json       Filmcraft GCC-PHAT match of normalized PCM windows
   mcp                           MCP server on stdio (headless, or --bridge to the live app)
   help                          this text
   --version                     print the version
@@ -275,6 +277,14 @@ async fn cli() {
     // `--version` anywhere and `-V` as the subcommand, also after global options (`--demo --version`, #710).
     if a.wants_version() {
         outln!("filmcraft-cli {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if a.pos(0) == Some("sync-audio") {
+        let path = a.pos(1).unwrap_or_else(|| usage("sync-audio request.json"));
+        match podcast_sync::run(path) {
+            Ok(value) => print(&a, &value),
+            Err(error) => fail(error),
+        }
         return;
     }
     register_hardware_decoders();
