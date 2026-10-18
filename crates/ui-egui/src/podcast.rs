@@ -2041,6 +2041,74 @@ mod tests {
     }
 
     #[test]
+    fn native_review_uses_program_transport_and_three_views() {
+        use super::*;
+        let root = std::env::temp_dir().join(format!("youcraft-review-ui-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let wav = root.join("master.wav");
+        let size = 4 * 48000 * 2u32;
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&(36 + size).to_le_bytes());
+        bytes.extend_from_slice(b"WAVEfmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&48000u32.to_le_bytes());
+        bytes.extend_from_slice(&96000u32.to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&size.to_le_bytes());
+        bytes.resize(44 + size as usize, 0);
+        std::fs::write(&wav, bytes).unwrap();
+        let host = root.join("host.png");
+        let guest = root.join("guest.png");
+        image::RgbImage::from_pixel(320, 180, image::Rgb([210, 90, 50])).save(&host).unwrap();
+        image::RgbImage::from_pixel(320, 180, image::Rgb([50, 110, 210])).save(&guest).unwrap();
+        let plan = json!({"version":1,"review":true,"name":"Reaction review","master":"master",
+            "assets":[{"id":"master","path":wav},{"id":"host","path":host},{"id":"guest","path":guest}],
+            "clips":[{"start":0,"end":4*254_016_000_000_i64,"video":[
+                {"asset":"host","source_in":0,"speed":1.0,"side":"review-bottom-A"},
+                {"asset":"guest","source_in":0,"speed":1.0,"side":"review-bottom-B"},
+                {"asset":"host","source_in":0,"speed":1.0,"side":"review-top-full"}]}],
+            "transcript":{"language":"or","source":"test","speakers":[],"words":[]}});
+        let project = json!({"id":"review-test","name":"Review fixture","revision":1,"settings":{},
+            "clips":[],"captions":[{"id":"caption","start":0,"end":4,"speaker":"host","text":"ନମସ୍କାର","reviewed":true}]});
+        let mut app = FilmcraftApp::new(filmcraft_engine::Session::default());
+        app.set_workspace("Podcast");
+        let mut state =
+            State { project_id: "review-test".into(), cache: root.to_string_lossy().into(), step: 5, action: "review_assemble".into(), ..Default::default() };
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(Ok(json!({"project":project,"plan":plan}))).unwrap();
+        state.pending = Some(rx);
+        poll(&mut app, &mut state);
+        assert!(state.error.is_empty(), "{}", state.error);
+        assert!(state.review_active);
+        app.podcast = state;
+        app.play(1.);
+        assert!(app.playback.playing);
+        assert!(!app.source_playback.clock.playing);
+        app.stop();
+        let screenshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(PathBuf::from);
+        let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 768.)).with_max_steps(10000);
+        if screenshots.is_some() {
+            builder = builder.wgpu();
+        }
+        let mut harness = builder.build_eframe(move |_| app);
+        for _ in 0..20 {
+            harness.step();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(harness.state().auto.find("program.scrubBar").is_some());
+        if let Some(directory) = screenshots {
+            std::fs::create_dir_all(&directory).unwrap();
+            harness.render().unwrap().save(directory.join("podcast-native-review.png")).unwrap();
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn workflow_file_selection_updates_the_correct_input() {
         let mut s = super::State::default();
         s.add_files(vec!["audio.wav".into()]);
