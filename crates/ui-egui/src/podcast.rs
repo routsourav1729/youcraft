@@ -1251,16 +1251,13 @@ fn open_path(app: &mut FilmcraftApp, s: &mut State, path: &Path) {
 fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.group(|ui| {
         ui.strong("Connect AI");
-        ui.label("Claude Desktop: install the extension, then enable YouCraft in your chat.");
+        ui.label("Register tools, restart your AI app, then enable YouCraft.");
         ui.add_enabled_ui(!s.ai_setup.busy(), |ui| {
             ui.horizontal_wrapped(|ui| {
-                if button(app, ui, "ai.desktop", "Claude Desktop") {
-                    match std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("YouCraft.mcpb"))) {
-                        Some(path) if path.is_file() => open_path(app, s, &path),
-                        _ => s.ai_setup.error = "Claude extension missing. Reinstall YouCraft.".into(),
-                    }
+                if button(app, ui, "ai.desktop", "Register Claude app") {
+                    s.ai_setup.start("Connect-AI.ps1", "-Client", "desktop");
                 }
-                for (id, label) in [("claude", "Claude Code CLI"), ("codex", "Codex CLI")] {
+                for (id, label) in [("claude", "Register Claude CLI"), ("codex", "Register Codex CLI")] {
                     if button(app, ui, &format!("ai.{id}"), label) {
                         s.ai_setup.start("Connect-AI.ps1", "-Client", id);
                     }
@@ -1273,9 +1270,10 @@ fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         if s.ai_setup.busy() { ui.spinner(); }
         if !s.ai_setup.stage.is_empty() { ui.label(&s.ai_setup.stage); }
         if !s.ai_setup.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &s.ai_setup.error); }
-        ui.label("Keep YouCraft open. Claude chat: + > Connectors > YouCraft.");
+        ui.label("Keep YouCraft open. Claude Code: use a Local session.");
         ui.collapsing("Connection help", |ui| {
-            ui.label("If the extension does not open: Claude Settings > Extensions > Advanced settings > Install Extension.");
+            ui.label("Registration does not launch Claude. Open Claude separately and enable YouCraft in its tools.");
+            ui.label("Alternative: install YouCraft.mcpb from Claude Settings > Extensions.");
             if button(app, ui, "ai.folder", "Extension folder")
                 && let Ok(path) = std::env::current_exe()
                 && let Some(folder) = path.parent()

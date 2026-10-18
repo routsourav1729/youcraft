@@ -26,13 +26,15 @@ try {
         if (Test-Path $path) { Copy-Item $path "$path.youcraft-backup" -Force }
         [IO.File]::WriteAllText("$path.tmp", ($config | ConvertTo-Json -Depth 100), (New-Object Text.UTF8Encoding($false)))
         Move-Item "$path.tmp" $path -Force
-        Report 'Registered. Restart Claude Desktop.' 'succeeded'
+        Report "Registered in $path. Restart Claude; open a Local Code session and enable YouCraft." 'succeeded'
     } else {
-        if (-not (Get-Command $Client -ErrorAction SilentlyContinue)) { throw "$Client CLI command was not found. For the Claude Desktop app, use the Claude Desktop extension button instead." }
+        $clientCommand = Get-Command "$Client.exe", "$Client.cmd" -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $clientCommand) { throw "$Client terminal CLI was not found. If you use the Code tab inside Claude, choose Register Claude app instead." }
+        $clientPath = $clientCommand.Source
         if ($Client -eq 'codex') {
-            & codex mcp add youcraft -- $cli mcp --bridge 127.0.0.1:9876
+            & $clientPath mcp add youcraft -- $cli mcp --bridge 127.0.0.1:9876
         } else {
-            & claude mcp add --transport stdio --scope user youcraft -- $cli mcp --bridge 127.0.0.1:9876
+            & $clientPath mcp add --transport stdio --scope user youcraft -- $cli mcp --bridge 127.0.0.1:9876
         }
         if ($LASTEXITCODE -ne 0) { throw 'Registration failed. Check setup log; if YouCraft is already registered, verify it in your client.' }
         Report "Registered. Restart $Client." 'succeeded'

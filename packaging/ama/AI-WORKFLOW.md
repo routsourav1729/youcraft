@@ -1,14 +1,15 @@
 # YouCraft local editing
 
-Open YouCraft and choose **Connect AI**. **Claude Desktop** opens the included
-`YouCraft.mcpb` extension. Approve its installation in Claude. If Windows does not
-open it, use Claude Settings > Extensions > Advanced settings > Install Extension,
-and select `YouCraft.mcpb` in the YouCraft installation folder. The app's
-**Connection help > Extension folder** opens that folder.
+Open YouCraft → **Connect AI → Register Claude app**. This updates only the
+`youcraft` entry in `%APPDATA%\Claude\claude_desktop_config.json`, keeping a backup
+and preserving other settings. It does not launch Claude or open a file editor.
+Quit Claude completely, reopen it, and start a **Local** Code session. Enable
+YouCraft in the session's tools/connectors. Current Claude Desktop also reads
+this configuration for local Code sessions; cloud/SSH sessions run elsewhere.
 
-In a Claude chat, use **+ > Connectors > YouCraft** to enable the tools. Restart
-Claude completely if the new extension is not listed. YouCraft is a private local
-extension; searching the public connector directory will not find it.
+The optional `YouCraft.mcpb` can instead be installed from Claude Settings →
+Extensions. Do not use Windows double-click if its file association opens Notepad.
+YouCraft is private/local, so searching the public connector directory will not find it.
 
 **Check tools** verifies MCP initialization, tool discovery and `podcast.inspect`
 against the running YouCraft app. It does not claim that Claude enabled the tools
@@ -75,3 +76,6 @@ inspect/refetch after a conflict. A failed import retains the selected camera fi
 Official client setup references:
 - https://learn.chatgpt.com/docs/extend/mcp?surface=cli
 - https://code.claude.com/docs/en/mcp
+
+Official Desktop configuration reference:
+https://code.claude.com/docs/en/desktop#mcp-servers-from-the-claude-desktop-chat-app
