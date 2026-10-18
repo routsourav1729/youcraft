@@ -1308,7 +1308,9 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if s.review_active {
         crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Program);
         let time = app.session.playhead().seconds();
-        if let Some(c) = rows(&s.project, "captions").iter().find(|c| number(c, "start") <= time && time < number(c, "end")) {
+        if caption_height > 0.
+            && let Some(c) = rows(&s.project, "captions").iter().find(|c| number(c, "start") <= time && time < number(c, "end"))
+        {
             ui.painter().text(
                 egui::pos2(rect.center().x, preview.bottom() + 6.),
                 egui::Align2::CENTER_TOP,
@@ -2316,7 +2318,7 @@ mod tests {
         }
         assert!(harness.state().auto.find("program.scrubBar").is_some());
         let picture = harness.state().auto.find("program.picture").expect("Visible review video");
-        assert!(picture.rect[2] >= 400. && picture.rect[3] >= 200., "Review collapsed: {:?}", picture.rect);
+        assert!(picture.rect[2] >= 700. && picture.rect[3] >= 200., "Review collapsed: {:?}", picture.rect);
 
         if let Some(directory) = &screenshots {
             std::fs::create_dir_all(directory).unwrap();

@@ -112,7 +112,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
             ids.insert(asset.id.clone(), id);
         }
         let master = *ids.get(&plan.master).ok_or_else(|| bad("podcast.assemble", "master missing"))?;
-        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":if plan.review && !plan.review_edit {540}else{1080},"fps":plan.fps,"video":if plan.review {4}else{2},"audio":1}))?;
+        s.execute("file.newSequence", json!({"name":plan.name,"width":1920,"height":if plan.review {540}else{1080},"fps":plan.fps,"video":if plan.review {4}else{2},"audio":1}))?;
         if !plan.review {
             s.execute("transcript.set", json!({"item":master,"transcript":plan.transcript}))?;
         }
@@ -150,17 +150,15 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                     Ok(())
                 })?;
                 if picture.side.starts_with("review-") {
+                    let source_view = picture.side.starts_with("review-bottom-");
                     let full = picture.side == "review-top-full";
-                    let x = if full {
-                        960.0
-                    } else if picture.side.ends_with('A') {
-                        640.0
-                    } else {
-                        1280.0
-                    };
-                    let y = if picture.side.starts_with("review-bottom-") { 180.0 } else { 720.0 };
+                    let x = if source_view {
+                        if picture.side.ends_with('A') { 230.0 } else { 1690.0 }
+                    } else if full { 960.0 } else if picture.side.ends_with('A') { 720.0 } else { 1200.0 };
+                    let y = if source_view { 130.0 } else { 270.0 };
+                    let scale = if source_view { 48.0 } else if full { 100.0 } else { 50.0 };
                     for id in &clips {
-                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":if full {66.666667}else{33.333333}}))?;
+                        s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":scale}))?;
                         s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"position","value":[x,y]}))?;
                     }
                 } else if picture.side != "full" {
