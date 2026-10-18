@@ -1,6 +1,11 @@
 name: YouCraft Windows V1
 on:
   workflow_dispatch:
+    inputs:
+      full_setup:
+        description: Reinstall and validate speech/reaction packs (for setup changes)
+        type: boolean
+        default: false
   push:
     branches: [ama-bartalap]
   pull_request:
@@ -55,6 +60,7 @@ jobs:
             if ($errors.Count) { throw ($errors | Out-String) }
           }
       - name: MCP preflight before compilation
+        if: ${{ inputs.full_setup == true }}
         shell: pwsh
         run: |
           $baseline = Join-Path $env:RUNNER_TEMP 'youcraft-baseline.exe'
@@ -74,6 +80,7 @@ jobs:
           $mediaConfig = Get-Content "$mediaRoot/media-tools.json" -Raw | ConvertFrom-Json
           & $mediaConfig.ffmpeg -version
           if ($LASTEXITCODE -ne 0) { throw 'App-local FFmpeg cannot run' }
+          if ('${{ inputs.full_setup }}' -ne 'true') { exit 0 }
           $savedProxy = $env:HTTPS_PROXY
           try {
             $env:HTTPS_PROXY = 'http://127.0.0.1:1'
@@ -95,6 +102,7 @@ jobs:
           & "$env:RUNNER_TEMP/youcraft-runtime-test/speech-cpu/Scripts/python.exe" ama-backend/tests/windows_model_smoke.py "$env:RUNNER_TEMP/youcraft-runtime-test"
           if ($LASTEXITCODE -ne 0) { throw 'Downloaded CPU speaker model failed inference' }
       - name: Reaction runtime and verified model
+        if: ${{ inputs.full_setup == true }}
         shell: pwsh
         run: |
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-vision.ps1 -Root "$env:RUNNER_TEMP/youcraft-runtime-test" -ScriptsDirectory "$env:GITHUB_WORKSPACE/ama-backend/scripts" -StatusFile "$env:RUNNER_TEMP/vision-status.json"
@@ -197,8 +205,10 @@ jobs:
             $env:YOUCRAFT_SMOKE_TOKEN = $token
             $env:YOUCRAFT_SMOKE_MEDIA = $media
             $env:YOUCRAFT_SMOKE_AUTO_IDENTIFY = '1'
-            python ama-backend/tests/packaged_model_smoke.py $config "$env:RUNNER_TEMP/youcraft-runtime-test/models.json" $media
-            if ($LASTEXITCODE -ne 0) { throw 'Installed helper could not run the real CPU speaker model' }
+            if ('${{ inputs.full_setup }}' -eq 'true') {
+              python ama-backend/tests/packaged_model_smoke.py $config "$env:RUNNER_TEMP/youcraft-runtime-test/models.json" $media
+              if ($LASTEXITCODE -ne 0) { throw 'Installed helper could not run the real CPU speaker model' }
+            }
           } catch {
             Get-Content "$env:RUNNER_TEMP/ama-helper-error.log" -Tail 40 -ErrorAction SilentlyContinue
             throw

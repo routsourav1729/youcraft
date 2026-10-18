@@ -124,9 +124,12 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                 continue;
             }
             let duration = end - start;
+            // The timeline is frame-aligned. Align master source boundaries too,
+            // otherwise each shard boundary skips/repeats up to half a frame of audio.
+            let audio_in = rate.snap_nearest(Tick(span.source_start.unwrap_or(span.start)));
             let audio = s.execute(
                 "timeline.place",
-                json!({"item":master,"track":"A1","time":start.0,"sourceIn":span.source_start.unwrap_or(span.start),"duration":duration.0,"video":false,"audio":true}),
+                json!({"item":master,"track":"A1","time":start.0,"sourceIn":audio_in.0,"duration":duration.0,"video":false,"audio":true}),
             )?;
             let mut linked = clip_ids(&audio)?;
             for (index, picture) in span.video.iter().enumerate() {
@@ -134,7 +137,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                 let placed = s.execute(
                     "timeline.place",
                     json!({"item":item,"track":format!("V{}",index+1),"time":start.0,
-                    "sourceIn":picture.source_in,"duration":duration.0,"video":true,"audio":false}),
+                    "sourceIn":(picture.source_in + ((start.0-span.start) as f64 * picture.speed).round() as i64).max(0),"duration":duration.0,"video":true,"audio":false}),
                 )?;
                 let clips = clip_ids(&placed)?;
                 s.edit_sequence("Camera clock correction", |q, _, _| {
@@ -368,6 +371,21 @@ mod tests {
         assert_eq!(words[0].text, "ଓଡ଼ିଶା");
         assert_eq!(words[0].start, Tick::from_seconds_f64(0.5));
         assert_eq!(session.active_sequence().unwrap().duration(), Tick::from_seconds_f64(2.));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn podcast_subframe_boundaries_keep_master_audio_continuous() {
+        let (root, mut plan) = fixture();
+        let edge = Tick::from_seconds_f64(1.013).0;
+        plan["clips"][0]["end"] = json!(edge);
+        plan["clips"][1]["start"] = json!(edge);
+        plan["clips"][1]["video"][0]["source_in"] = json!(edge);
+        let mut session = Session::default();
+        session.execute("podcast.assemble", plan).unwrap();
+        let audio = &session.active_sequence().unwrap().audio_tracks[0].items;
+        assert_eq!(audio[0].end(), audio[1].source_in);
+        assert_eq!(audio[1].start, audio[1].source_in);
         let _ = std::fs::remove_dir_all(root);
     }
 
