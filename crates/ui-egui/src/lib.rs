@@ -1026,7 +1026,10 @@ impl FilmcraftApp {
         self.stop();
         let end = self.session.active_sequence().map(|q| q.duration()).unwrap_or_default();
         self.session.set_playhead(self.session.sequence_rate().snap(to.max(Tick::ZERO).min(end)));
-        if resume { self.play(speed); }
+        // An explicit seek to the end should stay there, not trigger Play's restart-from-zero.
+        if resume && self.session.playhead() < end {
+            self.play(speed);
+        }
     }
 
     pub fn stop(&mut self) {

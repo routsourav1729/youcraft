@@ -2341,7 +2341,9 @@ mod tests {
             mix((second * 48000.) as i64, &mut samples, 2);
             assert!(samples.iter().any(|x| x.abs() > 0.1), "Master audio silent after seek");
         }
-        app.stop();
+        app.seek_program(filmcraft_time::Tick::from_seconds_f64(100.));
+        assert!(!app.playback.playing, "Seeking beyond the end must stop, not restart at zero");
+        assert_eq!(app.session.playhead(), app.session.active_sequence().unwrap().duration());
         app.seek_program(filmcraft_time::Tick::ZERO);
         assert!(!app.playback.playing, "Seeking while paused must remain paused");
         app.podcast = state;
