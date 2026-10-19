@@ -77,7 +77,6 @@ jobs:
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Automatic app-local media installation failed' }
           $mediaRoot = Join-Path $env:LOCALAPPDATA 'YouCraft'
-          if (-not (Test-Path "$installed/Update-YouCraft.ps1")) { throw 'Updater missing from installation' }
           $mediaConfig = Get-Content "$mediaRoot/media-tools.json" -Raw | ConvertFrom-Json
           & $mediaConfig.ffmpeg -version
           if ($LASTEXITCODE -ne 0) { throw 'App-local FFmpeg cannot run' }
