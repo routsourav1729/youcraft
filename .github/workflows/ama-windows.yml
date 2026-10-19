@@ -35,13 +35,13 @@ jobs:
       - name: External media test tools
         shell: pwsh
         run: |
-          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            choco install ffmpeg --no-progress -y
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          ffmpeg -version
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Verified media setup failed' }
+          $mediaConfig = Get-Content "$env:LOCALAPPDATA/YouCraft/media-tools.json" -Raw | ConvertFrom-Json
+          (Split-Path $mediaConfig.ffmpeg) | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $mediaConfig.ffmpeg -version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          ffprobe -version
+          & $mediaConfig.ffprobe -version
       - name: Package Python analysis service when included in source bundle
         if: ${{ hashFiles('ama-backend/pyproject.toml') != '' }}
         working-directory: ama-backend
@@ -77,6 +77,7 @@ jobs:
           & ama-backend/dist/BetunBackend/BetunBackend.exe --check-mcp "$folder/filmcraft-cli.exe" --tools-only
           if ($LASTEXITCODE -ne 0) { throw 'MCP preflight failed before compilation' }
       - name: First-run setup and AI registration
+        if: ${{ inputs.full_setup == true }}
         shell: pwsh
         run: |
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1
