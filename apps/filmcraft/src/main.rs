@@ -219,19 +219,6 @@ fn app_creator(
             if let Err(e) = session.execute("file.open", json!({"path": p})) {
                 log::error!("{e}");
             }
-        } else if !startup_flag && session.prefs.general.at_startup == "openMostRecent" {
-            // Settings ▸ General ▸ At Startup ▸ Open Most Recent
-            let recent = session.prefs.general.recent_projects.iter().find(|p| std::path::Path::new(p).exists()).cloned();
-            match recent {
-                Some(p) => {
-                    if let Err(e) = session.execute("file.open", json!({"path": p})) {
-                        log::error!("{e}");
-                    }
-                }
-                None => {
-                    // No recent project: open the guided workflow without demo footage.
-                }
-            }
         } else if !startup_flag && session.prefs.general.at_startup == "emptyProject" {
         } else if demo {
             let _ = session.execute("file.openDemoProject", json!({}));

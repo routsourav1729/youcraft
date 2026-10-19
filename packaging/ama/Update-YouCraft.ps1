@@ -1,6 +1,6 @@
 # The stable installer AppId upgrades in place, preserving models and projects.
 $ErrorActionPreference = 'Stop'
-$installed = [version]'0.1.7'
+$installed = [version]'0.1.8'
 $base = 'https://routsourav1729.github.io/youcraft'
 $directory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'YouCraft\updates'
 $partial = Join-Path $directory 'YouCraft-Setup-x64.exe.partial'

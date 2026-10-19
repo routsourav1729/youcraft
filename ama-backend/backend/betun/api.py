@@ -215,7 +215,7 @@ def create_app(root=None, token=None):
 
     @app.get('/v1/projects')
     def projects():
-        return [dict(id=p['id'], name=p['name'], revision=p['revision'], duration=p['duration']) for p in store.list()]
+        return [dict(id=p['id'], name=p['name'], revision=p['revision'], duration=p['duration'], project_folder=str(store.directory(p['id']))) for p in store.list()]
 
     @app.get('/v1/projects/{pid}')
     def get(pid: str):
@@ -300,6 +300,12 @@ def create_app(root=None, token=None):
         if not path.is_file():
             raise KeyError('baseline')
         return Project.model_validate_json(path.read_text(encoding='utf-8'))
+
+    @app.get('/v1/storage')
+    def storage_locations():
+        home = store.default_project_home()
+        home.mkdir(parents=True, exist_ok=True)
+        return dict(projects_home=str(home), database=str(store.db), data_root=str(store.root))
 
     @app.get('/v1/projects/{pid}/storage')
     def project_storage(pid: str):

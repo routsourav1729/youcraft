@@ -54,6 +54,8 @@ pub mod play_ahead;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod podcast;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod podcast_audio;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod podcast_setup;
 mod rtl;
 pub mod scrub;
@@ -230,6 +232,7 @@ pub struct Playback {
     anchor_tick: Tick,
     /// Audio frames played at anchor (when the audio clock drives).
     pub audio_clock: bool,
+    pub audio_error: String,
     /// The audio clock's last reading and when (egui time, s) it last moved: a device that stops
     /// consuming samples hands the clock back to the wall clock (see [`AUDIO_STALL_S`]).
     audio_seen: (u64, f64),
@@ -1082,13 +1085,15 @@ impl FilmcraftApp {
         match a.start(fill) {
             Ok(_) => {
                 self.playback.audio_clock = true;
+                self.playback.audio_error.clear();
                 if let Some(note) = self.audio.as_ref().and_then(|audio| audio.note()) {
                     self.ui.status = note;
                 }
             }
             Err(e) => {
                 log::warn!("audio output unavailable: {e}");
-                self.ui.status = format!("Audio output unavailable: {e}");
+                self.playback.audio_error = format!("Audio output unavailable: {e}");
+                self.ui.status = self.playback.audio_error.clone();
                 self.playback.audio_clock = false;
             }
         }
@@ -1129,7 +1134,8 @@ impl FilmcraftApp {
                 audio.stop();
             }
             log::warn!("audio output lost its playback clock; playing without sound");
-            self.ui.status = tl!("Audio output failed: playing without sound (check Settings ▸ Audio Hardware)").into();
+            self.playback.audio_error = self.audio.as_ref().and_then(|a| a.note()).unwrap_or_else(|| "Audio output stopped. Open Audio output and Retry.".into());
+            self.ui.status = self.playback.audio_error.clone();
         }
         if let Some((f, sr)) = reading {
             if f != self.playback.audio_seen.0 {
@@ -1145,7 +1151,8 @@ impl FilmcraftApp {
                     a.stop();
                 }
                 log::warn!("audio output stalled (no samples consumed for {AUDIO_STALL_S} s); playing without sound");
-                self.ui.status = tl!("Audio output is not responding: playing without sound (check Settings ▸ Audio Hardware)").into();
+                self.playback.audio_error = "Audio output received no callbacks. Open Audio output and test the device.".into();
+                self.ui.status = self.playback.audio_error.clone();
             }
         }
         let elapsed = match reading {

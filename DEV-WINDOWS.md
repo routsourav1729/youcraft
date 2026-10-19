@@ -91,3 +91,32 @@ with `version` (numeric three-part version), `size` (bytes), and `sha256`, along
 the matching `YouCraft-Setup-x64.exe`. Increment the updater's installed version
 and Inno Setup AppVersion together. The downloader uses a fixed HTTPS origin.
 The checksum detects incomplete/mismatched downloads; it is not code signing.
+
+## Stage-by-stage development (0.1.8 onward)
+
+Pushes build the installer, check project persistence, and exercise the installed
+Projects/Audio-output UI through the existing control server. They do not compile
+an additional native unit-test executable or download speech models. Manually
+select `full_checks` for the complete backend/native suite, or `full_setup` to
+validate model installation. Keep each feedback release scoped to one workflow
+stage. Rust changes still require a native build; backend-only iteration can use
+the development helper described above without rebuilding the app.
+
+Launch opens Projects. Selecting Continue opens that project's saved view (or
+its earliest useful review step for older projects). New project clears the
+current inputs without deleting the previous episode. Active analysis or unsaved
+changes must finish before switching. Opening an explicit Filmcraft project file
+still opens that edit.
+
+New Windows projects use the system Documents folder under `YouCraft/Projects`;
+redirected Documents folders are respected. The Projects page shows the root and
+each episode's actual directory. Project folder allows a user-selected location;
+existing directories remain unchanged by updates. The legacy project index stays
+in `%LOCALAPPDATA%/Betun/betun.sqlite3`, model/runtime packs in
+`%LOCALAPPDATA%/YouCraft`, and per-project view preferences in
+`%LOCALAPPDATA%/YouCraft/media/view-<project-id>.json`. These are user data, separate
+from the replaceable installation in `%LOCALAPPDATA%/Programs/YouCraft`.
+
+For audio feedback, use Audio output → Test sound, then Copy diagnostics. The test
+uses the app's actual output stream, independent of media/model setup. A successful
+stream callback is not a claim that the user heard sound; confirm that manually.

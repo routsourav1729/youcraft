@@ -69,3 +69,20 @@ def test_progress_file_lock_does_not_fail_processing(tmp_path, monkeypatch):
         assert job['state'] == 'succeeded', job
     finally:
         queue.stop()
+
+
+def test_catalog_reports_persistent_project_location(tmp_path):
+    from fastapi.testclient import TestClient
+    from betun.api import create_app
+    root = tmp_path / 'data'
+    with TestClient(create_app(root=root, token='stage-one-test-token')) as client:
+        headers = {'Authorization': 'Bearer stage-one-test-token'}
+        created = client.post('/v1/projects', json={'name': 'Stage one'}, headers=headers).json()
+        catalog = client.get('/v1/projects', headers=headers).json()
+        directory = catalog[0]['project_folder']
+        locations = client.get('/v1/storage', headers=headers).json()
+        assert locations['projects_home'] == str(root / 'projects')
+    with TestClient(create_app(root=root, token='stage-one-test-token')) as client:
+        catalog = client.get('/v1/projects', headers=headers).json()
+        assert catalog[0]['id'] == created['id']
+        assert catalog[0]['project_folder'] == directory

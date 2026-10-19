@@ -36,6 +36,7 @@ pub struct CpalOut {
     /// Status-bar note: the host's default device could not be opened and a fallback device is
     /// in use, or no output device was found (playing without sound).
     note: Option<Note>,
+    last_error: Option<String>,
     /// The fallback picked when the default device could not be opened, as (host, device) names,
     /// so later lookups (`devices`, `configure`, `start`) reuse it instead of probing every PCM.
     fallback: Mutex<Option<(String, String)>>,
@@ -153,6 +154,7 @@ impl CpalOut {
             hw: AudioHardwarePrefs::default(),
             document_rate: None,
             note,
+            last_error: None,
             fallback,
         }
     }
@@ -217,7 +219,8 @@ impl CpalOut {
             return Err(format!("the output device now runs at {} Hz with {} channels", cfg.sample_rate().0, cfg.channels()));
         }
         let mut config: cpal::StreamConfig = cfg.clone().into();
-        if let cpal::SupportedBufferSize::Range { min, max } = cfg.buffer_size()
+        if !cfg!(target_os = "windows")
+            && let cpal::SupportedBufferSize::Range { min, max } = cfg.buffer_size()
             && (*min..=*max).contains(&self.hw.buffer_size)
         {
             config.buffer_size = cpal::BufferSize::Fixed(self.hw.buffer_size);
@@ -278,6 +281,7 @@ struct Health {
     failed: AtomicBool,
     /// The first error of a stream has been printed.
     reported: AtomicBool,
+    detail: Mutex<Option<String>>,
 }
 
 impl Health {
@@ -364,6 +368,7 @@ fn render(fill: &Mutex<Fill>, buf: &mut [f32], channels: usize, played: &AtomicU
 }
 
 fn stream_error(health: &Health, e: cpal::StreamError) {
+    *health.detail.lock().unwrap_or_else(PoisonError::into_inner) = Some(e.to_string());
     match e {
         cpal::StreamError::DeviceNotAvailable => health.lost.store(true, Ordering::SeqCst),
         cpal::StreamError::BackendSpecific { .. } => health.errored.store(true, Ordering::SeqCst),
@@ -388,7 +393,16 @@ impl AudioOut for CpalOut {
         self.health = Arc::new(Health::default());
         self.watchdog.reset(self.epoch.elapsed());
         let fill = Arc::new(Mutex::new(fill));
-        self.open(fill.clone(), None)?;
+        self.last_error = None;
+        if let Err(e) = self.open(fill.clone(), None) {
+            let error = format!(
+                "{} / {}: {e}",
+                host(&self.hw.device_class).id().name(),
+                if self.hw.default_output.is_empty() { "system default" } else { &self.hw.default_output }
+            );
+            self.last_error = Some(error.clone());
+            return Err(error);
+        }
         self.fill = Some(fill);
         Ok(self.rate)
     }
@@ -407,6 +421,7 @@ impl AudioOut for CpalOut {
             Verdict::Restart => {
                 log::warn!("the audio output stream {}; restarting it", if lost { "lost its device" } else { "stopped after an error" });
                 if let Err(e) = self.restart() {
+                    self.last_error = Some(format!("Output recovery failed: {e}"));
                     log::warn!("the audio output stream could not be restarted: {e}");
                     self.stream = None;
                     self.health.failed.store(true, Ordering::SeqCst);
@@ -436,6 +451,7 @@ impl AudioOut for CpalOut {
         AudioDevices { hosts: cpal::available_hosts().iter().map(|h| h.name().to_string()).collect(), inputs, outputs, output_channels }
     }
     fn configure(&mut self, hw: &AudioHardwarePrefs, document_rate: Option<u32>) {
+        self.last_error = None;
         self.hw = hw.clone();
         self.document_rate = document_rate;
         // the rate playback mixes at must be known before `start`
@@ -449,7 +465,10 @@ impl AudioOut for CpalOut {
         }
     }
     fn note(&self) -> Option<String> {
-        self.note.as_ref().map(Note::text)
+        self.last_error
+            .clone()
+            .or_else(|| self.health.detail.lock().unwrap_or_else(PoisonError::into_inner).clone())
+            .or_else(|| self.note.as_ref().map(Note::text))
     }
 }
 
