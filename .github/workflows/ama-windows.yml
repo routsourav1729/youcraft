@@ -77,6 +77,7 @@ jobs:
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/ama/Setup-media.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Automatic app-local media installation failed' }
           $mediaRoot = Join-Path $env:LOCALAPPDATA 'YouCraft'
+          if (-not (Test-Path "$installed/Update-YouCraft.ps1")) { throw 'Updater missing from installation' }
           $mediaConfig = Get-Content "$mediaRoot/media-tools.json" -Raw | ConvertFrom-Json
           & $mediaConfig.ffmpeg -version
           if ($LASTEXITCODE -ne 0) { throw 'App-local FFmpeg cannot run' }
@@ -169,6 +170,7 @@ jobs:
           $setup = Start-Process release/YouCraft-Setup-x64.exe -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$installed`"") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           if (-not (Test-Path "$installed/YouCraft.exe")) { throw 'Editor missing from installation' }
+          if (-not (Test-Path "$installed/Update-YouCraft.ps1")) { throw 'Updater missing from installation' }
           $mediaConfig = Get-Content "$env:LOCALAPPDATA/YouCraft/media-tools.json" -Raw | ConvertFrom-Json
           $env:BETUN_FFMPEG = $mediaConfig.ffmpeg
           $env:BETUN_FFPROBE = $mediaConfig.ffprobe

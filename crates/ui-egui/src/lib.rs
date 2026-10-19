@@ -1019,6 +1019,16 @@ impl FilmcraftApp {
         Ok(seconds)
     }
 
+    /// Re-anchor audio and video together; preserve the user's transport state.
+    pub fn seek_program(&mut self, to: Tick) {
+        let resume = self.playback.playing;
+        let speed = self.playback.speed;
+        self.stop();
+        let end = self.session.active_sequence().map(|q| q.duration()).unwrap_or_default();
+        self.session.set_playhead(self.session.sequence_rate().snap(to.max(Tick::ZERO).min(end)));
+        if resume { self.play(speed); }
+    }
+
     pub fn stop(&mut self) {
         self.playback.playing = false;
         self.playback.stop_at = None;

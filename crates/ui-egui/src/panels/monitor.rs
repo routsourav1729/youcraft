@@ -327,8 +327,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     let min = if which == Which::Program { Tick::ZERO } else { origin };
     match crate::widgets::timecode_field(ui, egui::Id::new((prefix, "timecode")), tc_rect, &tc, time, min, rate, drop_frame, t.timecode) {
         Some(Ok(to)) => {
-            let cmd = if which == Which::Program { "playhead.set" } else { "source.setPlayhead" };
-            if let Err(e) = app.session.execute(cmd, json!({"time": to.0})) {
+            if which == Which::Program {
+                app.seek_program(to);
+            } else if let Err(e) = app.session.execute("source.setPlayhead", json!({"time": to.0})) {
                 app.ui.status = e.to_string();
             }
         }
@@ -872,8 +873,7 @@ fn mini_timeline(
     if let Some(tk) = scrub {
         match which {
             Which::Program => {
-                app.stop();
-                app.session.set_playhead(tk);
+                app.seek_program(tk);
             }
             Which::Source => {
                 let _ = app.session.execute("source.setPlayhead", json!({"time": tk.0}));

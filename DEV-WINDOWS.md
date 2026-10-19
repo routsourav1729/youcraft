@@ -76,3 +76,18 @@ helper. A .mcpb opening in Notepad is a Windows file association issue, not an M
 connection; registration avoids that association.
 
 Official reference: https://code.claude.com/docs/en/desktop#mcp-servers-from-the-claude-desktop-chat-app
+
+## App updates
+
+From 0.1.7, use **Updates** in the Podcast header. A separate Windows progress
+window checks the published version, downloads from the Pages mirror, verifies
+size and SHA-256, and opens the installer after confirmation. Save and close
+YouCraft before installation. Install over the current app; do not uninstall.
+Models and project folders are retained. A failed download removes its partial
+file and leaves the existing installation intact.
+
+Publishing an update requires refreshing `update.json` on the `downloads` branch
+with `version` (numeric three-part version), `size` (bytes), and `sha256`, alongside
+the matching `YouCraft-Setup-x64.exe`. Increment the updater's installed version
+and Inno Setup AppVersion together. The downloader uses a fixed HTTPS origin.
+The checksum detects incomplete/mismatched downloads; it is not code signing.

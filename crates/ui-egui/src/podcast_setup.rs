@@ -195,3 +195,27 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+/// Run the bundled updater in a visible progress window (never through a file association).
+pub fn launch_updater() -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let script = exe.parent().ok_or("Missing app folder")?.join("Update-YouCraft.ps1");
+        if !script.is_file() {
+            return Err("Updater missing. Install the latest YouCraft once.".into());
+        }
+        Command::new("powershell.exe")
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+            .arg(script)
+            .creation_flags(0x00000010)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("App updates are available in the Windows installation.".into())
+    }
+}

@@ -776,6 +776,9 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     if let Some(error) = value["error"].as_str() {
                         s.error = error.into();
                     } else {
+                        // Finish the old sequence's automation and audio before replacing its strips.
+                        app.stop();
+                        app.stop_source();
                         match app.session.execute("podcast.assemble", value["plan"].clone()).and_then(|result| {
                             let item = result["sequence"].as_u64().ok_or_else(|| filmcraft_engine::EngineError::Other("Review sequence missing".into()))?;
                             s.review_item = Some(item);
@@ -803,6 +806,9 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     if let Some(error) = value["error"].as_str() {
                         s.error = error.into();
                     } else {
+                        // Finish the old sequence's automation and audio before replacing its strips.
+                        app.stop();
+                        app.stop_source();
                         match app.session.execute("podcast.assemble", value.get("plan").cloned().unwrap_or(value)) {
                             Ok(_) => {
                                 s.assembled = true;
@@ -1053,6 +1059,13 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         }
         if button(app, ui, "connect_ai", "Connect AI") {
             s.setup.ai_open = !s.setup.ai_open;
+        }
+        if button(app, ui, "updates", "Updates") {
+            s.checkpoint_on_exit();
+            match crate::podcast_setup::launch_updater() {
+                Ok(()) => s.status = "Updater opened. Save your edit before installing.".into(),
+                Err(error) => s.error = error,
+            }
         }
         if s.assembled && button(app, ui, "editor", "Editor") {
             app.set_workspace("Editing");
@@ -1802,7 +1815,15 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     set_rows(s, "clips", clips);
     if let Some(time) = preview {
         s.review_seek = time;
-        s.review_preview(false);
+        if s.review_active && s.review_item == app.session.state.active_sequence.map(|id| id.0) && s.project == s.saved_project && !s.busy() {
+            app.seek_program(filmcraft_time::Tick::from_seconds_f64(time));
+            if !app.playback.playing {
+                app.play(1.);
+            }
+        } else {
+            app.stop();
+            s.review_preview(false);
+        }
     }
 }
 fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
@@ -2296,6 +2317,33 @@ mod tests {
         poll(&mut app, &mut state);
         assert!(state.error.is_empty(), "{}", state.error);
         assert!(state.review_active);
+        // Regression: replacing a playing review must finish automation on the OLD strips.
+        app.play(1.);
+        app.end_preroll(0.);
+        assert!(app.session.mixrec.active());
+        let old_sequence = app.session.state.active_sequence;
+        state.action = "review_assemble".into();
+        let (tx, rx) = std::sync::mpsc::channel();
+        tx.send(Ok(json!({"project":project,"plan":plan}))).unwrap();
+        state.pending = Some(rx);
+        poll(&mut app, &mut state);
+        assert!(state.error.is_empty(), "Rebuild failed: {}", state.error);
+        assert_ne!(old_sequence, app.session.state.active_sequence);
+        assert!(!app.session.mixrec.active());
+        app.play(1.);
+        app.end_preroll(1.);
+        for second in [2., 0.4, 3., 1.] {
+            app.seek_program(filmcraft_time::Tick::from_seconds_f64(second));
+            assert!(app.playback.playing, "Seeking must preserve Play");
+            app.end_preroll(second + 2.);
+            let mut mix = crate::playback_mix(&app.session, app.session.state.active_sequence.unwrap(), 48000);
+            let mut samples = vec![0.; 4800];
+            mix((second * 48000.) as i64, &mut samples, 2);
+            assert!(samples.iter().any(|x| x.abs() > 0.1), "Master audio silent after seek");
+        }
+        app.stop();
+        app.seek_program(filmcraft_time::Tick::ZERO);
+        assert!(!app.playback.playing, "Seeking while paused must remain paused");
         app.podcast = state;
         let sequence = app.session.state.active_sequence.unwrap();
         let mut mix = crate::playback_mix(&app.session, sequence, 48000);
