@@ -3,6 +3,16 @@
 The egui frontend draws panels and dialogs, and dispatches project changes through the engine.
 Interactive controls keep stable automation ids regardless of the interface language.
 
+The Podcast Audio page retains its Auto/CPU/GPU controls after master import.
+Users can return to Audio, select CPU after a GPU failure, then return to the
+processing step and rerun it. The next analysis submission saves this selection;
+changing it alone does not alter recordings or the native edit. The
+`imported_episode_keeps_compute_controls_available_for_recovery` UI regression
+drives the CPU control on an imported episode and checks project preservation.
+On 23 October 2026 the four-test `podcast_ui` suite passed, and the recovery
+screen was rendered and inspected with software OpenGL. The optional live-helper
+test had no endpoint configured and did not exercise HTTP/model inference.
+
 ## Transition drop previews
 
 Dragging a video or audio transition over a compatible clip shows its actual time span, the

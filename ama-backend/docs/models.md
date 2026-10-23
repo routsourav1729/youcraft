@@ -11,7 +11,8 @@ Missing Windows App Installer is reported as an actionable setup error.
 The pinned Nemotron and Indic Core packs download from Hugging Face into
 `%LOCALAPPDATA%\YouCraft`. Several GB beyond the small installer are required.
 Setup progress, cancellation, retry, and **Setup log** are available in the app.
-The app reads the completed configuration without a restart. Inference is offline.
+The app reads the completed configuration without a restart. Inference is offline. NVIDIA setup selects CUDA explicitly. GPU errors never
+automatically start CPU inference.
 
 The Odia model may require accepting its Hugging Face access conditions. Open
 **Odia model access**, grant access with your own account, and enter a read token
@@ -111,7 +112,8 @@ installation is a separate compatibility constraint on Windows. Odia text can
 always be edited directly; Romanized spelling suggestions require this runtime.
 
 The default laptop configuration now selects Nemotron and Indic Core sequentially,
-with a 4.5 GiB allocation budget and optional fresh-process CPU retry. See the
+with a 4.5 GiB allocation budget. GPU failure stops the task; CPU retry requires
+an explicit user choice. See the
 fork's `docs/ama-validation.md` for measured server GPU results and their limits.
 
 ## Windows model setup (0.1.4)

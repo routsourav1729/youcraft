@@ -7,6 +7,7 @@ fn podcast_workspace_renders_every_step_before_opening_native_editor() {
     session.execute("file.newSequence", serde_json::json!({"name":"UI fixture", "fps":25})).unwrap();
     let mut app = FilmcraftApp::new(session);
     app.set_workspace("Podcast");
+    app.podcast.projects_open = false;
     // Synthetic analysis state exercises the controls that are absent in an empty project.
     app.podcast.project_id = "ui-fixture".into();
     app.podcast.project = serde_json::json!({
@@ -182,4 +183,178 @@ fn podcast_live_helper_flow() {
     call(harness.state_mut(), &ctx, "podcast.action", json!({"action":"save"}));
     wait!();
     assert!(harness.state().session.active_sequence().is_some());
+}
+
+#[test]
+fn imported_episode_keeps_compute_controls_available_for_recovery() {
+    use filmcraft_ui_egui::control::{ControlRequest, handle};
+    let mut app = FilmcraftApp::new(Session::default());
+    app.set_workspace("Podcast");
+    app.podcast.projects_open = false;
+    app.podcast.step = 1;
+    app.podcast.compute_device = "cuda".into();
+    app.podcast.project_id = "device-fixture".into();
+    app.podcast.project = serde_json::json!({
+        "id":"device-fixture", "name":"GPU recovery", "revision":1,
+        "settings":{"compute_device":"cuda"},
+        "clips":[{"id":"master","camera":"master","path":"episode.wav","duration":60}]
+    });
+    let screenshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
+    let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 768.)).with_max_steps(10000);
+    if screenshots.is_some() {
+        builder = builder.wgpu();
+    }
+    let mut harness = builder.build_eframe(move |_| app);
+    for _ in 0..5 {
+        harness.step();
+    }
+    for device in ["auto", "cpu", "cuda"] {
+        assert!(harness.state().auto.find(&format!("podcast.device.{device}")).is_some());
+    }
+    let ctx = harness.ctx.clone();
+    let (req, _) = ControlRequest::new("ui.click", serde_json::json!({"id":"podcast.device.cpu"}));
+    let _ = handle(harness.state_mut(), &ctx, &req);
+    for _ in 0..5 {
+        let mut input = std::mem::take(harness.input_mut());
+        eframe::App::raw_input_hook(harness.state_mut(), &ctx, &mut input);
+        *harness.input_mut() = input;
+        harness.step();
+    }
+    assert_eq!(harness.state().podcast.compute_device, "cpu");
+    assert_eq!(harness.state().podcast.project["revision"], 1);
+    assert_eq!(harness.state().podcast.project["clips"][0]["path"], "episode.wav");
+    if let Some(dir) = screenshots {
+        std::fs::create_dir_all(&dir).unwrap();
+        harness.render().expect("render recovery controls").save(dir.join("podcast-device-recovery.png")).unwrap();
+    }
+}
+
+fn saved_episode_app() -> FilmcraftApp {
+    let mut app = FilmcraftApp::new(Session::default());
+    app.set_workspace("Podcast");
+    app.podcast.projects_open = false;
+    app.podcast.project_id = "workflow-fixture".into();
+    app.podcast.step = 3;
+    app.podcast.project = serde_json::json!({
+        "id":"workflow-fixture", "name":"Saved conversation", "revision":7, "duration":60,
+        "settings":{"compute_device":"cuda","roles_locked":true,"host_speaker":"host"},
+        "clips":[{"id":"master","camera":"master","path":"master.wav","duration":60},
+                 {"id":"host-camera","camera":"A","path":"host.mp4","duration":60,"sync_reviewed":true}],
+        "activity":[{"id":"turn","start":0,"end":60,"speaker":"host"}],
+        "captions":(0..6).map(|i| serde_json::json!({"id":format!("caption-{i}"),"start":i*10,"end":(i+1)*10,"speaker":"host","text":format!("ନମସ୍କାର segment {i}"),"reviewed":true})).collect::<Vec<_>>(),
+        "shots":[{"id":"cut","start":0,"end":60,"layout":"A","locked":true}],
+        "reactions":[], "cuts":[]
+    });
+    app
+}
+
+fn click_workflow(harness: &mut egui_kittest::Harness<'_, FilmcraftApp>, id: &str) {
+    use filmcraft_ui_egui::control::{ControlRequest, handle};
+    let ctx = harness.ctx.clone();
+    let (req, _) = ControlRequest::new("ui.click", serde_json::json!({"id":id}));
+    let _ = handle(harness.state_mut(), &ctx, &req);
+    for _ in 0..5 {
+        let mut input = std::mem::take(harness.input_mut());
+        eframe::App::raw_input_hook(harness.state_mut(), &ctx, &mut input);
+        *harness.input_mut() = input;
+        harness.step();
+    }
+}
+
+#[test]
+fn navigation_and_continue_preserve_saved_results_without_starting_jobs() {
+    let app = saved_episode_app();
+    let original = app.podcast.project.clone();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 900.)).build_eframe(move |_| app);
+    for _ in 0..5 {
+        harness.step();
+    }
+    click_workflow(&mut harness, "podcast.transcribe");
+    assert_eq!(harness.state().podcast.step, 4);
+    for step in [2, 3, 4, 5, 6, 4] {
+        click_workflow(&mut harness, &format!("podcast.step.{step}"));
+        assert_eq!(harness.state().podcast.step, step);
+        assert_eq!(harness.state().podcast.project, original);
+        assert!(harness.state().podcast.job.is_none());
+        let inspect = filmcraft_ui_egui::podcast::control(harness.state_mut(), "podcast.inspect", &serde_json::json!({})).unwrap();
+        assert_eq!(inspect["busy"], false, "Navigation launched a request");
+    }
+}
+
+#[test]
+fn compact_transcript_edits_one_segment_and_requests_regeneration_explicitly() {
+    let mut app = saved_episode_app();
+    app.podcast.step = 4;
+    let original = app.podcast.project.clone();
+    let screenshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
+    let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 768.)).with_max_steps(10000);
+    if screenshots.is_some() {
+        builder = builder.wgpu();
+    }
+    let mut harness = builder.build_eframe(move |_| app);
+    for _ in 0..5 {
+        harness.step();
+    }
+    assert!(harness.state().auto.find("podcast.caption.text.0").is_some());
+    assert!(harness.state().auto.find("podcast.caption.text.1").is_none());
+    click_workflow(&mut harness, "podcast.captions.next");
+    assert!(harness.state().auto.find("podcast.caption.text.0").is_none());
+    assert!(harness.state().auto.find("podcast.caption.text.1").is_some());
+    click_workflow(&mut harness, "podcast.caption.roman.1");
+    assert!(harness.state().auto.find("podcast.roman").is_some());
+    if let Some(dir) = &screenshots {
+        std::fs::create_dir_all(dir).unwrap();
+        harness.render().unwrap().save(dir.join("compact-transcript.png")).unwrap();
+    }
+    filmcraft_ui_egui::podcast::control(harness.state_mut(), "podcast.action", &serde_json::json!({"action":"transcribe"})).unwrap();
+    let inspect = filmcraft_ui_egui::podcast::control(harness.state_mut(), "podcast.inspect", &serde_json::json!({})).unwrap();
+    assert_eq!(inspect["regeneration_pending"], "transcribe");
+    assert_eq!(inspect["busy"], false);
+    filmcraft_ui_egui::podcast::control(harness.state_mut(), "podcast.action", &serde_json::json!({"action":"keep_results"})).unwrap();
+    assert_eq!(harness.state().podcast.project, original);
+}
+
+#[test]
+fn recovery_drafts_are_separate_per_project_and_keep_outputs_and_view() {
+    let root = std::env::temp_dir().join(format!("youcraft-draft-test-{}", std::process::id()));
+    let mut app = saved_episode_app();
+    app.podcast.cache = root.to_string_lossy().into();
+    app.podcast.step = 6;
+    for id in ["11111111111111111111111111111111", "22222222222222222222222222222222"] {
+        app.podcast.project_id = id.into();
+        app.podcast.project["id"] = serde_json::json!(id);
+        app.podcast.checkpoint_on_exit();
+    }
+    for id in ["11111111111111111111111111111111", "22222222222222222222222222222222"] {
+        let saved: serde_json::Value = serde_json::from_slice(&std::fs::read(root.join(format!("unsaved-{id}.json"))).unwrap()).unwrap();
+        assert_eq!(saved["project_id"], id);
+        assert_eq!(saved["step"], 6);
+        assert_eq!(saved["project"]["captions"].as_array().unwrap().len(), 6);
+        assert_eq!(saved["project"]["shots"][0]["locked"], true);
+        assert!(saved.get("token").is_none());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn startup_lands_on_clean_projects_screen() {
+    let mut app = FilmcraftApp::new(Session::default());
+    app.set_workspace("Podcast");
+    let screenshots = std::env::var_os("FILMCRAFT_UI_SNAPSHOT_DIR").map(std::path::PathBuf::from);
+    let mut builder = egui_kittest::Harness::builder().with_size(egui::vec2(1366., 768.)).with_max_steps(10000);
+    if screenshots.is_some() {
+        builder = builder.wgpu();
+    }
+    let mut harness = builder.build_eframe(move |_| app);
+    harness.step();
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    for _ in 0..5 {
+        harness.step();
+    }
+    assert!(harness.state().auto.find("podcast.new_project").is_some());
+    assert!(harness.state().auto.find("podcast.connect_ai").is_none());
+    if let Some(dir) = screenshots {
+        std::fs::create_dir_all(&dir).unwrap();
+        harness.render().unwrap().save(dir.join("projects-home.png")).unwrap();
+    }
 }

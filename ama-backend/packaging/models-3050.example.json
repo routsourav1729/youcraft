@@ -2,19 +2,19 @@
   "diarize": {
     "provider": "nemotron-transformers", "python": "C:/YouCraft/ml/python.exe",
     "model_path": "C:/YouCraft/models/nemotron", "revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e",
-    "device": "auto", "max_vram_gb": 4.5, "cpu_threads": 4, "allow_cpu_fallback": true
+    "device": "auto", "max_vram_gb": 4.5, "cpu_threads": 4, "allow_cpu_fallback": false
   },
   "transcribe": {
     "provider": "indic-core", "python": "C:/YouCraft/ml/python.exe",
     "model_path": "C:/YouCraft/models/indic-core", "revision": "e083ab7dfeeddcb5c0b4a2d7df53f53e7b0f1537",
-    "device": "auto", "max_vram_gb": 4.5, "cpu_threads": 4, "allow_cpu_fallback": true
+    "device": "auto", "max_vram_gb": 4.5, "cpu_threads": 4, "allow_cpu_fallback": false
   },
   "reactions": {
     "provider": "mediapipe-l2cs", "python": "C:/YouCraft/vision/python.exe",
     "model_path": "C:/YouCraft/models/vision", "revision": "REPLACE_WITH_VERIFIED_BUNDLE_HASH",
     "gaze_weights": "C:/YouCraft/models/vision/L2CSNet_gaze360.pkl",
     "face_model": "C:/YouCraft/models/vision/face_landmarker.task",
-    "device": "auto", "max_vram_gb": 2, "cpu_threads": 4, "allow_cpu_fallback": true
+    "device": "auto", "max_vram_gb": 2, "cpu_threads": 4, "allow_cpu_fallback": false
   },
   "transliterate": {
     "provider": "indicxlit", "python": "C:/YouCraft/xlit/python.exe",

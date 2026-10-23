@@ -1134,7 +1134,8 @@ impl FilmcraftApp {
                 audio.stop();
             }
             log::warn!("audio output lost its playback clock; playing without sound");
-            self.playback.audio_error = self.audio.as_ref().and_then(|a| a.note()).unwrap_or_else(|| "Audio output stopped. Open Audio output and Retry.".into());
+            self.playback.audio_error =
+                self.audio.as_ref().and_then(|a| a.note()).unwrap_or_else(|| "Audio output stopped. Open Audio output and Retry.".into());
             self.ui.status = self.playback.audio_error.clone();
         }
         if let Some((f, sr)) = reading {

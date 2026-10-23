@@ -120,3 +120,23 @@ from the replaceable installation in `%LOCALAPPDATA%/Programs/YouCraft`.
 For audio feedback, use Audio output → Test sound, then Copy diagnostics. The test
 uses the app's actual output stream, independent of media/model setup. A successful
 stream callback is not a claim that the user heard sound; confirm that manually.
+
+## File-level updates (0.1.9 onward)
+
+0.1.8 needs one final full installer upgrade to acquire the new updater. From
+0.1.9, Updates compares installed SHA-256 hashes with `files-VERSION.json` and
+fetches only changed files from immutable `files/HASH.gz` objects on the same
+HTTPS mirror. A changed EXE is downloaded whole; this is not binary delta patching.
+New files are staged and verified before application. All replaced files have
+backups and a persistent transaction journal. Close the editor before applying.
+If interrupted, rerun Updates with the editor closed to restore the prior files.
+Successful updates delete their staging and backup cache. Full installers remain
+available for repair. Models, projects and runtime packs outside the installation
+are untouched. Hashes detect corruption; packages are not code-signed.
+
+The old full-installer cache is one reused file, not a growing series, at
+`%LOCALAPPDATA%\YouCraft\updates\YouCraft-Setup-x64.exe`. The new updater removes
+that old cached download when next opened. Subsequent file updates write their
+managed file list to `installed-files.json`; only previously managed paths can
+be removed. Windows Add/Remove Programs retains the last full-installer version;
+the updater's installed version identifies the actual application update.

@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from .media import run
+from .media import Cancelled, run
 
 
 def configuration():
@@ -17,6 +17,8 @@ def configuration():
 
 
 def invoke(task, payload, directory, cancel=lambda: False, device='auto', progress=lambda _: None):
+    if cancel():
+        raise Cancelled('Job cancelled')
     config = configuration().get(task)
     if not config and task == 'transliterate':
         from indic_transliteration import sanscript
@@ -31,6 +33,11 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
         raise ValueError('Choose Auto, CPU or GPU')
     if device != 'auto':
         config = dict(config, device=device)
+    # Old NVIDIA installers wrote auto; CPU installs explicitly write cpu.
+    if task in ('diarize', 'transcribe') and config.get('device') == 'auto':
+        config = dict(config, device='cuda')
+    # Never reuse a cache produced under the old silent CPU-fallback policy.
+    config = dict(config, allow_cpu_fallback=False)
     if not config.get('revision'):
         raise ValueError('Provider configuration needs a revision for reproducible caching')
     digest = hashlib.sha256(json.dumps(dict(task=task, payload=payload, config=config), sort_keys=True).encode()).hexdigest()
@@ -40,6 +47,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
     request = directory / f'request-{digest}.json'
     partial = directory / f'model-{digest}.partial.json'
     status_path = directory / f'progress-{digest}.json'
+    partial.unlink(missing_ok=True)
     status_path.unlink(missing_ok=True)
     request.write_text(json.dumps(dict(task=task, payload=payload, config=config, progress_path=str(status_path))))
     last_status = None
@@ -58,7 +66,8 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
                 last_status = text
         except (OSError, ValueError):
             pass
-    progress(dict(stage='Starting model worker'))
+    execution_label = 'NVIDIA GPU' if str(config.get('device', 'cpu')).startswith('cuda') else 'CPU'
+    progress(dict(stage=f'Starting {execution_label} worker'))
     # Commands are administrator configuration, never supplied through the HTTP API.
     command = config.get('command')
     if command is None:
@@ -70,24 +79,24 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
     if not isinstance(command, list) or not all(isinstance(x, str) for x in command) or not command:
         raise ValueError('Provider command must be a nonempty argument array')
     try:
-        fallback = False
         try:
             run([*command, str(request), str(partial)], cancel, timeout=86400, on_poll=report)
         except RuntimeError as exc:
-            # The failed GPU process has been reaped by run() before this CPU retry starts.
-            if not config.get('allow_cpu_fallback', False) or not any(x in str(exc) for x in ('CUDA out of memory', 'OutOfMemoryError')):
-                raise
-            fallback = True
-            retry = dict(config, device='cpu')
-            progress(dict(stage='Releasing GPU memory · retrying on CPU'))
-            request.write_text(json.dumps(dict(task=task, payload=payload, config=retry, progress_path=str(status_path))))
-            run([*command, str(request), str(partial)], cancel, timeout=86400, on_poll=report)
+            if cancel():
+                raise Cancelled('Job cancelled')
+            if 'cuda out of memory' in str(exc).lower():
+                raise RuntimeError('GPU memory is full. Your saved results are unchanged. '
+                    'Retry on GPU after closing other GPU apps; for transcription, choose shorter segments. '
+                    'CPU processing starts only when you select CPU explicitly.') from exc
+            raise
+        if cancel():
+            raise Cancelled('Job cancelled')
         report()
         progress(dict(stage='Saving results'))
         result = json.loads(partial.read_text(encoding='utf-8'))
         if not isinstance(result, dict):
             raise ValueError('Worker result must be a JSON object')
-        result['_execution'] = dict(worker_exited=True, cpu_fallback=fallback)
+        result['_execution'] = dict(worker_exited=True, cpu_fallback=False, device=result.pop('_device', config.get('device', 'cpu')))
         partial.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
         partial.replace(destination)
         return result

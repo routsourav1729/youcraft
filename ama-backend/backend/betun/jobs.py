@@ -4,6 +4,7 @@ import time
 from .media import Cancelled
 from .pipeline import process
 from .schema import Project, uid
+from .store import Conflict
 
 
 class Queue:
@@ -128,6 +129,8 @@ class Queue:
                 directory.mkdir(parents=True, exist_ok=True)
                 if cancelled():
                     raise Cancelled()
+                if self.store.get(project.id).revision != project.revision:
+                    raise Conflict('Project changed while queued; retry to use the latest revision')
                 result = process(self.store, project, row['kind'], payload['options'], directory, cancelled, progress)
                 state, error = 'succeeded', None
             except Cancelled:

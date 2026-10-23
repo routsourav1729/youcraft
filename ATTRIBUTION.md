@@ -158,6 +158,15 @@ the original copyright and permission notice in its header.
 |---|---|---|---|
 | `crates/platform/src/nvenc/ffi.rs` | NVIDIA Corporation (`nvEncodeAPI.h`); FilmCraft contributors (Rust transcription) | Structures (including `NV_ENC_CONFIG_HEVC` and its bit-field masks, `NV_ENC_PIC_PARAMS_HEVC`, `NV_ENC_SEI_PAYLOAD`, `NV_ENC_TIME_CODE`), function table, codec / profile GUIDs (H.264, HEVC Main, HEVC Main 10) and constants (`NV_ENC_LEVEL_HEVC_*`, tier, CU size, `NV_ENC_BUFFER_FORMAT_YUV420_10BIT`, `NV_ENC_CAPS_SUPPORT_10BIT_ENCODE`, BT.2020 / PQ / HLG VUI codes) transcribed from `nvEncodeAPI.h`, NVIDIA Video Codec SDK, API 12.1 (https://developer.nvidia.com/video-codec-sdk) | MIT (Copyright (c) 2010-2023 NVIDIA Corporation; notice kept in the file header) |
 
+## YouCraft project assets
+
+Existing project-provided assets; metadata normalization does not change their recorded permissions.
+
+| Asset | Author | Source | Licence |
+|---|---|---|---|
+| `assets/youcraft/logo.png` | Supplied by YouCraft project owner | User-supplied YouCraft geometric play logo.png | LicenseRef-UserProvided; existing record notes project-owner authorization |
+| `assets/youcraft/logo.ico` | Supplied by YouCraft project owner | Windows icon conversion of the supplied YouCraft logo | LicenseRef-UserProvided; existing record notes project-owner authorization |
+
 ## Downloaded at runtime
 
 These files are never in the repository or the app bundle. FilmCraft downloads them into the
@@ -168,6 +177,3 @@ SHA-256 (`crates/speech/src/models.rs`, `docs/transcripts.md`).
 | Asset | Author | Source | Licence |
 |---|---|---|---|
 | Whisper tiny / base / small speech-recognition weights (`model.safetensors`, `config.json`, `generation_config.json`, `tokenizer.json`) | OpenAI | `https://huggingface.co/openai/whisper-{tiny,base,small}` (revisions `169d4a43…`, `e37978b9…`, `973afd24…`); weights released with `https://github.com/openai/whisper` | MIT (weights and code, github.com/openai/whisper); the Hugging Face conversion is labelled Apache-2.0 |
-
-| assets/youcraft/logo.png | YouCraft logo supplied by project owner | LicenseRef-UserProvided; use authorized by project owner |
-| assets/youcraft/logo.ico | Windows format conversion of the supplied YouCraft logo | LicenseRef-UserProvided; use authorized by project owner |

@@ -76,7 +76,7 @@ try {
     [IO.File]::WriteAllText($runtimeStamp, $Mode)
     if ($RuntimeOnly) { Report 'Runtime ready' 'succeeded'; exit 0 }
     $models = Join-Path $Root 'models'
-    $device = if ($Mode -eq 'nvidia') { 'auto' } else { 'cpu' }
+    $device = if ($Mode -eq 'nvidia') { 'cuda' } else { 'cpu' }
     foreach ($pack in @('nemotron','indic-core')) {
         Report $(if ($pack -eq 'nemotron') { 'Downloading speaker model' } else { 'Downloading Odia model' })
         $downloadArgs = @("$ScriptsDirectory/download_models.py", '--directory', $models, '--pack', $pack)

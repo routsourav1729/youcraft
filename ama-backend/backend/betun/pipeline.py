@@ -17,6 +17,7 @@ def natural_key(path):
 def chunk_turns(project, audio_paths, directory):
     """Diarization supplies speech detection; split long turns near low-energy pauses."""
     chunks, captions = [], []
+    segment_seconds = project.settings.transcription_segment_seconds
     arrays = {}
     for turn in sorted(project.activity, key=lambda a: (a.start, a.speaker)):
         boundaries = {turn.start, turn.end}
@@ -30,13 +31,13 @@ def chunk_turns(project, audio_paths, directory):
             overlap = any(t.speaker != turn.speaker and t.start < end and t.end > start for t in project.activity)
             cursor = start
             while cursor < end - .001:
-                stop = min(cursor + 28, end)
+                stop = min(cursor + segment_seconds, end)
                 if stop < end:
                     if str(audio) not in arrays:
                         arrays[str(audio)] = media.read_wav(audio)[0]
                     samples = arrays[str(audio)]
-                    # Search 20–28 seconds for the lowest 200 ms energy; no speech is removed.
-                    candidates = np.arange(cursor + 20, stop - .1, .1)
+                    # Find a low-energy split within the chosen segment limit; no speech is removed.
+                    candidates = np.arange(cursor + min(20, segment_seconds * .75), stop - .1, .1)
                     energies = [float(np.mean(samples[int((x - .1) * 16000):int((x + .1) * 16000)] ** 2)) for x in candidates]
                     if energies:
                         stop = float(candidates[int(np.argmin(energies))])

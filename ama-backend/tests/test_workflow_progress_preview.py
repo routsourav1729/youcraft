@@ -47,7 +47,7 @@ def test_transcription_reports_loading_and_completed_chunks(tmp_path, monkeypatc
     request.write_text(json.dumps(dict(task='transcribe', config=dict(provider='indic-core', model_path=str(tmp_path), device='cpu'),
         progress_path=str(status), payload=dict(chunks=[dict(id='one', audio='one.wav'), dict(id='two', audio='two.wav')]))))
     main(str(request), str(tmp_path / 'result.json'))
-    assert events[0]['stage'] == 'Loading model'
+    assert events[0]['stage'] == 'Loading model · CPU'
     assert [e['completed'] for e in events[1:]] == [0, 1]
     assert json.loads(status.read_text(encoding="utf-8"))['fraction'] == 1.
     assert len(json.loads((tmp_path / 'result.json').read_text(encoding="utf-8"))['captions']) == 2

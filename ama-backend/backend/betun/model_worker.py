@@ -38,6 +38,8 @@ def main(request_path, result_path):
         if device == 'auto':
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if device.startswith('cuda'):
+            if not torch.cuda.is_available():
+                raise ValueError('NVIDIA GPU is unavailable in this runtime. Choose CPU or install the NVIDIA runtime in Models.')
             selected = torch.device(device).index
             device = f'cuda:{torch.cuda.current_device() if selected is None else selected}'
         if device.startswith('cuda') and config.get('max_vram_gb'):
@@ -48,7 +50,7 @@ def main(request_path, result_path):
             torch.cuda.set_per_process_memory_fraction(fraction, device)
         config = dict(config, device=device)
 
-    progress('Loading model')
+    progress('Loading model · ' + ('NVIDIA GPU' if device.startswith('cuda') else 'CPU'))
     if task == 'diarize' and provider == 'pyannote':
         import torch
         from pyannote.audio import Pipeline
@@ -141,6 +143,8 @@ def main(request_path, result_path):
         result = dict(text=transliterate.process('ITRANS', 'Oriya', payload['text']))
     else:
         raise ValueError(f'Unsupported built-in provider: {task}/{provider}; configure an external command for extensions')
+    if task in ('diarize', 'transcribe'):
+        result['_device'] = device
     Path(result_path).write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
 
 

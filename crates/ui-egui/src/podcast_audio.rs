@@ -106,10 +106,10 @@ impl State {
                         Err(e) => self.message = e.to_string(),
                     }
                 }
-                if button(app, ui, "test", "Test sound") {
-                    if let Err(e) = self.test(app) {
-                        self.message = format!("Test failed: {e}");
-                    }
+                if button(app, ui, "test", "Test sound")
+                    && let Err(e) = self.test(app)
+                {
+                    self.message = format!("Test failed: {e}");
                 }
                 if ui.add_enabled(app.session.active_sequence().is_some(), egui::Button::new("Retry playback")).clicked() {
                     self.configure(app);
@@ -141,7 +141,9 @@ impl State {
             if button(app, ui, "copy", "Copy diagnostics") {
                 ctx.copy_text(report);
             }
-            if button(app, ui, "done", "Done") { close = true; }
+            if button(app, ui, "done", "Done") {
+                close = true;
+            }
         });
         self.open = open && !close;
     }

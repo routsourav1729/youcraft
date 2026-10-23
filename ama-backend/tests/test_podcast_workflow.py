@@ -89,7 +89,7 @@ def test_cancelled_worker_is_reaped(tmp_path):
     assert time.monotonic()-start<10
 
 
-def test_provider_cpu_retry_starts_after_gpu_worker_has_exited(tmp_path,monkeypatch):
+def test_gpu_failure_requires_explicit_cpu_choice(tmp_path,monkeypatch):
     import json
     from pathlib import Path
     from betun.providers import invoke
@@ -101,9 +101,12 @@ def test_provider_cpu_retry_starts_after_gpu_worker_has_exited(tmp_path,monkeypa
         if config['device']=='cuda':raise RuntimeError('CUDA out of memory')
         Path(args[-1]).write_text(json.dumps(dict(activity=[])))
     monkeypatch.setattr('betun.providers.run',run)
-    result=invoke('diarize',dict(audio='fake'),tmp_path)
-    assert devices==['cuda','cpu']
-    assert result['_execution']==dict(worker_exited=True,cpu_fallback=True)
+    with pytest.raises(RuntimeError, match='CPU explicitly'):
+        invoke('diarize',dict(audio='fake'),tmp_path)
+    assert devices == ['cuda']
+    result = invoke('diarize', dict(audio='fake'), tmp_path, device='cpu')
+    assert devices == ['cuda', 'cpu']
+    assert result['_execution'] == dict(worker_exited=True, cpu_fallback=False, device='cpu')
 
 
 def test_cpu_choice_overrides_gpu_config_and_uses_a_separate_cache(tmp_path, monkeypatch):

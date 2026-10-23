@@ -1,4 +1,7 @@
-Source: User-supplied YouCraft geometric play logo.png
-Author: Supplied by YouCraft project owner
-License: LicenseRef-UserProvided
-Permission: Project owner explicitly requested incorporation into YouCraft on 2026-10-18.
+asset: logo.png
+title: YouCraft geometric play logo
+author: Supplied by YouCraft project owner
+source: User-supplied YouCraft geometric play logo.png
+license: LicenseRef-UserProvided
+added: 2026-10-18 (existing project asset; metadata normalized 2026-10-23)
+notes: Existing record states that the project owner explicitly requested incorporation into YouCraft on 2026-10-18. This metadata correction does not grant additional rights.

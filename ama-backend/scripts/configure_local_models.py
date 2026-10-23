@@ -15,7 +15,7 @@ def configuration(directory, device, python, partial=False):
             raise ValueError(f'Missing model directory: {name}')
         config[task] = dict(provider=provider, python=str(python), device=device,
             model_path=entry['path'], revision=entry['revision'], cpu_threads=4,
-            max_vram_gb=4.5, allow_cpu_fallback=True)
+            max_vram_gb=4.5, allow_cpu_fallback=False)
     return config
 
 def main():

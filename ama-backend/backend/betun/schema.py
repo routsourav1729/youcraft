@@ -69,6 +69,7 @@ class Cut(Span):
 
 class Settings(Model):
     compute_device: Literal['auto', 'cpu', 'cuda'] = 'auto'
+    transcription_segment_seconds: float = Field(default=28, ge=8, le=28)
     host_speaker: str | None = None
     roles_locked: bool = False
     minimum_shot: float = Field(default=4, ge=0, le=30)

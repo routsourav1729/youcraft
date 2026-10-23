@@ -64,6 +64,8 @@ jobs:
             [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count) { throw ($errors | Out-String) }
           }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/file-update.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Incremental updater regression failed' }
       - name: MCP preflight before compilation
         if: ${{ inputs.full_setup == true }}
         shell: pwsh
@@ -168,6 +170,18 @@ jobs:
           }
           & $compiler "/DRepoRoot=$env:GITHUB_WORKSPACE" packaging/ama-installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build incremental update files
+        shell: pwsh
+        run: |
+          python packaging/build_updates.py release/YouCraft release/incremental 0.1.9
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          . ./packaging/ama/Apply-FileUpdate.ps1
+          $manifest = Get-Content release/incremental/files-0.1.9.json -Raw | ConvertFrom-Json
+          foreach ($file in $manifest.files) { Get-SafeUpdatePath "$env:GITHUB_WORKSPACE/release/YouCraft" $file.path | Out-Null }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouCraft-Incremental
+          path: release/incremental/
       - name: Install and check the packaged local helper
         shell: pwsh
         run: |

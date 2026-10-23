@@ -1,64 +1,123 @@
-# The stable installer AppId upgrades in place, preserving models and projects.
 $ErrorActionPreference = 'Stop'
-$installed = [version]'0.1.8'
+$installed = [version]'0.1.9'
 $base = 'https://routsourav1729.github.io/youcraft'
 $directory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'YouCraft\updates'
-$partial = Join-Path $directory 'YouCraft-Setup-x64.exe.partial'
-$installer = Join-Path $directory 'YouCraft-Setup-x64.exe'
-New-Item -ItemType Directory -Force -Path $directory | Out-Null
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+$transaction = Join-Path $directory 'transaction'
 $client = $null
-$response = $null
-$output = $null
+$lock = $null
+New-Item -ItemType Directory -Force $directory | Out-Null
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+. (Join-Path $PSScriptRoot 'Apply-FileUpdate.ps1')
+
+function Assert-AppClosed {
+    foreach ($process in @(Get-Process YouCraft,BetunBackend,filmcraft-cli -ErrorAction SilentlyContinue)) {
+        if ($process.Path -and $process.Path.StartsWith($PSScriptRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Save your project and close YouCraft and its helper before continuing. No processes were terminated.'
+        }
+    }
+}
+function Receive-VerifiedFile($Url, $Destination, [long]$Size, [string]$Hash) {
+    $response = $null; $output = $null; $inputStream = $null
+    $deadline = New-Object Threading.CancellationTokenSource
+    $deadline.CancelAfter([TimeSpan]::FromMinutes(15))
+    try {
+        $response = $client.GetAsync($Url, [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+        $response.EnsureSuccessStatusCode() | Out-Null
+        $inputStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $output = [IO.File]::Create($Destination)
+        $buffer = New-Object byte[] 262144
+        $received = 0L
+        while (($count = $inputStream.ReadAsync($buffer, 0, $buffer.Length, $deadline.Token).GetAwaiter().GetResult()) -gt 0) {
+            $received += $count
+            if ($received -gt $Size) { throw 'Update download exceeds expected size' }
+            $output.Write($buffer, 0, $count)
+            Write-Progress -Activity 'Downloading changed files' -Status "$([math]::Round($received / 1MB, 1)) MB of current file" -PercentComplete ([math]::Min(100,100 * $received / [math]::Max(1,$Size)))
+        }
+        $output.Dispose(); $output = $null
+        if ($received -ne $Size -or (Get-FileHash $Destination -Algorithm SHA256).Hash -ne $Hash) { throw 'Update checksum mismatch' }
+    } finally {
+        if ($output) { $output.Dispose() }
+        if ($inputStream) { $inputStream.Dispose() }
+        if ($response) { $response.Dispose() }
+        $deadline.Dispose()
+    }
+}
 try {
-    Write-Host "YouCraft $installed - Checking for updates..."
-    $manifest = Invoke-RestMethod -Uri "$base/update.json?check=$([DateTime]::UtcNow.Ticks)" -TimeoutSec 30
-    $latest = [version]$manifest.version
-    if ($latest -le $installed) {
-        Write-Host 'YouCraft is up to date.'
+    $lock = [IO.File]::Open((Join-Path $directory 'update.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
+    if (Test-Path (Join-Path $transaction 'journal.json')) {
+        Assert-AppClosed
+        Restore-FileUpdate $PSScriptRoot $transaction
+        Write-Host 'Recovered the previous update. Please run Updates again.'
         return
     }
-    if ($manifest.sha256 -notmatch '^[a-fA-F0-9]{64}$' -or [long]$manifest.size -le 0 -or [long]$manifest.size -gt 1GB) {
-        throw 'Invalid update metadata. Nothing was installed.'
+    # Old updater reused one installer filename; remove that completed-download cache.
+    Remove-Item (Join-Path $directory 'YouCraft-Setup-x64.exe') -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $directory 'YouCraft-Setup-x64.exe.partial') -Force -ErrorAction SilentlyContinue
+    Write-Host "YouCraft $installed - Checking for updates..."
+    $manifest = Invoke-RestMethod "$base/update.json?check=$([DateTime]::UtcNow.Ticks)" -TimeoutSec 30
+    if ($manifest.version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid version metadata' }
+    $latest = [version]$manifest.version
+    if ($latest -le $installed) { Write-Host 'YouCraft is up to date.'; return }
+    $release = Invoke-RestMethod "$base/files-$latest.json" -TimeoutSec 30
+    if ($release.version -ne $manifest.version -or @($release.files).Count -eq 0 -or @($release.files).Count -gt 10000) { throw 'Invalid file manifest' }
+    $changed = @(); $seen = @{}; $total = 0L
+    foreach ($file in $release.files) {
+        $path = Get-SafeUpdatePath $PSScriptRoot $file.path
+        if ($seen.ContainsKey($file.path) -or $file.path -eq 'installed-files.json' -or $file.sha256 -notmatch '^[a-f0-9]{64}$' -or $file.download_sha256 -notmatch '^[a-f0-9]{64}$' -or [long]$file.size -lt 0 -or [long]$file.size -gt 1GB -or [long]$file.download_size -le 0 -or [long]$file.download_size -gt 1GB) { throw 'Invalid file metadata' }
+        $seen[$file.path] = $true
+        if ((Test-Path $path -PathType Leaf) -and (Get-Item $path).Length -eq $file.size -and (Get-FileHash $path -Algorithm SHA256).Hash -eq $file.sha256) { continue }
+        $changed += $file
+        $total += [long]$file.download_size
     }
-    Write-Host "Available: $latest ($([math]::Round($manifest.size / 1MB, 1)) MB)"
-    if ((Read-Host 'Download update? [Y/N]') -notmatch '^[yY]') { return }
-    # Fixed HTTPS origin: metadata cannot redirect execution to an arbitrary executable.
+    if ($total -gt 2GB) { throw 'Update exceeds supported size' }
+    Write-Host "$installed -> $latest : $($changed.Count) changed files, $([math]::Round($total / 1MB, 1)) MB. Models and projects are kept."
+    if ((Read-Host 'Download changed files? [Y/N]') -notmatch '^[yY]') { return }
+    if (Test-Path $transaction) { Remove-Item $transaction -Recurse -Force }
+    New-Item -ItemType Directory -Force (Join-Path $transaction 'staged') | Out-Null
     Add-Type -AssemblyName System.Net.Http
     $client = New-Object Net.Http.HttpClient
     $client.Timeout = [TimeSpan]::FromMinutes(15)
-    $response = $client.GetAsync("$base/YouCraft-Setup-x64.exe?v=$latest", [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
-    $response.EnsureSuccessStatusCode() | Out-Null
-    $inputStream = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
-    $output = [IO.File]::Create($partial)
-    $buffer = New-Object byte[] 262144
-    $received = 0L
-    $deadline = New-Object Threading.CancellationTokenSource
-    $deadline.CancelAfter([TimeSpan]::FromMinutes(15))
-    while (($count = $inputStream.ReadAsync($buffer, 0, $buffer.Length, $deadline.Token).GetAwaiter().GetResult()) -gt 0) {
-        $received += $count
-        if ($received -gt [long]$manifest.size) { throw 'Update size mismatch.' }
-        $output.Write($buffer, 0, $count)
-        Write-Progress -Activity "Downloading YouCraft $latest" -Status "$([math]::Round($received / 1MB, 1)) / $([math]::Round($manifest.size / 1MB, 1)) MB" -PercentComplete ([math]::Min(100, 100 * $received / $manifest.size))
+    foreach ($file in $changed) {
+        $packed = Join-Path $transaction 'download.gz'
+        Receive-VerifiedFile "$base/files/$($file.sha256).gz" $packed $file.download_size $file.download_sha256
+        $target = Get-SafeUpdatePath (Join-Path $transaction 'staged') $file.path
+        New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+        $inputFile = [IO.File]::OpenRead($packed)
+        $gzip = New-Object IO.Compression.GZipStream($inputFile, [IO.Compression.CompressionMode]::Decompress)
+        $output = [IO.File]::Create($target)
+        try {
+            $buffer = New-Object byte[] 262144; $expanded = 0L
+            while (($count = $gzip.Read($buffer,0,$buffer.Length)) -gt 0) {
+                $expanded += $count
+                if ($expanded -gt [long]$file.size) { throw 'Expanded update exceeds expected size' }
+                $output.Write($buffer,0,$count)
+            }
+        } finally { $output.Dispose(); $gzip.Dispose(); $inputFile.Dispose() }
     }
-    $output.Dispose(); $output = $null
-    Write-Progress -Activity 'Downloading YouCraft' -Completed
-    if ($received -ne [long]$manifest.size -or (Get-FileHash $partial -Algorithm SHA256).Hash -ne $manifest.sha256) {
-        throw 'Update verification failed. Nothing was installed; retry Updates.'
+    Write-Progress -Activity 'Downloading changed files' -Completed
+    # Only files listed in our previous manifest can be removed.
+    $previous = Join-Path $PSScriptRoot 'installed-files.json'
+    if (Test-Path $previous) {
+        foreach ($old in @((Get-Content $previous -Raw | ConvertFrom-Json).files)) {
+            if (-not $seen.ContainsKey($old.path)) { $changed += @{path=$old.path; remove=$true} }
+        }
     }
-    Move-Item $partial $installer -Force
-    Write-Host 'Download verified. Save your project and close YouCraft before continuing.'
-    if ((Read-Host 'Open installer now? [Y/N]') -match '^[yY]') {
-        Start-Process -FilePath $installer -ArgumentList @('/NORESTART', ('/DIR="' + $PSScriptRoot + '"')) -Wait
-    }
+    $record = Join-Path $transaction 'staged/installed-files.json'
+    $release | ConvertTo-Json -Depth 8 | Set-Content $record -Encoding UTF8
+    $changed += @{path='installed-files.json'; size=(Get-Item $record).Length; sha256=(Get-FileHash $record -Algorithm SHA256).Hash}
+    Write-Host 'Download verified. Save your project and close YouCraft now.'
+    if ((Read-Host 'Apply update? [Y/N]') -notmatch '^[yY]') { return }
+    Assert-AppClosed
+    Install-FileUpdate $PSScriptRoot $transaction $changed
+    Write-Host "Updated to $latest. You can reopen YouCraft. Download and backup files have been removed."
 } catch {
-    Write-Host "Update failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host 'Your existing installation is unchanged. Retry Updates later.'
+    Write-Host "Update stopped: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host 'If interrupted during installation, close YouCraft and run Updates again to recover. A full installer is also available from the download page.'
 } finally {
-    if ($output) { $output.Dispose() }
-    if ($response) { $response.Dispose() }
     if ($client) { $client.Dispose() }
-    if ($deadline) { $deadline.Dispose() }
-    Remove-Item $partial -Force -ErrorAction SilentlyContinue
+    if ($lock) {
+        if ((Test-Path $transaction) -and -not (Test-Path (Join-Path $transaction 'journal.json'))) { Remove-Item $transaction -Recurse -Force -ErrorAction SilentlyContinue }
+        $lock.Dispose()
+    }
     Read-Host 'Press Enter to close' | Out-Null
 }

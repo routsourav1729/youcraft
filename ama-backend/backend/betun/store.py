@@ -4,6 +4,7 @@ import os
 import shutil
 import logging
 from contextlib import contextmanager
+from contextlib import closing
 from pathlib import Path
 from .schema import Project
 
@@ -35,7 +36,8 @@ class Store:
 
     @contextmanager
     def connect(self):
-        with sqlite3.connect(self.db, timeout=30) as db:
+        # The SQLite transaction context commits/rolls back, but does not close.
+        with closing(sqlite3.connect(self.db, timeout=30)) as db, db:
             db.row_factory = sqlite3.Row
             yield db
 

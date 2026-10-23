@@ -21,7 +21,7 @@ def test_model_config_uses_installed_paths_and_memory_limits(tmp_path):
     for entry in config.values():
         assert entry['max_vram_gb'] == 4.5
         assert entry['cpu_threads'] == 4
-        assert entry['allow_cpu_fallback']
+        assert entry['allow_cpu_fallback'] is False
         assert entry['device'] == 'auto'
         assert Path(entry['model_path']).is_dir()
     (tmp_path/'nemotron').rmdir()

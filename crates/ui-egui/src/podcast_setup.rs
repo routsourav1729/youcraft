@@ -173,29 +173,6 @@ pub fn log_path() -> PathBuf {
     std::env::var_os("LOCALAPPDATA").map(PathBuf::from).unwrap_or_default().join("YouCraft/setup.log")
 }
 
-#[cfg(test)]
-mod tests {
-    #[cfg(not(windows))]
-    #[test]
-    fn failed_installer_exits_and_reports_without_blocking_ui() {
-        let root = std::env::temp_dir().join(format!("youcraft-setup-test-{}", std::process::id()));
-        std::fs::create_dir_all(&root).unwrap();
-        let mut command = super::Command::new("sh");
-        command.args(["-c", "echo dependency-failed; exit 7"]);
-        let task = super::spawn(command, root.join("status.json"), &root.join("setup.log")).unwrap();
-        let mut state = super::State { task: Some(task), ..Default::default() };
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while !state.poll() {
-            assert!(std::time::Instant::now() < deadline);
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        assert!(!state.busy());
-        assert!(state.error.contains("Setup failed"));
-        assert!(std::fs::read_to_string(root.join("setup.log")).unwrap().contains("dependency-failed"));
-        std::fs::remove_dir_all(root).unwrap();
-    }
-}
-
 /// Run the bundled updater in a visible progress window (never through a file association).
 pub fn launch_updater() -> Result<(), String> {
     #[cfg(windows)]
@@ -217,5 +194,28 @@ pub fn launch_updater() -> Result<(), String> {
     #[cfg(not(windows))]
     {
         Err("App updates are available in the Windows installation.".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(not(windows))]
+    #[test]
+    fn failed_installer_exits_and_reports_without_blocking_ui() {
+        let root = std::env::temp_dir().join(format!("youcraft-setup-test-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut command = super::Command::new("sh");
+        command.args(["-c", "echo dependency-failed; exit 7"]);
+        let task = super::spawn(command, root.join("status.json"), &root.join("setup.log")).unwrap();
+        let mut state = super::State { task: Some(task), ..Default::default() };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !state.poll() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(!state.busy());
+        assert!(state.error.contains("Setup failed"));
+        assert!(std::fs::read_to_string(root.join("setup.log")).unwrap().contains("dependency-failed"));
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
