@@ -173,10 +173,10 @@ jobs:
       - name: Build incremental update files
         shell: pwsh
         run: |
-          python packaging/build_updates.py release/YouCraft release/incremental 0.1.10
+          python packaging/build_updates.py release/YouCraft release/incremental 0.1.11
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           . ./packaging/ama/Apply-FileUpdate.ps1
-          $manifest = Get-Content release/incremental/files-0.1.10.json -Raw | ConvertFrom-Json
+          $manifest = Get-Content release/incremental/files-0.1.11.json -Raw | ConvertFrom-Json
           foreach ($file in $manifest.files) { Get-SafeUpdatePath "$env:GITHUB_WORKSPACE/release/YouCraft" $file.path | Out-Null }
       - uses: actions/upload-artifact@v4
         with:
@@ -256,6 +256,8 @@ jobs:
             if (-not $ready) { throw 'Editor control connection unavailable' }
             python ama-backend/tests/stage_one_smoke.py
             if ($LASTEXITCODE -ne 0) { throw 'Project and audio recovery UI check failed' }
+            python ama-backend/tests/reaction_ui_smoke.py
+            if ($LASTEXITCODE -ne 0) { throw 'Reaction workspace UI check failed' }
             & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$installed/Check-AI.ps1"
             if ($LASTEXITCODE -ne 0) { throw 'MCP could not inspect the installed editor podcast workflow' }
           } finally { if (-not $editor.HasExited) { taskkill /PID $editor.Id /T /F | Out-Null } }
@@ -264,3 +266,9 @@ jobs:
         with:
           name: YouCraft-Windows
           path: release/YouCraft-Setup-x64.exe
+
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('release/ui-check/*.png') != ''
+        with:
+          name: YouCraft-UI-check
+          path: release/ui-check/

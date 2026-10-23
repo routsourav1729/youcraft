@@ -113,6 +113,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         project.clips.extend(additions)
         project.cuts = [cut for cut in project.cuts if not cut.id.startswith('gap-')]
         project.reactions = []
+        project.reaction_analysis = {}
         # Source coverage changed; preserve deliberate manual edits only.
         project.shots = [shot for shot in project.shots if shot.locked]
         store.save(project, base_revision)
@@ -121,6 +122,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         from .sync import synchronize
         project.cuts = [cut for cut in project.cuts if not cut.id.startswith('gap-')]
         project.reactions = []
+        project.reaction_analysis = {}
         project.shots = [shot for shot in project.shots if shot.locked]
         progress(dict(stage='Preparing master playback'))
         media.playback_audio(master, cache, cancel)
@@ -179,6 +181,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         project.activity = turns
         project.settings.roles_locked = False
         project.reactions = []
+        project.reaction_analysis = {}
         project.shots = [shot for shot in project.shots if shot.locked]
         for caption in project.captions:
             caption.reviewed = False
@@ -227,6 +230,21 @@ def process(store, project, kind, options, directory, cancel, progress):
     if kind == 'proxies':
         from .remote_media import make_proxies
         return make_proxies(project, cache, directory, cancel, progress)
+    if kind == 'reaction_select':
+        from .podcast import suggestions
+        analysis = project.reaction_analysis
+        if not analysis:
+            raise ValueError('Find reactions first; interval changes then reuse the saved analysis')
+        previous = analysis.setdefault('decisions', {})
+        previous.update({f'{r.clip_id}:{r.start}:{r.end}': r.decision for r in project.reactions})
+        manual = [r for r in project.reactions if 'manual' in r.cues]
+        selected = suggestions(project, analysis['candidates'], interval=options['interval'], spacing=analysis['spacing'])
+        for r in selected:
+            r.decision = previous.get(f'{r.clip_id}:{r.start}:{r.end}', 'pending')
+        project.reactions = sorted(manual + [r for r in selected if not any(r.start < m.end and r.end > m.start for m in manual)], key=lambda r:r.start)
+        analysis['interval'] = options['interval']
+        store.save(project, base_revision)
+        return dict(revision=base_revision+1, suggestions=len(project.reactions))
     if kind in ('reactions', 'reference_suggestions'):
         from .podcast import suggestions
         if not project.settings.roles_locked or not project.shots:
@@ -237,18 +255,37 @@ def process(store, project, kind, options, directory, cancel, progress):
             raise ValueError('Review host camera synchronization before reaction analysis')
         for clip in clips:
             reference = options['references'].get(clip.id)
-            if kind == 'reactions' and (reference is None or not 0 <= reference < clip.duration):
+            if kind == 'reactions' and not options.get('reference_image') and (reference is None or not 0 <= reference < clip.duration):
                 raise ValueError('Choose a reference frame within every host camera shard')
             if media.fingerprint(clip.path) != clip.fingerprint:
                 raise ValueError('Host source changed; reimport before analysis')
-        response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], reference_only=kind == 'reference_suggestions', **options), cache, cancel, device=project.settings.compute_device, progress=progress)
+        options = dict(options)
+        if options.get('reference_image'):
+            image = Path(options['reference_image'])
+            if image.suffix.lower() not in ('.png', '.jpg', '.jpeg') or not image.is_file() or image.stat().st_size > 20*1024*1024:
+                raise ValueError('Choose a PNG/JPEG reference screenshot smaller than 20 MB')
+            options['reference_fingerprint'] = media.fingerprint(image)
+        host = project.settings.host_speaker
+        windows = {c.id: [[max(0., (a.start-c.offset)/c.rate), min(c.duration, (a.end-c.offset)/c.rate)]
+            for a in project.activity if a.speaker == host and a.end > c.offset and a.start < c.offset+c.duration*c.rate
+            and not any(b.speaker != host and b.start < a.end and b.end > a.start for b in project.activity)] for c in clips}
+        response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], reference_windows=windows, reference_only=kind == 'reference_suggestions', **options), cache, cancel, device=project.settings.compute_device, progress=progress)
         if kind == 'reference_suggestions':
-            return dict(references=response['references'])
+            refs = dict(project.reaction_calibration.get('references', {}))
+            refs.update(response['references'])
+            project.reaction_calibration['references'] = refs
+            saved = store.save(project, base_revision)
+            return dict(references=refs, issues=response.get('issues', {}), project=saved.model_dump())
+        if project.settings.overlap_padding != 2:
+            project.settings.overlap_padding = 2
+            project.shots = generate_shots(project)
+        project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'])
         project.reactions = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'])
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
     if kind == 'shots':
         project.reactions = []
+        project.reaction_analysis = {}
         project.shots = generate_shots(project)
         store.save(project, base_revision)
         return dict(revision=base_revision + 1, shots=len(project.shots))

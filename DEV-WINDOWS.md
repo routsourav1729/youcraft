@@ -160,3 +160,11 @@ Compute-node checks: 88 backend tests; isolated native watchdog regression; all
 seven real camera-audio shards from the prepared 20-minute bundle, reversed, with
 start offsets within 14 ms of the known placements. Matching took about 25 seconds
 on the compute node. This is not a laptop benchmark.
+
+## 0.1.11 reaction workspace and seeking
+
+Full model setup now includes the CPU reaction runtime; the Audio page also exposes missing reaction setup before editing. Reference suggestions prioritize solo host speech near the middle of each recording, retain partial successes, and accept an explicit host screenshot for a consistent camera angle. Calibration and measurements are saved in the project. MediaPipe startup warnings are not shown as the actionable failure; a missing face has a recovery instruction.
+
+The reaction workspace uses one master clock, smaller host/guest views flanking the output, a draggable video/control divider, horizontal tolerance/interval/gap controls, and measured eye/head cues only on the host view. Detection markers are sampled once per second, not live frame-by-frame tracking. Screen share counts accepted inserts and both views during overlap. Default overlap padding is two seconds; explicit reaction generation applies it while retaining locked cuts. Pending suggestions can be auditioned without accepting them. Interval changes reuse saved candidates and preserve decisions; reference/tolerance edits require explicit regeneration.
+
+Monitor dragging suspends playback once and resumes once on release. A pause cancels pending resume and does not trigger a stray scrub grain. Real Windows speaker audibility still needs laptop feedback; CI verifies transport state and installed UI behavior.

@@ -129,7 +129,7 @@ impl State {
             let rate = app.audio.as_ref().map(|a| a.sample_rate()).unwrap_or(0);
             let channels = app.audio.as_ref().map(|a| a.channels()).unwrap_or(0);
             let report = format!(
-                "YouCraft 0.1.10\nOutput: {device}\nAvailable: {}\nFormat: {rate} Hz, {channels} channels\nDevice: {detail}\nPlayback: {}\nTest: {}",
+                "YouCraft 0.1.11\nOutput: {device}\nAvailable: {}\nFormat: {rate} Hz, {channels} channels\nDevice: {detail}\nPlayback: {}\nTest: {}",
                 devices.outputs.join(", "),
                 app.playback.audio_error,
                 self.message

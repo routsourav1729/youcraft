@@ -31,6 +31,12 @@ pub struct State {
     pub monitor_volume_db: f64,
     pub monitor_muted: bool,
     pub focus_video: bool,
+    pub video_fraction: f32,
+    pub transcript_video_fraction: f32,
+    pub reference_image: String,
+    pub show_detection: bool,
+    #[serde(skip)]
+    recalibrating: bool,
     pub project_id: String,
     pub name: String,
     pub project: Value,
@@ -90,6 +96,10 @@ pub struct State {
     #[serde(skip)]
     review_autoplay: bool,
     #[serde(skip)]
+    review_is_edit: bool,
+    #[serde(skip)]
+    review_reaction: Option<String>,
+    #[serde(skip)]
     storage: Value,
     #[serde(skip)]
     confirm_delete: bool,
@@ -112,6 +122,11 @@ impl Default for State {
             monitor_volume_db: 0.,
             monitor_muted: false,
             focus_video: false,
+            video_fraction: 0.58,
+            transcript_video_fraction: 0.40,
+            reference_image: String::new(),
+            show_detection: true,
+            recalibrating: false,
             token: String::new(),
             remote: false,
             compute_device: "auto".into(),
@@ -166,6 +181,8 @@ impl Default for State {
             review_seek: 0.,
             review_clip: None,
             review_autoplay: false,
+            review_is_edit: false,
+            review_reaction: None,
             storage: Value::Null,
             confirm_delete: false,
             startup: None,
@@ -378,10 +395,12 @@ impl State {
     }
     fn review_preview(&mut self, edit: bool) {
         self.review_clip = None;
+        self.review_reaction = None;
         self.review_autoplay = false;
         self.request_review(edit, None);
     }
     fn request_review(&mut self, edit: bool, clip_id: Option<String>) {
+        let reaction = self.review_reaction.clone();
         let project = self.project.clone();
         let id = self.project_id.clone();
         self.start("review_assemble", move |c| {
@@ -392,6 +411,12 @@ impl State {
                     return Err("Invalid camera shard identifier".into());
                 }
                 query.push_str(&format!("&clip_id={clip}"));
+            }
+            if let Some(reaction) = reaction {
+                if !reaction.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+                    return Err("Invalid reaction identifier".into());
+                }
+                query.push_str(&format!("&reaction_id={reaction}"));
             }
             match c.get(&query) {
                 Ok(plan) => Ok(json!({"project":saved,"plan":plan})),
@@ -653,6 +678,23 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     s.project_id = string(&value, "id");
                     s.compute_device = value["settings"]["compute_device"].as_str().unwrap_or("auto").into();
                     s.project = value;
+                    if let Some(calibration) = s.project["reaction_calibration"].as_object() {
+                        if let Some(refs) = calibration.get("references").and_then(Value::as_object) {
+                            s.references = refs.iter().filter_map(|(id, t)| t.as_f64().map(|t| (id.clone(), t))).collect();
+                        }
+                        s.reference_image = calibration.get("reference_image").and_then(Value::as_str).unwrap_or("").into();
+                        s.tolerance = calibration.get("tolerance").and_then(Value::as_f64).unwrap_or(s.tolerance);
+                        s.spacing = calibration.get("spacing").and_then(Value::as_f64).unwrap_or(s.spacing);
+                    }
+                    if !s.recalibrating
+                        && let Some(analysis) = s.project["reaction_analysis"].as_object().filter(|a| !a.is_empty())
+                    {
+                        if let Some(refs) = analysis.get("references").and_then(Value::as_object) {
+                            s.references = refs.iter().filter_map(|(id, t)| t.as_f64().map(|t| (id.clone(), t))).collect();
+                        }
+                        s.interval = analysis.get("interval").and_then(Value::as_f64).unwrap_or(s.interval);
+                        s.reference_image = analysis.get("reference_image").and_then(Value::as_str).unwrap_or("").into();
+                    }
                     if let Some(master) = rows(&s.project, "clips").iter().find(|c| c["camera"] == "master") {
                         s.master = string(master, "path");
                     }
@@ -784,6 +826,11 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                     Ok(json!({"path":dest}))
                                 });
                             } else if s.job_kind == "reference_suggestions" {
+                                if value["result"]["project"].is_object() {
+                                    s.project = value["result"]["project"].clone();
+                                    s.saved_project = s.project.clone();
+                                    s.edited_at = None;
+                                }
                                 if let Some(references) = value["result"]["references"].as_object() {
                                     for (id, time) in references {
                                         if let Some(time) = time.as_f64() {
@@ -791,7 +838,15 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                         }
                                     }
                                 }
-                                s.status = "References suggested · Preview before analysis".into();
+                                s.status = "References suggested from host speech · Preview before analysis".into();
+                                if let Some(issues) = value["result"]["issues"].as_object()
+                                    && !issues.is_empty()
+                                {
+                                    s.error = format!(
+                                        "{} host recording(s) need a clearer reference. Move to a visible host face and use current frame, or choose a reference screenshot. Successful references were kept.",
+                                        issues.len()
+                                    );
+                                }
                             } else if s.job_kind == "filmcraft_export" {
                                 s.output_job = jid;
                                 s.status = "Export ready".into();
@@ -828,6 +883,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                 } else if s.job_kind == "diarize" {
                                     s.step = 2;
                                     s.follow_up = "samples".into();
+                                }
+                                if matches!(s.job_kind.as_str(), "reactions" | "reaction_select") {
+                                    s.recalibrating = false;
+                                    s.follow_up = "review".into();
                                 }
                                 if s.job_kind == "transcribe" {
                                     s.step = 4;
@@ -896,6 +955,7 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                             let item = result["sequence"].as_u64().ok_or_else(|| filmcraft_engine::EngineError::Other("Review sequence missing".into()))?;
                             s.review_item = Some(item);
                             s.review_active = true;
+                            s.review_is_edit = value["plan"]["review_edit"] == true;
                             app.stop_source();
                             app.ui.program.zoom = None;
                             if let Some(track) = app.session.active_sequence().and_then(|q| q.audio_tracks.first()) {
@@ -962,7 +1022,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
             "compute_device":s.compute_device,"samples":s.samples,"job":s.job,"regeneration_pending":s.pending_regeneration.as_ref().map(|v| &v.0),
             "setup":{"ready":s.setup.ready(),"busy":s.setup.busy(),"stage":s.setup.stage,"error":s.setup.error},
             "job_kind":s.job_kind,"status":s.status,"error":s.error,"assembled":s.assembled,
-            "actions":["create","refresh","samples","save","review_playback","accept_transcript","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","reference_suggestions","sample","sync_preview","reference_frame","reaction_preview","transliterate","open_edit","cancel","keep_results","confirm_regenerate"]}),
+            "actions":["create","refresh","samples","save","review_playback","accept_transcript","lock_roles","attach_cameras","diarize","sync","transcribe","shots","reactions","reaction_select","reference_suggestions","sample","sync_preview","reference_frame","reaction_preview","transliterate","open_edit","cancel","keep_results","confirm_regenerate"]}),
         );
     }
     if s.busy() && !(method == "podcast.action" && p["action"] == "cancel") {
@@ -1069,6 +1129,7 @@ pub fn control(app: &mut FilmcraftApp, method: &str, p: &Value) -> Reply {
                 | "transcribe"
                 | "shots"
                 | "reactions"
+                | "reaction_select"
                 | "reference_suggestions"
                 | "sample"
                 | "sync_preview"
@@ -1436,6 +1497,9 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 }
                 s.step = i;
                 s.remember_view();
+                if i == 5 && s.review_active && !s.review_is_edit && !s.busy() {
+                    s.review_preview(true);
+                }
             }
         }
     });
@@ -1487,13 +1551,27 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     if matches!(s.step, 3..=5) {
         let bounds = ui.available_rect_before_wrap();
-        let height =
-            if s.focus_video { bounds.height() } else { (bounds.height() * if s.step == 4 { 0.40 } else { 0.52 }).max(100.).min(bounds.height().max(0.)) };
+        let fraction = if s.step == 4 { s.transcript_video_fraction.clamp(0.25, 0.82) } else { s.video_fraction.clamp(0.25, 0.82) };
+        let height = if s.focus_video { bounds.height() } else { (bounds.height() * fraction).max(100.).min(bounds.height().max(0.)) };
         let top = Rect::from_min_max(bounds.min, egui::pos2(bounds.right(), bounds.top() + height));
         let bottom = Rect::from_min_max(egui::pos2(bounds.left(), top.bottom() + 8.), bounds.max);
         let mut preview = ui.new_child(egui::UiBuilder::new().max_rect(top));
         review_player(app, &mut preview, &mut s);
         if !s.focus_video {
+            let divider = Rect::from_min_max(egui::pos2(bounds.left(), top.bottom()), egui::pos2(bounds.right(), top.bottom() + 8.));
+            let drag = ui.interact(divider, ui.id().with("video-height"), egui::Sense::drag()).on_hover_cursor(egui::CursorIcon::ResizeVertical);
+            app.auto.add_response("podcast.video_height", &drag, "Drag to resize video area");
+            ui.painter().line_segment([divider.left_center(), divider.right_center()], egui::Stroke::new(2., egui::Color32::from_gray(70)));
+            if drag.dragged()
+                && let Some(pos) = drag.interact_pointer_pos()
+            {
+                let fraction = ((pos.y - bounds.top()) / bounds.height().max(1.)).clamp(0.25, 0.82);
+                if s.step == 4 {
+                    s.transcript_video_fraction = fraction;
+                } else {
+                    s.video_fraction = fraction;
+                }
+            }
             let mut controls = ui.new_child(egui::UiBuilder::new().max_rect(bottom));
             egui::ScrollArea::vertical().id_salt("podcast-body").show(&mut controls, |ui| workflow_step(app, ui, &mut s));
         }
@@ -1505,6 +1583,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         if s.review_active && (s.project["clips"] != before_edit["clips"] || s.project["reactions"] != before_edit["reactions"]) {
             app.stop();
             s.review_seek = app.session.playhead().seconds();
+            s.follow_up = "review".into();
         }
         s.status = "Saving…".into();
         ui.ctx().request_repaint_after(Duration::from_secs(1));
@@ -1515,8 +1594,11 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.horizontal_wrapped(|ui| {
         ui.strong(if s.step == 5 { "Edit review" } else { "Host · Guest" });
         ui.toggle_value(&mut s.focus_video, "Focus video");
-        if !s.busy() && button(app, ui, "review_playback", "Reload") {
+        if !s.busy() && button(app, ui, "review_playback", if s.review_reaction.is_some() { "End suggestion preview" } else { "Reload" }) {
             s.review_preview(s.step == 5);
+        }
+        if s.review_reaction.is_some() {
+            ui.label("Suggestion preview · choose Keep to apply");
         }
         if s.review_active {
             if let Some(track) = app.session.active_sequence().and_then(|q| q.audio_tracks.first()) {
@@ -1574,6 +1656,9 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let preview = Rect::from_min_max(rect.min, egui::pos2(rect.right(), (rect.bottom() - caption_height).max(rect.top() + 130.)));
     if s.review_active {
         crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Program);
+        if s.step == 5 && s.review_is_edit {
+            reaction_overlay(app, ui, s);
+        }
         let time = app.session.playhead().seconds();
         if caption_height > 0.
             && let Some(c) = rows(&s.project, "captions").iter().find(|c| number(c, "start") <= time && time < number(c, "end"))
@@ -1598,6 +1683,94 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             egui::Color32::GRAY,
         );
     }
+}
+
+fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
+    let Some((pic, area)) = ui.ctx().data(|d| d.get_temp::<(Rect, Rect)>(egui::Id::new(("program", "picture_geometry")))) else { return };
+    let painter = ui.painter().with_clip_rect(area.intersect(ui.clip_rect()));
+    let host = s.project["settings"]["host_speaker"].as_str().unwrap_or("");
+    let camera = s.project["settings"]["speaker_camera"][host].as_str().unwrap_or("A");
+    let mut host_time = 0.;
+    let mut guest_time = 0.;
+    let reactions = rows(&s.project, "reactions");
+    for shot in rows(&s.project, "shots") {
+        if shot["layout"] == "black" {
+            continue;
+        }
+        let length = (number(&shot, "end") - number(&shot, "start")).max(0.);
+        let both = shot["layout"] == "both";
+        let host_shot = shot["layout"] == camera;
+        let inserted: f64 = reactions
+            .iter()
+            .filter(|r| r["decision"] == "keep")
+            .map(|r| (number(r, "end").min(number(&shot, "end")) - number(r, "start").max(number(&shot, "start"))).max(0.))
+            .sum();
+        host_time += if both || host_shot { length } else { inserted.min(length) };
+        guest_time += if both {
+            length
+        } else if host_shot {
+            0.
+        } else {
+            (length - inserted).max(0.)
+        };
+    }
+    let duration = number(&s.project, "duration").max(1.);
+    for (x, label) in [
+        (0.12, format!("HOST · {:.1} min · {:.0}%", host_time / 60., host_time / duration * 100.)),
+        (0.5, "OUTPUT · master audio".into()),
+        (0.88, format!("GUEST · {:.1} min · {:.0}%", guest_time / 60., guest_time / duration * 100.)),
+    ] {
+        painter.text(
+            egui::pos2(pic.left() + pic.width() * x, pic.top() + 8.),
+            egui::Align2::CENTER_TOP,
+            label,
+            egui::FontId::proportional(13.),
+            egui::Color32::WHITE,
+        );
+    }
+    if !s.show_detection {
+        return;
+    }
+    let time = app.session.playhead().seconds();
+    let measurement = s.project["reaction_analysis"]["measurements"]
+        .as_array()
+        .and_then(|rows| rows.iter().find(|m| number(m, "time") <= time && time - number(m, "time") < 1.));
+    let Some(m) = measurement else {
+        painter.text(
+            egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.),
+            egui::Align2::CENTER_BOTTOM,
+            "Detection appears after analysis",
+            egui::FontId::proportional(12.),
+            egui::Color32::GRAY,
+        );
+        return;
+    };
+    let color = if m["matching"] == true { egui::Color32::LIGHT_GREEN } else { egui::Color32::YELLOW };
+    // A sampled diagnostic, never an overlay on the output/export. Positions come from measured landmarks.
+    let aspect = m["aspect"].as_f64().unwrap_or(16. / 9.).clamp(0.1, 10.) as f32;
+    let h = 540_f32.min(1920. / aspect) * 0.48;
+    let w = h * aspect;
+    let map = |point: &Value| -> Option<egui::Pos2> {
+        let x = point.get(0)?.as_f64()? as f32;
+        let y = point.get(1)?.as_f64()? as f32;
+        Some(egui::pos2(pic.left() + pic.width() * (230. - w / 2. + x * w) / 1920., pic.top() + pic.height() * (270. - h / 2. + y * h) / 540.))
+    };
+    if let Some(eyes) = m["eyes"].as_array() {
+        for eye in eyes {
+            if let Some(pos) = map(eye) {
+                painter.circle_stroke(pos, 4., egui::Stroke::new(1.5, color));
+            }
+        }
+    }
+    if let Some(pos) = map(&m["nose"]) {
+        painter.circle_stroke(pos, 5., egui::Stroke::new(1.5, color));
+    }
+    let label = if m["detected"] == true {
+        format!("Sampled cue · head {:.0}° · smile {:.0}%", number(m, "pitch"), number(m, "smile") * 100.)
+    } else {
+        "No clear face at this sample".into()
+    };
+    painter.text(egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.), egui::Align2::CENTER_BOTTOM, label, egui::FontId::proportional(12.), color);
 }
 
 fn workflow_step(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
@@ -1669,7 +1842,7 @@ fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
 fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Set up models");
     ui.label("Local processing · CPU or NVIDIA");
-    for (key, label) in [("diarize", "Speaker model"), ("transcribe", "Odia model")] {
+    for (key, label) in [("diarize", "Speaker model"), ("transcribe", "Odia transcript model"), ("reactions", "Host reaction model")] {
         let ready = s.setup.capabilities["installed_providers"][key] == true;
         ui.label(format!("{}  {}", if ready { "✓" } else { "○" }, label));
     }
@@ -1697,10 +1870,10 @@ fn connect(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     app.auto.add_response("podcast.hf_token", &r, "Hugging Face token");
     ui.add_enabled_ui(!s.setup.busy(), |ui| {
         ui.horizontal(|ui| {
-            if button(app, ui, "setup_cpu", "Install · CPU") {
+            if button(app, ui, "setup_cpu", "Install all models · CPU") {
                 s.setup.start("Setup-models.ps1", "-Mode", "cpu");
             }
-            if button(app, ui, "setup_gpu", "Install · NVIDIA") {
+            if button(app, ui, "setup_gpu", "Install all models · NVIDIA") {
                 s.setup.start("Setup-models.ps1", "-Mode", "nvidia");
             }
         });
@@ -1842,6 +2015,15 @@ fn picker(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     }
 }
 fn audio(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    if s.setup.capabilities["installed_providers"]["reactions"] != true {
+        ui.group(|ui| {
+            ui.strong("Model setup · Speech + transcript + reactions");
+            ui.label("Reaction detection is not installed yet. Install it now to avoid interruption later.");
+            if button(app, ui, "audio.setup_reactions", "Install reactions") {
+                s.setup.start("Setup-vision.ps1", "-Mode", "cpu");
+            }
+        });
+    }
     ui.horizontal(|ui| {
         ui.label("Process on");
         for (device, label) in [("auto", "Installed mode"), ("cpu", "CPU"), ("cuda", "NVIDIA GPU")] {
@@ -2345,59 +2527,100 @@ fn replace_word(text: &str, selected: Option<usize>, expected: &str, replacement
 
 fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Host reactions");
-    ui.horizontal_wrapped(|ui| {
-        if button(app, ui, "suggest_references", "Suggest references") {
-            s.job("reference_suggestions", json!({}));
-        }
-        if button(app, ui, "reaction_models", "Model setup") {
-            s.step = 0;
-            s.start("capabilities", |c| c.get("/v1/capabilities"));
-        }
-    });
-    ui.weak("Preview each reference, then find reactions.");
     let host = string(&s.project["settings"], "host_speaker");
     let camera = s.project["settings"]["speaker_camera"][&host].clone();
-    for clip in rows(&s.project, "clips") {
-        if clip["camera"] == camera {
-            let id = string(&clip, "id");
-            ui.label(string(&clip, "path"));
-            let reference = s.references.entry(id.clone()).or_default();
-            ui.horizontal(|ui| {
-                ui.label("Reference (s)");
-                let r = ui.add(egui::DragValue::new(reference).range(0.0..=number(&clip, "duration")));
-                app.auto.add_response(&format!("podcast.reference.time.{id}"), &r, "Reference time");
-            });
-            let time = *reference;
-            if s.review_active && button(app, ui, &format!("reference.current.{id}"), "Use current frame") {
-                let local = (app.session.playhead().seconds() - number(&clip, "offset")) / number(&clip, "rate");
-                if local.is_finite() && local >= 0. && local < number(&clip, "duration") {
-                    s.references.insert(id.clone(), local);
-                } else {
-                    s.error = "Playhead is outside this recording".into();
-                }
-            }
-            if button(app, ui, &format!("reference.{id}"), "View reference") {
-                app.stop();
-                s.review_seek = number(&clip, "offset") + time * number(&clip, "rate");
-                if s.review_active {
-                    if let Err(error) = app.session.execute("playhead.set", json!({"seconds":s.review_seek})) {
-                        s.error = error.to_string();
-                    }
-                } else {
-                    s.review_preview(true);
-                }
-            }
-        }
+    let ready = s.setup.capabilities["installed_providers"]["reactions"] == true;
+    let analyzed = !s.recalibrating && s.project["reaction_analysis"].as_object().is_some_and(|a| !a.is_empty());
+    if analyzed {
+        s.tolerance = s.project["reaction_analysis"]["tolerance"].as_f64().unwrap_or(s.tolerance);
+        s.spacing = s.project["reaction_analysis"]["spacing"].as_f64().unwrap_or(s.spacing);
     }
-    let tolerance_label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance · % eye width" };
-    let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0).text(tolerance_label));
-    app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
-    let r = ui.add(egui::Slider::new(&mut s.interval, 15.0..=180.0).text("Interval (s)"));
-    app.auto.add_response("podcast.reaction_interval", &r, "Review interval");
-    let r = ui.add(egui::Slider::new(&mut s.spacing, 5.0..=60.0).text("Spacing (s)"));
-    app.auto.add_response("podcast.reaction_spacing", &r, "Minimum spacing");
-    if button(app, ui, "analyze_reactions", "Find reactions") {
-        s.job("reactions", json!({"references":s.references,"tolerance":s.tolerance,"interval":s.interval,"spacing":s.spacing}));
+    let calibration_before = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing});
+    ui.horizontal_wrapped(|ui| {
+        ui.label(format!(
+            "Host speaks → Host  ·  Guest speaks → Guest  ·  Overlap → Both ({:.0} s before/after)",
+            s.project["settings"]["overlap_padding"].as_f64().unwrap_or(2.)
+        ));
+        let r = ui.checkbox(&mut s.show_detection, "Show host detection");
+        app.auto.add_response("podcast.show_detection", &r, "Show measured host eye and head cues");
+    });
+    if !ready {
+        ui.group(|ui| {
+            ui.label("Install the reaction model before suggesting references or finding reactions.");
+            if button(app, ui, "reaction_models", "Install reactions") {
+                s.setup.start("Setup-vision.ps1", "-Mode", "cpu");
+            }
+        });
+    }
+    ui.columns(3, |cols| {
+        cols[0].add_enabled_ui(!analyzed, |ui| {
+            let label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance · % eye width" };
+            let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0).text(label));
+            app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
+            ui.small("Allowed difference from the host reference look.");
+        });
+        let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0).text("One reaction per (s)"));
+        app.auto.add_response("podcast.reaction_interval", &r, "One host reaction per interval");
+        cols[1].small("At most one smile/nod insert in each interval.");
+        cols[2].add_enabled_ui(!analyzed, |ui| {
+            let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0).text("Minimum gap (s)"));
+            app.auto.add_response("podcast.reaction_spacing", &r, "Minimum gap between reaction inserts");
+            ui.small("Quiet space between the end of one insert and the next.");
+        });
+    });
+    if analyzed {
+        ui.horizontal_wrapped(|ui| {
+            ui.weak("Reference and tolerance are frozen. Interval changes reuse saved measurements.");
+            if button(app, ui, "reaction_reselect", "Apply interval") {
+                s.job("reaction_select", json!({"interval":s.interval}));
+            }
+            if button(app, ui, "reaction_recalibrate", "Change reference / tolerance…") {
+                s.recalibrating = true;
+                s.status = "Existing reactions retained. Adjust settings, then explicitly regenerate analysis.".into();
+            }
+        });
+    } else {
+        ui.group(|ui| {
+            ui.horizontal_wrapped(|ui| {
+                ui.add_enabled_ui(ready, |ui| {
+                    if button(app, ui, "suggest_references", "Suggest from host speech") { s.job("reference_suggestions", json!({})); }
+                });
+                if button(app, ui, "reference_image", "Choose reference screenshot…") {
+                    if let Some(path) = app.hooks.pick_files.as_mut().and_then(|f| f(&["png", "jpg", "jpeg"]).into_iter().next()) {
+                        s.reference_image = path;
+                    }
+                }
+                if !s.reference_image.is_empty() {
+                    ui.label("Screenshot reference selected");
+                    if button(app, ui, "reference_image_clear", "Use video references") { s.reference_image.clear(); }
+                }
+            });
+            let hosts: Vec<Value> = rows(&s.project, "clips").into_iter().filter(|c| c["camera"] == camera).collect();
+            ui.label(format!("{} / {} host sections calibrated · one continuous master timeline", hosts.iter().filter(|c| s.references.contains_key(&string(c,"id"))).count(), hosts.len()));
+            ui.small("Suggestions prioritize clear, open eyes while the host speaks near the middle of the conversation. A screenshot applies to all host sections recorded from the same camera angle. Analysis uses a 2-second overlap buffer and preserves locked cuts.");
+            let now = app.session.playhead().seconds();
+            if let Some(clip) = hosts.iter().find(|c| number(c,"offset") <= now && now < number(c,"offset")+number(c,"duration")*number(c,"rate")) {
+                let id = string(clip,"id");
+                ui.horizontal_wrapped(|ui| {
+                    if s.review_active && button(app, ui, "reference_current", "Use current host frame") {
+                        s.references.insert(id.clone(), (now-number(clip,"offset"))/number(clip,"rate").max(0.98));
+                    }
+                    if let Some(time) = s.references.get(&id).copied() {
+                        ui.label(format!("Reference on master: {:.1}s", number(clip,"offset")+time*number(clip,"rate")));
+                        if button(app, ui, "reference_view", "View reference") { app.stop(); app.seek_program(filmcraft_time::Tick::from_seconds_f64(number(clip,"offset")+time*number(clip,"rate"))); }
+                    }
+                });
+            }
+            ui.add_enabled_ui(ready && (!s.reference_image.is_empty() || hosts.iter().all(|c| s.references.contains_key(&string(c, "id")))), |ui| {
+                if button(app, ui, "analyze_reactions", "Find smiles & nods") {
+                    s.job("reactions", json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"interval":s.interval,"spacing":s.spacing}));
+                }
+            });
+        });
+    }
+    let calibration = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing});
+    if !analyzed && calibration != calibration_before {
+        s.project["reaction_calibration"] = calibration;
     }
     let mut reactions = rows(&s.project, "reactions");
     if s.review_active && button(app, ui, "manual_reaction", "Add host shot here") {
@@ -2456,7 +2679,9 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             });
             if button(app, ui, &format!("reaction.preview.{i}"), "Preview") {
                 s.review_seek = number(r, "start");
-                s.review_preview(true);
+                s.review_reaction = Some(string(r, "id"));
+                s.review_autoplay = true;
+                s.request_review(true, None);
             }
             ui.horizontal(|ui| {
                 for (decision, label) in [("pending", "Review"), ("keep", "Keep"), ("reject", "Reject")] {

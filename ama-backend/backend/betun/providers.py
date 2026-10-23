@@ -29,6 +29,10 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
         return dict(text=converted, candidates=[converted], method='phonetic-itrans')
     if not config:
         raise ValueError('Open Models → Install reactions first' if task == 'reactions' else 'Open Models and finish speech setup first' if task in ('diarize', 'transcribe') else f'{task.title()} is not installed in this version')
+    if task == 'reactions':
+        config = dict(config, reaction_policy='host-reference-v2')
+        if config.get('provider') == 'mediapipe-reference':
+            device = 'cpu'  # This lightweight face model has a CPU runtime, not a GPU fallback.
     if device not in ('auto', 'cpu', 'cuda'):
         raise ValueError('Choose Auto, CPU or GPU')
     if device != 'auto':
@@ -88,6 +92,10 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
                 raise RuntimeError('GPU memory is full. Your saved results are unchanged. '
                     'Retry on GPU after closing other GPU apps; for transcription, choose shorter segments. '
                     'CPU processing starts only when you select CPU explicitly.') from exc
+            if task == 'reactions':
+                messages = [line.strip() for line in str(exc).splitlines() if line.startswith(('ValueError:', 'FileNotFoundError:'))]
+                if messages:
+                    raise ValueError(messages[-1].split(':', 1)[1].strip()) from exc
             raise
         if cancel():
             raise Cancelled('Job cancelled')

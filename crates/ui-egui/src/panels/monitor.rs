@@ -290,6 +290,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     // Click/drag in the picture: the Hand tool pans a magnified picture, otherwise focus.
     let pic_resp = ui.interact(pic, egui::Id::new((prefix, "pic")), if show_picture { Sense::click_and_drag() } else { Sense::hover() });
     app.auto.add(&format!("{prefix}.picture"), pic.intersect(video_area), "picture");
+    ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new((prefix, "picture_geometry")), (pic, video_area)));
     // (Comparison View always fits both frames)
     if show_picture && !compare {
         monitor_view::zoom_pan_input(app, ui, which, video_area, pic, display_w, ppp);
@@ -870,10 +871,17 @@ fn mini_timeline(
             None
         }
     });
+    if which == Which::Program && resp.drag_stopped() {
+        app.finish_program_drag();
+    }
     if let Some(tk) = scrub {
         match which {
             Which::Program => {
-                app.seek_program(tk);
+                if resp.dragged() {
+                    app.drag_program(tk);
+                } else {
+                    app.seek_program(tk);
+                }
             }
             Which::Source => {
                 let _ = app.session.execute("source.setPlayhead", json!({"time": tk.0}));

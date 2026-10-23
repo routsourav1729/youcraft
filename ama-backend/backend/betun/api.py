@@ -39,7 +39,7 @@ class Revision(Model):
 
 
 class JobRequest(Model):
-    kind: Literal['import', 'attach_cameras', 'sample', 'sync_preview', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'reference_suggestions', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
+    kind: Literal['import', 'attach_cameras', 'sample', 'sync_preview', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'reaction_select', 'reference_suggestions', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
     options: dict = Field(default_factory=dict)
 
 
@@ -84,6 +84,7 @@ class SyncPreviewOptions(Model):
 
 class ReactionOptions(Model):
     references: dict[str, float] = Field(default_factory=dict)
+    reference_image: str = Field(default='', max_length=4096)
     tolerance: float = Field(default=10, gt=0, le=45)
     interval: float = Field(default=60, ge=10, le=600)
     spacing: float = Field(default=15, ge=0, le=120)
@@ -252,10 +253,12 @@ def create_app(root=None, token=None):
                 caption.reviewed = False
         if body.activity != old.activity or body.settings != old.settings:
             body.reactions = []
+            body.reaction_analysis = {}
             body.shots = [s for s in body.shots if s.locked]
         if any((c.offset,c.rate) != (next(x for x in old.clips if x.id==c.id).offset,
                                     next(x for x in old.clips if x.id==c.id).rate) for c in body.clips):
             body.reactions = []
+            body.reaction_analysis = {}
             body.shots = [s for s in body.shots if s.locked]
         return store.save(body, body.revision)
 
@@ -341,9 +344,9 @@ def create_app(root=None, token=None):
         return playback_plan(pid, manifest(store.get(pid)))
 
     @app.get('/v1/projects/{pid}/review-plan')
-    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None):
+    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None, reaction_id: str | None = None):
         from .podcast import review_manifest
-        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id))
+        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id, reaction_id))
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):
@@ -416,7 +419,7 @@ def create_app(root=None, token=None):
 
     @app.post('/v1/projects/{pid}/jobs', status_code=202)
     def submit(pid: str, body: JobRequest):
-        options_class = {'import': ImportOptions, 'attach_cameras': CameraOptions, 'sample': PreviewOptions, 'preview': PreviewOptions, 'diarize': DiarizeOptions, 'transliterate': TextOptions, 'reactions': ReactionOptions, 'reference_suggestions': ReactionOptions, 'filmcraft_export': FilmcraftExportOptions, 'reaction_preview': ReactionPreviewOptions, 'reference_frame': ReferenceOptions, 'sync_preview': SyncPreviewOptions}.get(body.kind, Model)
+        options_class = {'import': ImportOptions, 'attach_cameras': CameraOptions, 'sample': PreviewOptions, 'preview': PreviewOptions, 'diarize': DiarizeOptions, 'transliterate': TextOptions, 'reactions': ReactionOptions, 'reaction_select': ReactionOptions, 'reference_suggestions': ReactionOptions, 'filmcraft_export': FilmcraftExportOptions, 'reaction_preview': ReactionPreviewOptions, 'reference_frame': ReferenceOptions, 'sync_preview': SyncPreviewOptions}.get(body.kind, Model)
         options = options_class.model_validate(body.options).model_dump()
         if body.kind in ('preview', 'sample') and options['end'] is not None and options['end'] <= options['start']:
             raise ValueError('Preview end must be after start')

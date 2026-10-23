@@ -358,3 +358,31 @@ fn startup_lands_on_clean_projects_screen() {
         harness.render().unwrap().save(dir.join("projects-home.png")).unwrap();
     }
 }
+
+#[test]
+fn rapid_drag_resumes_once_and_pause_cancels_resume() {
+    let mut session = Session::default();
+    session.execute("file.openDemoProject", serde_json::json!({})).unwrap();
+    let mut app = FilmcraftApp::new(session);
+    app.play(1.);
+    for n in 1..30 {
+        app.drag_program(filmcraft_time::Tick::from_seconds_f64(n as f64 / 10.));
+        assert!(!app.playback.playing, "drag must not restart a device per frame");
+        assert!(app.playback.preroll.is_none());
+    }
+    app.finish_program_drag();
+    assert!(app.playback.playing);
+    assert!(app.playback.preroll.is_some());
+    app.drag_program(filmcraft_time::Tick::from_seconds_f64(1.));
+    app.stop();
+    app.finish_program_drag();
+    assert!(!app.playback.playing, "explicit pause cancels pending resume");
+    app.drag_program(filmcraft_time::Tick::from_seconds_f64(2.));
+    app.finish_program_drag();
+    assert!(!app.playback.playing, "a paused seek stays paused");
+    app.session.prefs.audio.scrub_audio = true;
+    app.scrub_tick(0., false);
+    app.session.set_playhead(filmcraft_time::Tick::from_seconds_f64(3.));
+    app.stop();
+    assert!(!app.scrub_tick(1., true), "pause click must not start a stray audio grain");
+}

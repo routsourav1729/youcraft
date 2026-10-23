@@ -65,9 +65,11 @@ def eligible(project, start, end, margin=0.5):
 
 
 def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6):
-    """Rank measured contiguous spans, at most two per interval; never synthesize gaze scores."""
+    """Rank measured contiguous spans, at most one per interval; never synthesize gaze scores."""
     ranked = []
     for row in rows:
+        if not any(cue in row.get('cues', []) for cue in ('smile', 'nod', 'manual')):
+            continue
         clip = next((c for c in project.clips if c.id == row.get('clip_id')), None)
         if clip is None or clip.camera != project.settings.speaker_camera.get(project.settings.host_speaker):
             continue
@@ -83,7 +85,7 @@ def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6):
     chosen, counts = [], {}
     for r in sorted(ranked, key=lambda r: (-r.score, r.start)):
         bucket = int(r.start // interval)
-        if counts.get(bucket, 0) >= 2 or any(r.start < x.end + spacing and r.end > x.start - spacing for x in chosen):
+        if counts.get(bucket, 0) >= 1 or any(r.start < x.end + spacing and r.end > x.start - spacing for x in chosen):
             continue
         chosen.append(r)
         counts[bucket] = counts.get(bucket, 0) + 1
@@ -172,11 +174,13 @@ def manifest(project):
                     speakers=[dict(name=('Host' if s == project.settings.host_speaker else 'Guest') + ' · ' + s) for s in speakers], words=words))
 
 
-def review_manifest(project, edit=False, clip_id=None):
+def review_manifest(project, edit=False, clip_id=None, reaction_id=None):
     """Unsaved native review sequence: one clock, master audio, all camera shards.
 
     Reviewing never marks sync, captions or reactions as approved.
     """
+    if reaction_id is not None and not any(r.id == reaction_id for r in project.reactions):
+        raise ValueError('Reaction suggestion not found')
     master = next((c for c in project.clips if c.camera == 'master'), None)
     cameras = [c for c in project.clips if c.camera in ('A', 'B') and c.has_video]
     if clip_id is not None:
@@ -206,11 +210,11 @@ def review_manifest(project, edit=False, clip_id=None):
                 video.append(dict(asset=source.id, source_in=round(max(0.,(start-source.offset)/source.rate)*TICKS),
                                   speed=1/source.rate, side=side))
         for camera in ('A', 'B'):
-            picture(camera, 'full' if clip_id is not None else 'review-bottom-' + camera if edit else camera)
+            picture(camera, 'full' if clip_id is not None else 'review-bottom-' + ('A' if camera == project.settings.speaker_camera.get(project.settings.host_speaker, 'A') else 'B') if edit else camera)
         if edit:
             shot = next((s for s in project.shots if s.start <= mid < s.end), None)
             layout = shot.layout if shot else 'both'
-            if any(r.decision == 'keep' and r.start <= mid < r.end for r in project.reactions):
+            if any((r.decision == 'keep' or r.id == reaction_id) and r.start <= mid < r.end for r in project.reactions):
                 layout = project.settings.speaker_camera.get(project.settings.host_speaker, layout)
             if layout in sources and sources[layout] is None:
                 layout = next((key for key,value in sources.items() if value is not None),'both')

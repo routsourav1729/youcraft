@@ -228,6 +228,8 @@ pub enum Dialog {
 #[derive(Default)]
 pub struct Playback {
     pub playing: bool,
+    /// Resume only after a monitor drag finishes; never reopen the device on every pointer move.
+    pub(crate) seek_resume: Option<f64>,
     pub speed: f64,
     pub looping: bool,
     /// Wall-clock (egui time, s) and timeline tick when playback (re)started.
@@ -1038,7 +1040,27 @@ impl FilmcraftApp {
         }
     }
 
+    pub fn drag_program(&mut self, to: Tick) {
+        if self.playback.playing {
+            let speed = self.playback.speed;
+            self.stop();
+            self.playback.seek_resume = Some(speed);
+        }
+        let end = self.session.active_sequence().map(|q| q.duration()).unwrap_or_default();
+        self.session.set_playhead(self.session.sequence_rate().snap(to.max(Tick::ZERO).min(end)));
+    }
+
+    pub fn finish_program_drag(&mut self) {
+        if let Some(speed) = self.playback.seek_resume.take() {
+            let end = self.session.active_sequence().map(|q| q.duration()).unwrap_or_default();
+            if self.session.playhead() < end {
+                self.play(speed);
+            }
+        }
+    }
+
     pub fn stop(&mut self) {
+        self.playback.seek_resume = None;
         self.playback.playing = false;
         self.playback.stop_at = None;
         self.playback.rest_at = None;

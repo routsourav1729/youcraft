@@ -45,6 +45,7 @@ impl ScrubAudio {
     /// The output device was stopped under the stream: the next grain reopens it.
     pub(crate) fn device_stopped(&mut self) {
         self.open = false;
+        self.last_tick = None;
     }
 }
 
@@ -62,7 +63,7 @@ impl FilmcraftApp {
     pub fn scrub_tick(&mut self, now: f64, down: bool) -> bool {
         let ph = self.session.playhead();
         let prev = self.scrub.last_tick.replace(ph);
-        if self.playback.playing || self.source_playback.clock.playing {
+        if self.playback.playing || self.playback.seek_resume.is_some() || self.source_playback.clock.playing {
             // playback (Program or Source) owns the device: it stopped the scrub stream when it
             // started, and the scrub must not stop it when the button is released
             self.scrub.open = false;

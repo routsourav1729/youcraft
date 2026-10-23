@@ -38,11 +38,11 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
         base_options=mp.tasks.BaseOptions(model_asset_path=config['face_model']),
         running_mode=mp.tasks.vision.RunningMode.IMAGE, num_faces=2,
         output_face_blendshapes=True, output_facial_transformation_matrixes=True)
-    rows, references = [], {}
+    rows, references, issues, measurements = [], {}, {}, []
     with mp.tasks.vision.FaceLandmarker.create_from_options(opts) as face:
         def measure(frame):
-            if frame.shape[1] > 960:
-                frame = cv2.resize(frame, (960, max(1, round(frame.shape[0] * 960 / frame.shape[1]))))
+            if frame.shape[1] > 1280:
+                frame = cv2.resize(frame, (1280, max(1, round(frame.shape[0] * 1280 / frame.shape[1]))))
             f = face.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
             if len(f.face_landmarks) != 1 or not f.face_blendshapes or not f.facial_transformation_matrixes:
                 return None
@@ -71,7 +71,14 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
             head_pitch = math.degrees(math.atan2(-mat[2,1], mat[2,2]))
             return dict(gaze=direction, yaw=math.degrees(math.atan2(mat[2,0], mat[2,2])),
                 smile=(scores.get('mouthSmileLeft',0)+scores.get('mouthSmileRight',0))/2,
-                blink=max(scores.get('eyeBlinkLeft',0), scores.get('eyeBlinkRight',0)), pitch=head_pitch)
+                blink=max(scores.get('eyeBlinkLeft',0), scores.get('eyeBlinkRight',0)), pitch=head_pitch, aspect=frame.shape[1]/frame.shape[0], eyes=[[float(f.face_landmarks[0][i].x), float(f.face_landmarks[0][i].y)] for i in (468, 473)],
+                nose=[float(f.face_landmarks[0][1].x), float(f.face_landmarks[0][1].y)])
+        image_ref = None
+        if payload.get('reference_image'):
+            image = cv2.imread(payload['reference_image'])
+            image_ref = measure(image) if image is not None else None
+            if image_ref is None:
+                raise ValueError('Screenshot has no usable single face. Choose a clear host screenshot with both eyes visible.')
         total_seconds = sum(c['duration'] for c in payload['clips'])
         finished_seconds = 0.
         for clip in payload['clips']:
@@ -82,30 +89,37 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     raise ValueError('Cannot decode host camera ' + clip['path'])
                 if payload.get('reference_only'):
                     samples = []
-                    for second in np.linspace(0, max(0., clip['duration'] - 1), 20):
+                    times = reference_times(clip['duration'], payload.get('reference_windows', {}).get(clip['id'], []))
+                    for sample_index, second in enumerate(times):
+                        progress('Choosing host reference', completed=sample_index, total=len(times), units='frames')
                         cap.set(cv2.CAP_PROP_POS_MSEC, second * 1000)
                         ok, image = cap.read()
                         measured = measure(image) if ok else None
                         if measured and measured['blink'] < .4:
                             samples.append((float(second), measured))
+                            if len(samples) >= 16:
+                                break
                     if not samples:
-                        raise ValueError('No clear single-face reference found; select another recording')
+                        issues[clip['id']] = 'No clear host face found. Use a visible host frame or upload a reference screenshot; other references were kept.'
+                        continue
                     center = np.median([m['gaze'] for _, m in samples], axis=0)
                     references[clip['id']] = min(samples, key=lambda x: float(np.linalg.norm(np.asarray(x[1]['gaze']) - center)))[0]
                     continue
-                if reference is None:
-                    raise ValueError('Choose or suggest a reference frame for every host recording')
-                cap.set(cv2.CAP_PROP_POS_MSEC, reference*1000)
-                ok, image = cap.read()
-                ref = measure(image) if ok else None
+                if reference is None and image_ref is None:
+                    raise ValueError('Choose a host reference frame or upload a reference screenshot')
+                ref = image_ref
                 if ref is None:
-                    raise ValueError('Reference must show exactly one visible face with usable eyes')
+                    cap.set(cv2.CAP_PROP_POS_MSEC, reference*1000)
+                    ok, image = cap.read()
+                    ref = measure(image) if ok else None
+                if ref is None:
+                    raise ValueError('Host reference has no usable single face. Suggest another reference or upload a clear host screenshot with both eyes visible.')
                 fps = float(cap.get(cv2.CAP_PROP_FPS))
                 if not math.isfinite(fps) or fps <= 0:
                     raise ValueError('Invalid camera frame rate')
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 stride = max(1, round(fps / 8))  # Enough temporal samples to distinguish a nod.
-                streak, missed, index = [], 0, 0
+                streak, missed, index, last_measurement = [], 0, 0, -1
                 def finish():
                     if len(streak) < 16:
                         return
@@ -135,6 +149,12 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     else:
                         match = m and angle(m['gaze'], ref['gaze']) <= payload['tolerance']
                     good = match and m['blink'] < .6
+                    if int(seconds) != last_measurement and len(measurements) < 86400:
+                        last_measurement = int(seconds)
+                        row = dict(time=clip['offset']+seconds*clip['rate'], clip_id=clip['id'], detected=m is not None, matching=bool(good))
+                        if m:
+                            row.update({key:m[key] for key in ('eyes', 'nose', 'pitch', 'yaw', 'smile', 'blink', 'aspect')})
+                        measurements.append(row)
                     if good:
                         streak.append((seconds,m)); missed=0
                     else:
@@ -145,4 +165,19 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
             finally:
                 cap.release()
                 finished_seconds += clip['duration']
-    return dict(candidates=rows, references=references)
+    return dict(candidates=rows, references=references, issues=issues, measurements=measurements)
+
+
+def reference_times(duration, speaking_windows):
+    """Bounded sampling, prioritized by host speech and distance from recording edges."""
+    end = max(0., duration - .1)
+    windows = sorted(speaking_windows, key=lambda w: abs((w[0]+w[1])/2-duration/2))
+    preferred = [float(t) for a,b in windows[:16] if b>a for t in np.linspace(max(0.,a), min(end,b), 3)]
+    broad = [float(t) for t in np.linspace(duration*.1, end*.9, 32)]
+    seen, result = set(), []
+    for t in preferred + broad:
+        t = min(end, max(0.,t))
+        key = round(t, 2)
+        if key not in seen:
+            seen.add(key); result.append(t)
+    return result

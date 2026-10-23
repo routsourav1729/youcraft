@@ -92,6 +92,11 @@ try {
         & $python "$ScriptsDirectory/configure_local_models.py" --directory $models --output "$Root/models.json" --device $device --partial
         CheckExit 'Model configuration failed.'
     }
+    if (-not $RuntimeOnly) {
+        Report 'Setting up reaction model'
+        & (Join-Path $ScriptsDirectory 'Setup-vision.ps1') -Root $Root -StatusFile $StatusFile -ScriptsDirectory $ScriptsDirectory -Mode cpu
+        if ($LASTEXITCODE -ne 0) { throw 'Speech models are ready; reaction setup failed. Use Install reactions to retry.' }
+    }
     Report 'Models ready' 'succeeded'
 } catch {
     Report 'Setup failed' 'failed' $_.Exception.Message

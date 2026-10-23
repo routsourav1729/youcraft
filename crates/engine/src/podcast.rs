@@ -155,7 +155,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                     let x = if source_view {
                         if picture.side.ends_with('A') { 230.0 } else { 1690.0 }
                     } else if full { 960.0 } else if picture.side.ends_with('A') { 720.0 } else { 1200.0 };
-                    let y = if source_view { 130.0 } else { 270.0 };
+                    let y = 270.0;
                     let scale = if source_view { 48.0 } else if full { 100.0 } else { 50.0 };
                     for id in &clips {
                         s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":"scale","value":scale}))?;
