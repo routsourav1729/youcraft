@@ -46,6 +46,8 @@ ask('podcast.action',action='review_playback',options={'edit':True})
 ready(lambda s:s['status'].startswith('Review ready'))
 ask('ui.resize',width=1366,height=768)
 time.sleep(1)
+notices=ask('ui.elements',prefix='graphics.notice')
+if any(e['id']=='graphics.notice.close' for e in notices):ask('ui.click',id='graphics.notice.close')
 elements=ask('ui.elements',prefix='podcast.')
 ids={e['id'] for e in elements}
 for name in ['video_height','gaze_tolerance','reaction_interval','reaction_spacing','reference_image']:

@@ -122,7 +122,7 @@ impl Default for State {
             monitor_volume_db: 0.,
             monitor_muted: false,
             focus_video: false,
-            video_fraction: 0.58,
+            video_fraction: 0.64,
             transcript_video_fraction: 0.40,
             reference_image: String::new(),
             show_detection: true,
@@ -1631,7 +1631,7 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     });
     if s.step == 5 {
         let duration = number(&s.project, "duration").max(1.);
-        let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 20.), egui::Sense::hover());
+        let (bar, _) = ui.allocate_exact_size(egui::vec2(ui.available_width(), 10.), egui::Sense::hover());
         ui.painter().rect_filled(bar, 3., egui::Color32::from_gray(35));
         for r in rows(&s.project, "reactions") {
             let a = bar.left() + (number(&r, "start") / duration) as f32 * bar.width();
@@ -1652,7 +1652,7 @@ fn review_player(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         }
     }
     let rect = ui.available_rect_before_wrap();
-    let caption_height = if matches!(s.step, 4 | 5) { 32. } else { 0. };
+    let caption_height = if s.step == 4 { 32. } else { 0. };
     let preview = Rect::from_min_max(rect.min, egui::pos2(rect.right(), (rect.bottom() - caption_height).max(rect.top() + 130.)));
     if s.review_active {
         crate::panels::monitor::show(app, ui, preview, crate::panels::monitor::Which::Program);
@@ -1716,9 +1716,9 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
     }
     let duration = number(&s.project, "duration").max(1.);
     for (x, label) in [
-        (0.12, format!("HOST · {:.1} min · {:.0}%", host_time / 60., host_time / duration * 100.)),
-        (0.5, "OUTPUT · master audio".into()),
-        (0.88, format!("GUEST · {:.1} min · {:.0}%", guest_time / 60., guest_time / duration * 100.)),
+        (0.12, format!("HOST\n{:.0}% · {:.1} min", host_time / duration * 100., host_time / 60.)),
+        (0.5, "OUTPUT".into()),
+        (0.88, format!("GUEST\n{:.0}% · {:.1} min", guest_time / duration * 100., guest_time / 60.)),
     ] {
         painter.text(
             egui::pos2(pic.left() + pic.width() * x, pic.top() + 8.),
@@ -1739,7 +1739,7 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
         painter.text(
             egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.),
             egui::Align2::CENTER_BOTTOM,
-            "Detection appears after analysis",
+            "Run analysis\nto see detection",
             egui::FontId::proportional(12.),
             egui::Color32::GRAY,
         );
@@ -1766,9 +1766,9 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
         painter.circle_stroke(pos, 5., egui::Stroke::new(1.5, color));
     }
     let label = if m["detected"] == true {
-        format!("Sampled cue · head {:.0}° · smile {:.0}%", number(m, "pitch"), number(m, "smile") * 100.)
+        format!("Sample · head {:.0}°\nSmile {:.0}%", number(m, "pitch"), number(m, "smile") * 100.)
     } else {
-        "No clear face at this sample".into()
+        "No clear face\nat this sample".into()
     };
     painter.text(egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.), egui::Align2::CENTER_BOTTOM, label, egui::FontId::proportional(12.), color);
 }
@@ -2537,16 +2537,13 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     }
     let calibration_before = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing});
     ui.horizontal_wrapped(|ui| {
-        ui.label(format!(
-            "Host speaks → Host  ·  Guest speaks → Guest  ·  Overlap → Both ({:.0} s before/after)",
-            s.project["settings"]["overlap_padding"].as_f64().unwrap_or(2.)
-        ));
+        ui.label(format!("Speaker-led output · Both cameras during overlap (±{:.0} s)", s.project["settings"]["overlap_padding"].as_f64().unwrap_or(2.)));
         let r = ui.checkbox(&mut s.show_detection, "Show host detection");
         app.auto.add_response("podcast.show_detection", &r, "Show measured host eye and head cues");
     });
     if !ready {
-        ui.group(|ui| {
-            ui.label("Install the reaction model before suggesting references or finding reactions.");
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Reaction model missing.");
             if button(app, ui, "reaction_models", "Install reactions") {
                 s.setup.start("Setup-vision.ps1", "-Mode", "cpu");
             }
@@ -2555,17 +2552,20 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.columns(3, |cols| {
         cols[0].add_enabled_ui(!analyzed, |ui| {
             let label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance · % eye width" };
-            let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0).text(label));
+            ui.label(label);
+            let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0));
             app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
-            ui.small("Allowed difference from the host reference look.");
+            ui.add(egui::Label::new("Allowed difference from the reference look.").wrap());
         });
-        let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0).text("One reaction per (s)"));
+        cols[1].label("One reaction per (s)");
+        let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0));
         app.auto.add_response("podcast.reaction_interval", &r, "One host reaction per interval");
-        cols[1].small("At most one smile/nod insert in each interval.");
+        cols[1].add(egui::Label::new("At most one smile/nod in each interval.").wrap());
         cols[2].add_enabled_ui(!analyzed, |ui| {
-            let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0).text("Minimum gap (s)"));
+            ui.label("Minimum gap (s)");
+            let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0));
             app.auto.add_response("podcast.reaction_spacing", &r, "Minimum gap between reaction inserts");
-            ui.small("Quiet space between the end of one insert and the next.");
+            ui.add(egui::Label::new("Gap after one insert before the next.").wrap());
         });
     });
     if analyzed {

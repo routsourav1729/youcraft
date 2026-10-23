@@ -31,7 +31,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     let stacked_controls = rect.width() < 540.0;
     let separate_source_drag = which == Which::Source && stacked_controls && rect.width() < 310.0;
     let source_drag_h = if separate_source_drag { 26.0 } else { 0.0 };
-    let controls_h = 28.0 + 24.0 + 15.0 + 36.0 + if stacked_controls { 26.0 } else { 0.0 } + source_drag_h;
+    let compact = app.ui.workspace == "Podcast" && which == Which::Program;
+    let controls_h = if compact { 60.0 } else { 28.0 + 24.0 + 15.0 + 36.0 + if stacked_controls { 26.0 } else { 0.0 } + source_drag_h };
     let video_area = Rect::from_min_max(rect.min + vec2(4.0, 4.0), pos2(rect.max.x - 4.0, rect.max.y - controls_h));
     // the Source monitor's time ruler starts at `origin` (a subclip restricted to its range)
     let mut origin = Tick::ZERO;
@@ -319,6 +320,22 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
     if pic_resp.double_clicked() && which == Which::Source {
         // (Premiere opens the clip's settings; we show info)
         app.ui.status = name.clone();
+    }
+
+    if compact {
+        let bar = Rect::from_min_size(pos2(rect.left() + 14., rect.bottom() - 60.), vec2((rect.width() - 28.).max(1.), 22.));
+        follow_playhead(app, which, origin, duration, time);
+        mini_timeline(app, ui, bar, which, origin, time, duration, rate, mark_in, mark_out);
+        let row = Rect::from_min_size(pos2(rect.left(), rect.bottom() - 34.), vec2(rect.width(), 32.));
+        transport(app, ui, row, which);
+        let clock = format_time(time, rate, drop_frame, TimeDisplay::Timecode, 48000);
+        ui.painter().text(pos2(row.left() + 14., row.center().y), Align2::LEFT_CENTER, clock, Tokens::timecode(), t.timecode);
+        let zoom = Rect::from_min_size(pos2(row.right() - 112., row.top() + 3.), vec2(70., 24.));
+        let label = mv.zoom.map(|z| format!("{:.0}%", z * 100.)).unwrap_or_else(|| "Fit".into());
+        let response = crate::widgets::dropdown_text(ui, zoom, &label, &t, egui::Id::new((prefix, "zoom")));
+        app.auto.add(&format!("{prefix}.zoom"), zoom, "Video zoom");
+        monitor_view::zoom_menu(app, &response, which);
+        return;
     }
 
     // ---- controls row: timecode | zoom | res | wrench | duration
