@@ -37,6 +37,7 @@ pub struct CpalOut {
     /// in use, or no output device was found (playing without sound).
     note: Option<Note>,
     last_error: Option<String>,
+    opened_device: String,
     /// The fallback picked when the default device could not be opened, as (host, device) names,
     /// so later lookups (`devices`, `configure`, `start`) reuse it instead of probing every PCM.
     fallback: Mutex<Option<(String, String)>>,
@@ -155,6 +156,7 @@ impl CpalOut {
             document_rate: None,
             note,
             last_error: None,
+            opened_device: String::new(),
             fallback,
         }
     }
@@ -162,6 +164,10 @@ impl CpalOut {
     /// The stream configuration the settings ask for, falling back to the device default.
     fn config(&self, dev: &cpal::Device) -> Result<cpal::SupportedStreamConfig, String> {
         let default = dev.default_output_config().map_err(|e| e.to_string())?;
+        // Shared-mode Windows output should use the endpoint's actual mix format.
+        if cfg!(target_os = "windows") && !self.hw.force_document_rate {
+            return Ok(default);
+        }
         let want = if self.hw.force_document_rate { self.document_rate.unwrap_or(self.hw.sample_rate) } else { self.hw.sample_rate };
         let exact = dev.supported_output_configs().ok().and_then(|it| {
             it.filter(|c| c.channels() > 0 && (c.min_sample_rate().0..=c.max_sample_rate().0).contains(&want))
@@ -227,6 +233,7 @@ impl CpalOut {
         }
         self.rate = cfg.sample_rate().0;
         self.channels = cfg.channels();
+        self.opened_device = format!("{} / {} / {:?}", host.id().name(), dev.name().unwrap_or_else(|_| "Unknown endpoint".into()), cfg.sample_format());
         let stream = match cfg.sample_format() {
             cpal::SampleFormat::F32 => {
                 let played = self.played.clone();
@@ -331,7 +338,7 @@ impl Watchdog {
         // An error that arrives with the stream still consuming samples is only a hiccup.
         self.pending_error |= errored;
         let stalled = now.saturating_sub(self.seen.1) >= STALL_RESTART;
-        if !(lost || self.pending_error && stalled) {
+        if !(lost || (self.pending_error || played == 0) && stalled) {
             return Verdict::Healthy;
         }
         self.restarts.retain(|t| now.saturating_sub(*t) < RESTART_WINDOW);
@@ -470,6 +477,16 @@ impl AudioOut for CpalOut {
             .or_else(|| self.health.detail.lock().unwrap_or_else(PoisonError::into_inner).clone())
             .or_else(|| self.note.as_ref().map(Note::text))
     }
+    fn diagnostics(&self) -> String {
+        format!(
+            "{}; stream={}; frames={}; retries={}; {}",
+            self.opened_device,
+            self.stream.is_some(),
+            self.played.load(Ordering::SeqCst),
+            self.watchdog.restarts.len(),
+            self.note().unwrap_or_default()
+        )
+    }
 }
 
 #[cfg(test)]
@@ -547,6 +564,21 @@ mod tests {
         assert_eq!(w.check(ms(400), 480, false, false), Verdict::Healthy);
         // a stall without any reported error is left to the UI's own watchdog
         assert_eq!(w.check(ms(2_000), 480, false, false), Verdict::Healthy);
+    }
+
+    #[test]
+    fn a_stream_that_never_calls_back_gets_bounded_startup_retries() {
+        let mut w = Watchdog::default();
+        w.reset(ms(0));
+        assert_eq!(w.check(ms(299), 0, false, false), Verdict::Healthy);
+        for t in [300, 600, 900] {
+            assert_eq!(w.check(ms(t), 0, false, false), Verdict::Restart);
+        }
+        assert_eq!(w.check(ms(1200), 0, false, false), Verdict::GiveUp);
+        // A working stream must never restart just because it reports no errors.
+        w.reset(ms(0));
+        assert_eq!(w.check(ms(200), 480, false, false), Verdict::Healthy);
+        assert_eq!(w.check(ms(400), 960, false, false), Verdict::Healthy);
     }
 
     #[test]

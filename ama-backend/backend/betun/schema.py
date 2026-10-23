@@ -34,6 +34,8 @@ class Clip(Model):
     offset: float = 0
     rate: float = Field(default=1, ge=0.98, le=1.02)
     sync_score: float | None = None
+    sync_residual_seconds: float | None = Field(default=None, ge=0)
+    sync_anchor_count: int = Field(default=0, ge=0)
     sync_reviewed: bool = False
     sync_locked: bool = False
     warnings: list[str] = Field(default_factory=list)

@@ -172,13 +172,18 @@ def manifest(project):
                     speakers=[dict(name=('Host' if s == project.settings.host_speaker else 'Guest') + ' · ' + s) for s in speakers], words=words))
 
 
-def review_manifest(project, edit=False):
+def review_manifest(project, edit=False, clip_id=None):
     """Unsaved native review sequence: one clock, master audio, all camera shards.
 
     Reviewing never marks sync, captions or reactions as approved.
     """
     master = next((c for c in project.clips if c.camera == 'master'), None)
     cameras = [c for c in project.clips if c.camera in ('A', 'B') and c.has_video]
+    if clip_id is not None:
+        cameras = [c for c in cameras if c.id == clip_id]
+        if not cameras:
+            raise ValueError('Camera shard not found')
+        edit = False
     if master is None or not cameras or project.duration <= 0:
         raise ValueError('Add master audio and camera recordings first')
     tolerance = .5 / (cameras[0].frame_rate or 25)
@@ -201,7 +206,7 @@ def review_manifest(project, edit=False):
                 video.append(dict(asset=source.id, source_in=round(max(0.,(start-source.offset)/source.rate)*TICKS),
                                   speed=1/source.rate, side=side))
         for camera in ('A', 'B'):
-            picture(camera, 'review-bottom-' + camera if edit else camera)
+            picture(camera, 'full' if clip_id is not None else 'review-bottom-' + camera if edit else camera)
         if edit:
             shot = next((s for s in project.shots if s.start <= mid < s.end), None)
             layout = shot.layout if shot else 'both'

@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$installed = [version]'0.1.9'
+$installed = [version]'0.1.10'
 $base = 'https://routsourav1729.github.io/youcraft'
 $directory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'YouCraft\updates'
 $transaction = Join-Path $directory 'transaction'

@@ -13,11 +13,14 @@ pub struct State {
 impl State {
     pub fn tick(&mut self, app: &mut FilmcraftApp, ctx: &egui::Context) {
         if let Some(start) = self.testing {
+            if let Some(a) = app.audio.as_mut() {
+                a.recover();
+            }
             if app.playback.playing || app.source_playback.clock.playing {
                 self.testing = None;
-            } else if start.elapsed() >= Duration::from_millis(2200) {
+            } else if start.elapsed() >= Duration::from_millis(3200) {
                 let frames = app.audio.as_ref().and_then(|a| a.played_frames()).unwrap_or(0);
-                let detail = app.audio.as_ref().and_then(|a| a.note()).unwrap_or_default();
+                let detail = app.audio.as_ref().map(|a| a.diagnostics()).unwrap_or_default();
                 if let Some(a) = app.audio.as_mut() {
                     a.stop();
                 }
@@ -122,11 +125,11 @@ impl State {
             }
             let hw = &app.session.prefs.audio_hardware;
             let device = if hw.default_output.is_empty() { "System default" } else { &hw.default_output };
-            let detail = app.audio.as_ref().and_then(|a| a.note()).unwrap_or_default();
+            let detail = app.audio.as_ref().map(|a| a.diagnostics()).unwrap_or_default();
             let rate = app.audio.as_ref().map(|a| a.sample_rate()).unwrap_or(0);
             let channels = app.audio.as_ref().map(|a| a.channels()).unwrap_or(0);
             let report = format!(
-                "YouCraft 0.1.8\nOutput: {device}\nAvailable: {}\nFormat: {rate} Hz, {channels} channels\nDevice: {detail}\nPlayback: {}\nTest: {}",
+                "YouCraft 0.1.10\nOutput: {device}\nAvailable: {}\nFormat: {rate} Hz, {channels} channels\nDevice: {detail}\nPlayback: {}\nTest: {}",
                 devices.outputs.join(", "),
                 app.playback.audio_error,
                 self.message

@@ -86,6 +86,10 @@ pub struct State {
     #[serde(skip)]
     review_seek: f64,
     #[serde(skip)]
+    review_clip: Option<String>,
+    #[serde(skip)]
+    review_autoplay: bool,
+    #[serde(skip)]
     storage: Value,
     #[serde(skip)]
     confirm_delete: bool,
@@ -160,6 +164,8 @@ impl Default for State {
             review_item: None,
             review_active: false,
             review_seek: 0.,
+            review_clip: None,
+            review_autoplay: false,
             storage: Value::Null,
             confirm_delete: false,
             startup: None,
@@ -371,11 +377,23 @@ impl State {
         }
     }
     fn review_preview(&mut self, edit: bool) {
+        self.review_clip = None;
+        self.review_autoplay = false;
+        self.request_review(edit, None);
+    }
+    fn request_review(&mut self, edit: bool, clip_id: Option<String>) {
         let project = self.project.clone();
         let id = self.project_id.clone();
         self.start("review_assemble", move |c| {
             let saved = c.request(reqwest::Method::PUT, &format!("/v1/projects/{id}"), Some(&project))?;
-            match c.get(&format!("/v1/projects/{id}/review-plan?edit={edit}")) {
+            let mut query = format!("/v1/projects/{id}/review-plan?edit={edit}");
+            if let Some(clip) = clip_id {
+                if !clip.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') {
+                    return Err("Invalid camera shard identifier".into());
+                }
+                query.push_str(&format!("&clip_id={clip}"));
+            }
+            match c.get(&query) {
                 Ok(plan) => Ok(json!({"project":saved,"plan":plan})),
                 Err(error) => Ok(json!({"project":saved,"error":error})),
             }
@@ -887,7 +905,13 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                             }
                             app.session.execute("playhead.set", json!({"seconds":s.review_seek}))
                         }) {
-                            Ok(_) => s.status = "Review ready · Master audio".into(),
+                            Ok(_) => {
+                                s.status = "Review ready · Master audio".into();
+                                if s.review_autoplay {
+                                    s.review_autoplay = false;
+                                    app.play(1.);
+                                }
+                            }
                             Err(error) => s.error = error.to_string(),
                         }
                     }
@@ -2015,7 +2039,7 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                     if button(app, ui, &format!("sync.preview.{id}.{position}"), label) {
                         let first = number(clip, "offset").max(0.);
                         let last = (number(clip, "offset") + number(clip, "duration") * number(clip, "rate")).min(number(&s.project, "duration"));
-                        preview = Some(first + (last - first - 12.).max(0.) * position);
+                        preview = Some((id.clone(), first + (last - first - 12.).max(0.) * position));
                     }
                 }
                 let mut reviewed = clip["sync_reviewed"] == true;
@@ -2026,7 +2050,15 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 }
             });
             if let Some(score) = clip["sync_score"].as_f64() {
-                ui.small(format!("Match confidence: {score:.2}"));
+                ui.label(format!(
+                    "Master interval: {:.2}s – {:.2}s",
+                    number(clip, "offset"),
+                    number(clip, "offset") + number(clip, "duration") * number(clip, "rate")
+                ));
+                if let Some(residual) = clip["sync_residual_seconds"].as_f64() {
+                    ui.small(format!("{} matching anchors · timing-fit error {:.1} ms", clip["sync_anchor_count"].as_u64().unwrap_or(0), residual * 1000.));
+                }
+                ui.small(format!("Signal confidence {score:.1} · peak/noise ratio, not a percentage"));
             }
             for warning in clip["warnings"].as_array().into_iter().flatten().filter_map(Value::as_str) {
                 ui.colored_label(egui::Color32::YELLOW, warning);
@@ -2048,16 +2080,25 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         });
     }
     set_rows(s, "clips", clips);
-    if let Some(time) = preview {
+    if let Some((clip_id, time)) = preview
+        && !s.busy()
+    {
         s.review_seek = time;
-        if s.review_active && s.review_item == app.session.state.active_sequence.map(|id| id.0) && s.project == s.saved_project && !s.busy() {
+        if s.review_active
+            && s.review_clip.as_ref() == Some(&clip_id)
+            && s.review_item == app.session.state.active_sequence.map(|id| id.0)
+            && s.project == s.saved_project
+            && !s.busy()
+        {
             app.seek_program(filmcraft_time::Tick::from_seconds_f64(time));
             if !app.playback.playing {
                 app.play(1.);
             }
         } else {
             app.stop();
-            s.review_preview(false);
+            s.review_clip = Some(clip_id.clone());
+            s.review_autoplay = true;
+            s.request_review(false, Some(clip_id));
         }
     }
 }

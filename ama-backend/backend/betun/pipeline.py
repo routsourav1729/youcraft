@@ -124,31 +124,32 @@ def process(store, project, kind, options, directory, cancel, progress):
         project.shots = [shot for shot in project.shots if shot.locked]
         progress(dict(stage='Preparing master playback'))
         media.playback_audio(master, cache, cancel)
-        progress(dict(stage='Matching ordered camera shards'))
+        progress(dict(stage='Matching each camera shard to master'))
         master_audio, sr = media.read_wav(media.audio_copy(master, cache, rate=8000, cancel=cancel))
         results = {}
-        cursors = {}
         cameras = [c for camera in ('A', 'B') for c in project.clips if c.camera == camera]
         for index, clip in enumerate(cameras):
-            minimum = cursors.get(clip.camera)
             if clip.sync_locked:
-                if minimum is not None and clip.offset < minimum-.05:
-                    raise ValueError('Locked shard conflicts with camera order')
-                cursors[clip.camera] = clip.offset + clip.duration*clip.rate - .25
                 continue
             try:
                 signal, _ = media.read_wav(media.audio_copy(clip, cache, rate=sr, cancel=cancel))
-                result = synchronize(master_audio, signal, sr, directory=directory, minimum_offset=minimum, cancel=cancel,
-                                     on_progress=lambda value: progress(dict(stage='Matching ordered camera shards',
+                # Every shard must find its own interval in the continuous master.
+                # File picker order and a previous shard's match are not timing evidence.
+                result = synchronize(master_audio, signal, sr, directory=directory, cancel=cancel,
+                                     on_progress=lambda value: progress(dict(stage='Matching each camera shard to master',
                                          completed=index*5+round(value*5), total=len(cameras)*5, units='anchors',
                                          fraction=(index+value)/max(1,len(cameras)))))
-                cursors[clip.camera] = result["offset"] + clip.duration*result["rate"] - .25
                 clip.offset, clip.rate, clip.sync_score = result['offset'], result['rate'], result['score']
+                clip.sync_residual_seconds = result['residual_seconds']
+                clip.sync_anchor_count = result.get('inlier_count', len(result['anchors']))
                 clip.sync_reviewed = False
                 clip.warnings = result['warnings']
                 results[clip.id] = result
             except (ValueError, RuntimeError) as error:
                 clip.sync_reviewed = False
+                clip.sync_score = None
+                clip.sync_residual_seconds = None
+                clip.sync_anchor_count = 0
                 clip.warnings = ['manual_sync_required', str(error)]
                 results[clip.id] = dict(error=str(error))
             progress((index + 1) / max(1, len(cameras)))

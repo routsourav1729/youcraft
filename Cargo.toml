@@ -1,5 +1,6 @@
 [workspace]
 resolver = "3"
+exclude = ["vendor/cpal"]
 members = ["crates/*", "apps/*", "xtask"]
 default-members = ["crates/*", "apps/*", "xtask"]
 
@@ -145,3 +146,6 @@ opt-level = 3
 [profile.release]
 lto = "thin"
 codegen-units = 1
+
+[patch.crates-io]
+cpal = { path = "vendor/cpal" }

@@ -112,6 +112,9 @@ pub trait AudioOut {
     fn note(&self) -> Option<String> {
         None
     }
+    fn diagnostics(&self) -> String {
+        self.note().unwrap_or_default()
+    }
 }
 
 /// What the platform audio layer can open (Settings ▸ Audio Hardware).
@@ -1141,7 +1144,7 @@ impl FilmcraftApp {
         if let Some((f, sr)) = reading {
             if f != self.playback.audio_seen.0 {
                 self.playback.audio_seen = (f, now);
-            } else if now - self.playback.audio_seen.1 >= AUDIO_STALL_S {
+            } else if now - self.playback.audio_seen.1 >= if f == 0 { 3.0 } else { AUDIO_STALL_S } {
                 // the device stopped consuming samples: continue from where the audio got to on
                 // the wall clock, without sound
                 let played = if sr > 0 { f as f64 / sr as f64 } else { 0.0 };

@@ -140,3 +140,23 @@ that old cached download when next opened. Subsequent file updates write their
 managed file list to `installed-files.json`; only previously managed paths can
 be removed. Windows Add/Remove Programs retains the last full-installer version;
 the updater's installed version identifies the actual application update.
+
+## 0.1.10 audio and shard review
+
+Every shard searches the continuous mono master independently using Filmcraft's
+existing GCC-PHAT matcher. A unique global anchor narrows subsequent searches;
+clock drift is fitted from multiple anchors. Camera picker order cannot constrain
+matches. Failed matches clear stale evidence. The visible confidence ratio is not
+a percentage; use the matched master interval, anchor-fit error and master-audio
+preview to review synchronization. Each shard preview explicitly selects its video.
+
+The Windows CPAL 0.16 dependency has a narrow vendored compatibility patch: prime
+the cold shared output buffer before Start and use a thread handle when setting
+audio thread priority. Startup without callbacks gets bounded retries and clearer
+endpoint/frame-count diagnostics. This still requires an audible Realtek laptop
+retest; hosted CI cannot certify the user's speakers.
+
+Compute-node checks: 88 backend tests; isolated native watchdog regression; all
+seven real camera-audio shards from the prepared 20-minute bundle, reversed, with
+start offsets within 14 ms of the known placements. Matching took about 25 seconds
+on the compute node. This is not a laptop benchmark.

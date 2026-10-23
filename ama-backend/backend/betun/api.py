@@ -341,9 +341,9 @@ def create_app(root=None, token=None):
         return playback_plan(pid, manifest(store.get(pid)))
 
     @app.get('/v1/projects/{pid}/review-plan')
-    def review_plan(pid: str, edit: bool = False):
+    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None):
         from .podcast import review_manifest
-        return playback_plan(pid, review_manifest(store.get(pid), edit))
+        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id))
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):
