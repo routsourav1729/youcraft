@@ -424,9 +424,9 @@
     {
       "path": "BetunBackend/_internal/base_library.zip",
       "size": 1443565,
-      "sha256": "0aa9e81e711d529d9e3ae0054c2e4e5389441fd2511777f4a05b84da6ed02aea",
-      "download_size": 417978,
-      "download_sha256": "0df0c93d0bd327f5f952a530cbdd8f14608aecea7ea0a573974c8d9c205649cd"
+      "sha256": "ffc43e434656d028711685d10cf7b8f457059107043f1cc295c687fcdb4c2c90",
+      "download_size": 417900,
+      "download_sha256": "a3a049790fe0cd442402db82debbd35bef0fff9d79dade72fdc088e95a93085c"
     },
     {
       "path": "BetunBackend/_internal/betun/model_worker.py",
@@ -1222,9 +1222,9 @@
     {
       "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/RECORD",
       "size": 20234,
-      "sha256": "d27f482f0372ba04e48a2302ad70afa9f307af3069977a431fc0947c26d893a2",
+      "sha256": "04291d3024e6f076621b2490af73474719e5b16b966e6708435e431bfa3ca592",
       "download_size": 7164,
-      "download_sha256": "75bc8e4bd2db70a4b339820b84d4d41839ebd5e9044ea536994cd59bb51b2e3e"
+      "download_sha256": "1fa243be5bc3766c91644b3d43d9c2a0d92d355d69cf7e3d2046927093eee7ab"
     },
     {
       "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/top_level.txt",
@@ -1502,9 +1502,9 @@
     {
       "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/RECORD",
       "size": 129259,
-      "sha256": "d7fc071c7f04516ab41a5beb7995df16d42adb74668117a2ad79ac4964e07a7b",
-      "download_size": 50366,
-      "download_sha256": "6f3d1c4d6b622b42dffb4d211f912b419967b2c9a3b750c5ecf5f11c0df2966c"
+      "sha256": "732a6612d6ec77b6172d85531e04937461271f8dc93142ed9fd56c5f3a39a9a0",
+      "download_size": 50367,
+      "download_sha256": "a96da461327a7a8bb6a7223d2c1650b1a11a9864574aa25155663e109b6ae1d6"
     },
     {
       "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/WHEEL",
@@ -1684,9 +1684,9 @@
     {
       "path": "BetunBackend/BetunBackend.exe",
       "size": 9849411,
-      "sha256": "86b36c97721aee10ecf05f77fd209e6fb98c478cca16c841de57c52703a75698",
-      "download_size": 9638085,
-      "download_sha256": "cef567d41649d60a2c522dd27df622af0b3fd6e6969f2585b0bdc107bedab0b0"
+      "sha256": "bcd969a04597bed284764045016da5a0853cd32e755f5a92e2862de566937e84",
+      "download_size": 9638086,
+      "download_sha256": "ae32d9fbebfdc5b830782a167eaeeb3f231f03b9f84a5e445ed3ae29d7138d48"
     },
     {
       "path": "Check-AI.ps1",
@@ -1733,9 +1733,9 @@
     {
       "path": "filmcraft-cli.exe",
       "size": 44366336,
-      "sha256": "cc2e79751f2dd1bd8290d8a4b92b7a1170e38e6850d34fb15f73e227dcabf63a",
+      "sha256": "a7e5bd9915f13b44c7c259bfb8b7f362c5a32d9949dece1c971b75e8e7b8d43c",
       "download_size": 16854340,
-      "download_sha256": "57553e93d1a21561458b89f4cd8efe0a67eb863ae98f1dcd656a524116ab8956"
+      "download_sha256": "81c783eae9525839b652b2ac6324cb86ce4001cf1dc2c1daf06ef450ef6e6703"
     },
     {
       "path": "LICENSE-APACHE",
@@ -1837,17 +1837,17 @@
     },
     {
       "path": "YouCraft.exe",
-      "size": 64088064,
-      "sha256": "b7fae8faeeea363aa79e130535c1fd2baffb287190dbaf3c3480bf9f3441dc97",
-      "download_size": 24711981,
-      "download_sha256": "245ab8ab8624634119892f85899c7b27759880430db349fac1a46cf3203249a2"
+      "size": 64090112,
+      "sha256": "20e06d367dab51571ea50281d4dcdf70eaf11cdf5980b8143567516d345f6e49",
+      "download_size": 24713886,
+      "download_sha256": "00e33ab05be11bfe9f1ff39fe7ed3292182a29e0bf92696a63472db5aef8ddd6"
     },
     {
       "path": "YouCraft.mcpb",
       "size": 17436324,
-      "sha256": "80d2d326fe9a1d6ca7507211f925f73d21a9d745678e52633c2815cba970e088",
-      "download_size": 17414125,
-      "download_sha256": "bdea5013c5f4f71007dfc84537b25928a1982f526c9a9cd7e7f7ce16dcbcc036"
+      "sha256": "80397feee2dc7faacdf68a9922e8b0f4a2684f197caa123006c75ea9746aa7ac",
+      "download_size": 17414251,
+      "download_sha256": "d2be73f78c451657f21a1779b4de785aed913a388a92ab32f98790dbdbe6a040"
     }
   ]
 }
