@@ -35,7 +35,7 @@ function Install-FileUpdate($Root, $Transaction, $Files) {
     foreach ($file in $Files) {
         $target = Get-SafeUpdatePath $Root $file.path
         $staged = Get-SafeUpdatePath (Join-Path $Transaction 'staged') $file.path
-        if (-not $file.remove) {
+        if ($file.remove -ne $true) {
             if ((Get-Item $staged).Length -ne $file.size -or (Get-FileHash $staged -Algorithm SHA256).Hash -ne $file.sha256) { throw 'Staged update verification failed' }
         }
         $existed = Test-Path $target
@@ -52,7 +52,7 @@ function Install-FileUpdate($Root, $Transaction, $Files) {
     try {
         foreach ($file in $Files) {
             $target = Get-SafeUpdatePath $Root $file.path
-            if ($file.remove) { if (Test-Path $target) { Remove-Item $target -Force } }
+            if ($file.remove -eq $true) { if (Test-Path $target) { Remove-Item $target -Force } }
             else {
                 New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
                 Copy-Item (Get-SafeUpdatePath (Join-Path $Transaction 'staged') $file.path) $target -Force
