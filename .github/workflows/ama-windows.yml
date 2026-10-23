@@ -32,6 +32,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Validate setup helpers
+        shell: pwsh
+        run: |
+          Get-ChildItem packaging/ama/*.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count) { throw ($errors | Out-String) }
+          }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/file-update.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Incremental updater regression failed' }
       - name: External media test tools
         shell: pwsh
         run: |
@@ -55,17 +66,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & dist/BetunBackend/BetunBackend.exe --check-typing
           if ($LASTEXITCODE -ne 0) { throw 'Bundled Odia typing is incomplete' }
-      - name: Validate setup helpers
-        shell: pwsh
-        run: |
-          Get-ChildItem packaging/ama/*.ps1 | ForEach-Object {
-            $tokens = $null
-            $errors = $null
-            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
-            if ($errors.Count) { throw ($errors | Out-String) }
-          }
-          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/file-update.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Incremental updater regression failed' }
       - name: MCP preflight before compilation
         if: ${{ inputs.full_setup == true }}
         shell: pwsh

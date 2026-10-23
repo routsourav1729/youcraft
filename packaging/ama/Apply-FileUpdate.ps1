@@ -18,7 +18,7 @@ function Restore-FileUpdate($Root, $Transaction) {
     $journal = Join-Path $Transaction 'journal.json'
     if (-not (Test-Path $journal)) { return }
     if (-not (Test-Path (Join-Path $Transaction 'committed'))) {
-        $items = @(Get-Content $journal -Raw | ConvertFrom-Json)
+        $items = Get-Content $journal -Raw | ConvertFrom-Json
         foreach ($item in $items) {
             $target = Get-SafeUpdatePath $Root $item.path
             if ($item.existed) {
