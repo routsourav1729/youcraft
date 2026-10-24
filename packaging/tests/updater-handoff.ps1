@@ -25,6 +25,18 @@ $global:held = $true
 $rejected = $false
 try { Assert-AppClosed } catch { $rejected = $_.Exception.Message -like '*postponed*' }
 if (-not $rejected -or $global:sleeps -ne 30) { throw 'Save cancellation must leave app running and postpone apply' }
+# An orphan helper is stopped only after explicit consent and no editor is running.
+$helper = [pscustomobject]@{Path='C:\YouCraft\BetunBackend\BetunBackend.exe';ProcessName='BetunBackend';Id=101}
+$global:helperStopped = $false
+function Get-Process { param($Name, $ErrorAction) if (-not $global:helperStopped) { $helper }; $other }
+function Stop-Process { param([Parameter(ValueFromPipeline=$true)]$InputObject, $ErrorAction) process {
+    if ($InputObject.Id -ne 101) { throw 'Attempted to stop unrelated process' }
+    $global:helperStopped = $true
+} }
+$global:answer = 'Y'
+Assert-AppClosed
+if (-not $global:helperStopped) { throw 'Consented orphan helper cleanup failed' }
+Remove-Item Function:Stop-Process
 Remove-Item Function:Get-Process
 # End-to-end: a previous attempt's verified staged download must survive cancellation,
 # then install successfully on retry without any HTTP file download.

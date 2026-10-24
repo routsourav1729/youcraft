@@ -33,7 +33,17 @@ function Assert-AppClosed {
             Start-Sleep -Seconds 1
         }
         Write-Host ('Still running: ' + (($running | ForEach-Object { "$($_.ProcessName) (PID $($_.Id))" }) -join ', '))
-        Write-Host 'Close these from YouCraft or Task Manager after saving. Your downloaded files are kept.'
+        if (@($running | Where-Object { $_.ProcessName -eq 'YouCraft' }).Count -eq 0) {
+            if ((Read-Host 'YouCraft is closed. Stop its remaining helpers? Any unfinished analysis will stop. [Y/N]') -match '^[yY]') {
+                # Recheck editor state before stopping only helpers from this installation.
+                $remaining = @(Get-UpdateProcesses)
+                if (@($remaining | Where-Object { $_.ProcessName -eq 'YouCraft' }).Count -eq 0) {
+                    $remaining | Stop-Process -ErrorAction SilentlyContinue
+                    continue
+                }
+            }
+        }
+        Write-Host 'Close these from YouCraft after saving. Your downloaded files are kept.'
         if ((Read-Host 'Check again? [Y/N]') -notmatch '^[yY]') {
             throw 'Installation postponed. Downloads are saved for the next attempt.'
         }

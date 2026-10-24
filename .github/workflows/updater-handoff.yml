@@ -1,7 +1,7 @@
 name: Updater handoff regression
 on:
   push:
-    branches: [fix/updater-handoff]
+    branches: [fix/updater-handoff, ama-bartalap]
   workflow_dispatch:
 permissions:
   contents: read
