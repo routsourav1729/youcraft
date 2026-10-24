@@ -1,5 +1,11 @@
+param([string]$InstallDirectory = $PSScriptRoot)
 $ErrorActionPreference = 'Stop'
 $installed = [version]'0.1.11'
+$InstallDirectory = [IO.Path]::GetFullPath($InstallDirectory).TrimEnd('\')
+$installedRecord = Join-Path $InstallDirectory 'installed-files.json'
+if (Test-Path $installedRecord) {
+    $installed = [version](Get-Content $installedRecord -Raw | ConvertFrom-Json).version
+}
 $base = 'https://routsourav1729.github.io/youcraft'
 $directory = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'YouCraft\updates'
 $transaction = Join-Path $directory 'transaction'
@@ -9,10 +15,37 @@ New-Item -ItemType Directory -Force $directory | Out-Null
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 . (Join-Path $PSScriptRoot 'Apply-FileUpdate.ps1')
 
+function Get-UpdateProcesses {
+    @(Get-Process YouCraft,BetunBackend,filmcraft-cli -ErrorAction SilentlyContinue) | Where-Object {
+        $_.Path -and $_.Path.StartsWith($InstallDirectory + '\', [StringComparison]::OrdinalIgnoreCase)
+    }
+}
 function Assert-AppClosed {
-    foreach ($process in @(Get-Process YouCraft,BetunBackend,filmcraft-cli -ErrorAction SilentlyContinue)) {
-        if ($process.Path -and $process.Path.StartsWith($PSScriptRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
-            throw 'Save your project and close YouCraft and its helper before continuing. No processes were terminated.'
+    # WM_CLOSE follows the application's normal save/exit path. Never force-kill the editor.
+    foreach ($process in @(Get-UpdateProcesses)) {
+        if ($process.ProcessName -eq 'YouCraft') { $process.CloseMainWindow() | Out-Null }
+    }
+    Write-Host 'Waiting for YouCraft to close. Finish any save prompt in the app.'
+    while ($true) {
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            $running = @(Get-UpdateProcesses)
+            if ($running.Count -eq 0) { return }
+            Start-Sleep -Seconds 1
+        }
+        Write-Host ('Still running: ' + (($running | ForEach-Object { "$($_.ProcessName) (PID $($_.Id))" }) -join ', '))
+        if (@($running | Where-Object { $_.ProcessName -eq 'YouCraft' }).Count -eq 0) {
+            if ((Read-Host 'YouCraft is closed. Stop its remaining helpers? Any unfinished analysis will stop. [Y/N]') -match '^[yY]') {
+                # Recheck editor state before stopping only helpers from this installation.
+                $remaining = @(Get-UpdateProcesses)
+                if (@($remaining | Where-Object { $_.ProcessName -eq 'YouCraft' }).Count -eq 0) {
+                    $remaining | Stop-Process -ErrorAction SilentlyContinue
+                    continue
+                }
+            }
+        }
+        Write-Host 'Close these from YouCraft after saving. Your downloaded files are kept.'
+        if ((Read-Host 'Check again? [Y/N]') -notmatch '^[yY]') {
+            throw 'Installation postponed. Downloads are saved for the next attempt.'
         }
     }
 }
@@ -46,7 +79,7 @@ try {
     $lock = [IO.File]::Open((Join-Path $directory 'update.lock'), 'OpenOrCreate', 'ReadWrite', 'None')
     if (Test-Path (Join-Path $transaction 'journal.json')) {
         Assert-AppClosed
-        Restore-FileUpdate $PSScriptRoot $transaction
+        Restore-FileUpdate $InstallDirectory $transaction
         Write-Host 'Recovered the previous update. Please run Updates again.'
         return
     }
@@ -62,7 +95,7 @@ try {
     if ($release.version -ne $manifest.version -or @($release.files).Count -eq 0 -or @($release.files).Count -gt 10000) { throw 'Invalid file manifest' }
     $changed = @(); $seen = @{}; $total = 0L
     foreach ($file in $release.files) {
-        $path = Get-SafeUpdatePath $PSScriptRoot $file.path
+        $path = Get-SafeUpdatePath $InstallDirectory $file.path
         if ($seen.ContainsKey($file.path) -or $file.path -eq 'installed-files.json' -or $file.sha256 -notmatch '^[a-f0-9]{64}$' -or $file.download_sha256 -notmatch '^[a-f0-9]{64}$' -or [long]$file.size -lt 0 -or [long]$file.size -gt 1GB -or [long]$file.download_size -le 0 -or [long]$file.download_size -gt 1GB) { throw 'Invalid file metadata' }
         $seen[$file.path] = $true
         if ((Test-Path $path -PathType Leaf) -and (Get-Item $path).Length -eq $file.size -and (Get-FileHash $path -Algorithm SHA256).Hash -eq $file.sha256) { continue }
@@ -72,12 +105,16 @@ try {
     if ($total -gt 2GB) { throw 'Update exceeds supported size' }
     Write-Host "$installed -> $latest : $($changed.Count) changed files, $([math]::Round($total / 1MB, 1)) MB. Models and projects are kept."
     if ((Read-Host 'Download changed files? [Y/N]') -notmatch '^[yY]') { return }
-    if (Test-Path $transaction) { Remove-Item $transaction -Recurse -Force }
     New-Item -ItemType Directory -Force (Join-Path $transaction 'staged') | Out-Null
     Add-Type -AssemblyName System.Net.Http
     $client = New-Object Net.Http.HttpClient
     $client.Timeout = [TimeSpan]::FromMinutes(15)
     foreach ($file in $changed) {
+        $target = Get-SafeUpdatePath (Join-Path $transaction 'staged') $file.path
+        if ((Test-Path $target -PathType Leaf) -and (Get-Item $target).Length -eq $file.size -and (Get-FileHash $target -Algorithm SHA256).Hash -eq $file.sha256) {
+            Write-Host "Reusing verified download: $($file.path)"
+            continue
+        }
         $packed = Join-Path $transaction 'download.gz'
         Receive-VerifiedFile "$base/files/$($file.sha256).gz" $packed $file.download_size $file.download_sha256
         $target = Get-SafeUpdatePath (Join-Path $transaction 'staged') $file.path
@@ -96,7 +133,7 @@ try {
     }
     Write-Progress -Activity 'Downloading changed files' -Completed
     # Only files listed in our previous manifest can be removed.
-    $previous = Join-Path $PSScriptRoot 'installed-files.json'
+    $previous = Join-Path $InstallDirectory 'installed-files.json'
     if (Test-Path $previous) {
         foreach ($old in @((Get-Content $previous -Raw | ConvertFrom-Json).files)) {
             if (-not $seen.ContainsKey($old.path)) { $changed += @{path=$old.path; remove=$true} }
@@ -105,10 +142,10 @@ try {
     $record = Join-Path $transaction 'staged/installed-files.json'
     $release | ConvertTo-Json -Depth 8 | Set-Content $record -Encoding UTF8
     $changed += @{path='installed-files.json'; size=(Get-Item $record).Length; sha256=(Get-FileHash $record -Algorithm SHA256).Hash}
-    Write-Host 'Download verified. Save your project and close YouCraft now.'
+    Write-Host 'Download complete. Save your project. Apply will request a normal YouCraft close and wait for its helper.'
     if ((Read-Host 'Apply update? [Y/N]') -notmatch '^[yY]') { return }
     Assert-AppClosed
-    Install-FileUpdate $PSScriptRoot $transaction $changed
+    Install-FileUpdate $InstallDirectory $transaction $changed
     Write-Host "Updated to $latest. You can reopen YouCraft. Download and backup files have been removed."
 } catch {
     Write-Host "Update stopped: $($_.Exception.Message)" -ForegroundColor Red
@@ -116,7 +153,6 @@ try {
 } finally {
     if ($client) { $client.Dispose() }
     if ($lock) {
-        if ((Test-Path $transaction) -and -not (Test-Path (Join-Path $transaction 'journal.json'))) { Remove-Item $transaction -Recurse -Force -ErrorAction SilentlyContinue }
         $lock.Dispose()
     }
     Read-Host 'Press Enter to close' | Out-Null
