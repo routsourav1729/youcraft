@@ -158,11 +158,9 @@ impl Default for State {
             tolerance: 10.,
             interval: 60.,
             spacing: 15.,
-            cache: std::env::var("LOCALAPPDATA")
+            cache: std::env::var("YOUCRAFT_UI_CACHE_DIR")
                 .map(PathBuf::from)
-                .unwrap_or_else(|_| std::env::temp_dir())
-                .join("YouCraft")
-                .join("media")
+                .unwrap_or_else(|_| std::env::var("LOCALAPPDATA").map(PathBuf::from).unwrap_or_else(|_| std::env::temp_dir()).join("YouCraft").join("media"))
                 .to_string_lossy()
                 .into(),
             assembled: false,
@@ -353,6 +351,26 @@ impl Client {
     }
 }
 impl State {
+    pub(crate) fn save_for_update(&mut self) -> Result<bool, String> {
+        if self.job.is_some() || self.setup.busy() || self.ai_setup.busy() {
+            return Err("Finish analysis or setup before restarting to update.".into());
+        }
+        if self.pending.is_some() {
+            return Ok(false);
+        }
+        if !self.error.is_empty() {
+            return Err(self.error.clone());
+        }
+        if !self.project_id.is_empty() && self.project != self.saved_project {
+            self.save();
+            return Ok(false);
+        }
+        Ok(true)
+    }
+    pub(crate) fn restored_after_update(&mut self) {
+        self.saved_project = self.project.clone();
+        self.setup.check_on_start = false;
+    }
     fn busy(&self) -> bool {
         self.pending.is_some() || self.job.is_some() || self.setup.busy()
     }
@@ -1254,7 +1272,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         ui.spacing_mut().text_edit_width = 520.;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(35, 43, 55);
     }
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         if let Some(logo) = crate::brand::wordmark(ui.ctx(), true) {
             ui.add(
                 egui::Image::new(&logo).uv(egui::Rect::from_min_max(egui::pos2(0.28, 0.20), egui::pos2(0.72, 0.62))).fit_to_exact_size(egui::vec2(36., 36.)),
@@ -1281,22 +1299,19 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 let id = s.project_id.clone();
                 s.start("storage", move |c| c.get(&format!("/v1/projects/{id}/storage")));
             }
-            if button(app, ui, "audio_output", "Audio output") {
-                s.audio_output.open = true;
-            }
-            if button(app, ui, "connect_ai", "Connect AI") {
-                s.setup.ai_open = !s.setup.ai_open;
-            }
-            if button(app, ui, "updates", "Updates") {
-                s.checkpoint_on_exit();
-                match crate::podcast_setup::launch_updater() {
-                    Ok(()) => s.status = "Updater opened. Save your edit before installing.".into(),
-                    Err(error) => s.error = error,
-                }
-            }
             if s.assembled && button(app, ui, "editor", "Editor") {
                 app.set_workspace("Editing");
             }
+        }
+        if button(app, ui, "audio_output", "Audio output") {
+            s.audio_output.open = true;
+        }
+        if button(app, ui, "connect_ai", "Connect AI") {
+            s.setup.ai_open = !s.setup.ai_open;
+        }
+        if button(app, ui, "updates", "Updates") {
+            app.updates.open = true;
+            app.updates.check_requested = true;
         }
     });
     if s.storage.is_object() {

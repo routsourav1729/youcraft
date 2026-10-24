@@ -29,7 +29,7 @@ function Restore-FileUpdate($Root, $Transaction) {
     Remove-Item $Transaction -Recurse -Force
 }
 
-function Install-FileUpdate($Root, $Transaction, $Files) {
+function Install-FileUpdate($Root, $Transaction, $Files, [switch]$AwaitHealth) {
     if (Test-Path (Join-Path $Transaction 'journal.json')) { throw 'Recover the previous transaction first' }
     $journal = @()
     foreach ($file in $Files) {
@@ -58,10 +58,10 @@ function Install-FileUpdate($Root, $Transaction, $Files) {
                 Copy-Item (Get-SafeUpdatePath (Join-Path $Transaction 'staged') $file.path) $target -Force
             }
         }
-        Set-Content (Join-Path $Transaction 'committed') 'ok'
+        if (-not $AwaitHealth) { Set-Content (Join-Path $Transaction 'committed') 'ok' }
     } catch {
         Restore-FileUpdate $Root $Transaction
         throw
     }
-    Restore-FileUpdate $Root $Transaction
+    if (-not $AwaitHealth) { Restore-FileUpdate $Root $Transaction }
 }

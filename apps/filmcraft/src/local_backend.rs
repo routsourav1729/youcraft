@@ -40,9 +40,14 @@ fn start_at(directory: Option<&std::path::Path>) -> LocalBackend {
         process::{Command, Stdio},
     };
     let mut backend = LocalBackend { connection: Connection::default(), child: None };
-    backend.connection.endpoint = "http://127.0.0.1:8765".into();
+    let development_endpoint = std::env::var("YOUCRAFT_BACKEND_URL").ok();
+    backend.connection.endpoint = development_endpoint.clone().unwrap_or_else(|| "http://127.0.0.1:8765".into());
     backend.connection.token = filmcraft_ui_egui::podcast::local_token();
     if filmcraft_ui_egui::podcast::helper_available(&backend.connection.endpoint) {
+        return backend;
+    }
+    if development_endpoint.is_some() {
+        backend.connection.error = "Development helper unavailable. Start the source backend before the editor.".into();
         return backend;
     }
     let result = (|| -> Result<std::process::Child, String> {

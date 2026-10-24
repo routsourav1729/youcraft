@@ -88,6 +88,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, p: PanelKind, rect: Rect)
         PanelKind::AudioMeters => meters::show(app, ui, rect),
         PanelKind::LumetriColor => lumetri::show(app, ui, rect),
         PanelKind::Properties if graphics::graphic_selected(app) => graphics::properties(app, ui, rect),
+        PanelKind::Properties if text::caption_selected(app) => text::caption_properties(app, ui, rect),
         PanelKind::Properties => effect_controls::properties_panel(app, ui, rect),
         PanelKind::EssentialGraphics => graphics_templates::essential_graphics(app, ui, rect),
         PanelKind::History => misc::history(app, ui, rect),
@@ -178,6 +179,14 @@ pub fn dragged_project_item(ui: &egui::Ui) -> Option<ItemId> {
     match payload(ui) {
         Some(DragPayload::Item(i)) => Some(i),
         Some(DragPayload::Source(s)) => Some(s.item),
+        _ => None,
+    }
+}
+/// An item dragged from the Project panel (or the Media Browser), but not a Source Monitor drag,
+/// whose In/Out range and video/audio choice only a timeline drop keeps.
+pub fn dragged_panel_item(ui: &egui::Ui) -> Option<ItemId> {
+    match payload(ui) {
+        Some(DragPayload::Item(i)) => Some(i),
         _ => None,
     }
 }

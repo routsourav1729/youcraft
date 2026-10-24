@@ -21,7 +21,9 @@ def check(executable, tools_only=False, timeout=15):
 
         def read():
             while not stopped.is_set():
-                line = process.stdout.readline(1024 * 1024)
+                # A real episode includes transcript and reaction measurements. Do not split
+                # its JSON response at the old 1 MiB boundary and report invalid JSON.
+                line = process.stdout.readline(16 * 1024 * 1024 + 1)
                 try:
                     replies.put(line, timeout=1)
                 except queue.Full:
@@ -46,6 +48,8 @@ def check(executable, tools_only=False, timeout=15):
                     raise RuntimeError(f'MCP did not answer {method}. Keep YouCraft open and retry.') from None
                 if not line:
                     raise RuntimeError('MCP executable stopped before replying.')
+                if len(line) > 16 * 1024 * 1024 or not line.endswith(b'\n'):
+                    raise RuntimeError('MCP response exceeded the supported 16 MiB limit.')
                 reply = json.loads(line)
                 if reply.get('error'):
                     raise RuntimeError(f'MCP error: {reply["error"]}')

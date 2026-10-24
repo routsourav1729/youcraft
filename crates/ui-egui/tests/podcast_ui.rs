@@ -352,7 +352,15 @@ fn startup_lands_on_clean_projects_screen() {
         harness.step();
     }
     assert!(harness.state().auto.find("podcast.new_project").is_some());
-    assert!(harness.state().auto.find("podcast.connect_ai").is_none());
+    for id in ["podcast.models", "podcast.audio_output", "podcast.connect_ai", "podcast.updates"] {
+        assert!(harness.state().auto.find(id).is_some(), "Home must expose {id}");
+    }
+    assert!(harness.state().auto.find("podcast.project_folder").is_none());
+    click_workflow(&mut harness, "podcast.audio_output");
+    assert!(harness.state().podcast.audio_output.open);
+    assert!(harness.state().podcast.projects_open);
+    harness.state_mut().podcast.audio_output.open = false;
+    harness.step();
     if let Some(dir) = screenshots {
         std::fs::create_dir_all(&dir).unwrap();
         harness.render().unwrap().save(dir.join("projects-home.png")).unwrap();

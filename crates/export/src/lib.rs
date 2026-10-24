@@ -406,6 +406,10 @@ pub struct ExportSettings {
     /// writing `path` (hosts without a filesystem: the web app offers the file as a download).
     #[serde(skip)]
     pub sink: Option<OutputSink>,
+    /// An already-created primary output file. Internal callers use this to retain an exclusive
+    /// reservation made while choosing an output name, rather than reopening that path later.
+    #[serde(skip)]
+    pub output_file: Option<Arc<std::fs::File>>,
 }
 
 /// Receives in-memory export output: `(path, bytes)` per finished file.
@@ -432,6 +436,10 @@ enum Out {
 
 impl Out {
     fn create(settings: &ExportSettings) -> Result<Out> {
+        if let Some(file) = &settings.output_file {
+            let file = file.try_clone().map_err(|e| ExportError::Io(e.to_string()))?;
+            return Ok(Out::File(std::io::BufWriter::new(file)));
+        }
         Out::create_path(settings, &settings.path)
     }
 
@@ -439,6 +447,12 @@ impl Out {
     fn create_path(settings: &ExportSettings, path: &str) -> Result<Out> {
         if settings.sink.is_some() {
             return Ok(Out::Mem(std::io::Cursor::new(Vec::new())));
+        }
+        if path == settings.path
+            && let Some(file) = &settings.output_file
+        {
+            let file = file.try_clone().map_err(|e| ExportError::Io(e.to_string()))?;
+            return Ok(Out::File(std::io::BufWriter::new(file)));
         }
         let f = std::fs::File::create(path).map_err(|e| ExportError::Io(format!("{path}: {e}")))?;
         Ok(Out::File(std::io::BufWriter::new(f)))
@@ -520,11 +534,10 @@ impl ColorSignal {
         if self.matrix == 9 { (0.2627, 0.0593) } else { (0.2126, 0.0722) }
     }
     /// Sample-entry boxes: `colr` (nclx for MP4, nclc for MOV) plus `mdcv`/`clli` for PQ
-    /// (mastering display BT.2020/D65, 1000/0.0001 cd/m²; MaxCLL/MaxFALL 0 = unknown).
+    /// (mastering display BT.2020/D65, 1000/0.0001 cd/m²; MaxCLL/MaxFALL 0 = unknown). SDR gets
+    /// its `colr` too: Apple's media stack (QuickTime Player, Final Cut Pro) reads the colour of
+    /// ProRes, DNxHR and APV only from this box, not from their frame headers (#2142).
     pub fn apply_to(&self, e: &mut SampleEntry, mov: bool) {
-        if !self.is_hdr() {
-            return;
-        }
         if let Some(v) = e.video.as_mut() {
             let (p, t, m) = (self.primaries as u16, self.transfer as u16, self.matrix as u16);
             v.color = Some(if mov {
@@ -589,6 +602,7 @@ impl Default for ExportSettings {
             h264_pass: H264Pass::Single,
             signal: ColorSignal::default(),
             sink: None,
+            output_file: None,
         }
     }
 }

@@ -8,6 +8,7 @@
 //! (the demo project), Open Most Recent, or an empty project.
 //!
 //! `--control <port>` (or `FILMCRAFT_CONTROL_PORT`) starts a localhost JSON-lines control server;
+//! `FILMCRAFT_CONTROL_TOKEN` is required (see `docs/control-protocol.md`).
 //! see `filmcraft_ui_egui::control` for the methods. A port that is not a number is an error from
 //! either source.
 //!
@@ -123,6 +124,9 @@ fn main() -> eframe::Result {
     }
     let started = loop {
         let mut options = native_options(launch.control_port.is_some());
+        if let Some(root) = launch.data_dir.clone().or_else(|| std::env::var_os("FILMCRAFT_DATA_DIR").map(std::path::PathBuf::from)) {
+            options.persistence_path = Some(root.join("ui"));
+        }
         // Before eframe creates the wgpu instance (e.g. no OpenGL on Windows, see graphics.rs).
         graphics::apply(&mut options, graphics.mode(), backend_override);
         let app_created = Arc::new(AtomicBool::new(false));
@@ -162,10 +166,10 @@ fn main() -> eframe::Result {
 fn native_options(agent: bool) -> eframe::NativeOptions {
     eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("YouCraft")
+            .with_title(if std::env::var_os("YOUCRAFT_BACKEND_URL").is_some() { "YouCraft · Source development" } else { "YouCraft" })
             .with_inner_size([1280.0, 720.0])
             .with_maximized(true)
-            .with_min_inner_size([960.0, 600.0])
+            .with_min_inner_size([640.0, 400.0])
             .with_drag_and_drop(true)
             .with_fullsize_content_view(true)
             .with_titlebar_shown(false)
@@ -175,6 +179,10 @@ fn native_options(agent: bool) -> eframe::NativeOptions {
             // Wayland matches the window to `packaging/linux/ai.storyteller.filmcraft.desktop`.
             .with_app_id(APP_ID),
         event_loop_builder: agent_event_loop(agent),
+        // A saved physical window rectangle can exceed a laptop's logical work area
+        // after Windows changes its DPI. Start maximized on the current monitor.
+        persist_window: false,
+        window_builder: Some(Box::new(|builder| builder.with_position([0.0, 0.0]).with_inner_size([1280.0, 720.0]).with_maximized(true))),
         ..Default::default()
     }
 }
@@ -200,6 +208,8 @@ fn app_creator(
             "graphics-start",
             Arc::new(move |ui| {
                 if ui.ctx().cumulative_frame_nr() >= 2 && !confirmed.swap(true, Ordering::Relaxed) {
+                    #[cfg(windows)]
+                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Maximized(true));
                     graphics.confirm();
                 }
             }),
@@ -242,6 +252,9 @@ fn app_creator(
             app.podcast.setup.check_on_start = !has_edit;
         }
         startup_workspace(&mut app, has_edit);
+        if let Err(error) = filmcraft_ui_egui::updates::restore(&mut app) {
+            app.podcast.error = format!("Update session restore failed: {error}");
+        }
         app.graphics_notice = notice;
         if recover == Some(false) {
             app.dialog = None;

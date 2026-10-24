@@ -1,12 +1,24 @@
 """Fast check against the actual installed UI; no extra Rust test executable or models."""
+import hashlib
 import json
+from pathlib import Path
+import os
 import socket
 import time
 
 
+def control_token():
+    explicit = os.environ.get("FILMCRAFT_CONTROL_TOKEN")
+    if explicit:
+        return explicit
+    root = Path(os.environ.get("BETUN_DATA_DIR", str(Path(os.environ["LOCALAPPDATA"]) / "Betun")))
+    secret = (root / "api-token").read_text(encoding="utf-8").strip()
+    return hashlib.sha256(b"youcraft-control-v1\0" + secret.encode()).hexdigest()
+
+
 def ask(method, **params):
     with socket.create_connection(('127.0.0.1', 9876), timeout=15) as connection:
-        connection.sendall((json.dumps(dict(method=method, params=params))+'\n').encode())
+        connection.sendall((json.dumps(dict(method=method, params=params, token=control_token()))+'\n').encode())
         result = json.loads(connection.makefile('rb').readline())
     assert result.get('ok'), result
     return result['result']

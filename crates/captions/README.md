@@ -23,6 +23,14 @@ All cue times are exact `Tick`s. Milliseconds convert exactly (1 ms = 254 016 00
 frames map through `FrameRate::FPS_29_97`. `Document::snap_to_frames` snaps cues to a sequence's
 frame grid (the engine does this on import) and removes overlaps.
 
+### TTML tick timing
+
+When `ttp:tickRate` is omitted and `ttp:frameRate` is present, tick offsets use the effective
+frame rate (`frameRate` times `frameRateMultiplier`) times `subFrameRate`. The rate stays
+rational, so a 30-tick offset at 30 times 1000/1001 fps is exactly 1.001 seconds. An explicit
+`tickRate` takes precedence; without `frameRate`, the default is one tick per second.
+This follows [W3C TTML1, third edition (2018), §6.2.10](https://www.w3.org/TR/2018/REC-ttml1-20181108/#parameter-attribute-tickRate).
+
 ### TTML speaker metadata
 
 TTML and DFXP exports define each distinct speaker label once in the document head and refer to
@@ -77,7 +85,7 @@ implementation's code was consulted.
 
 - Unit tests per module (timestamps, decoding, sloppy SRT, WebVTT blocks and voices, CEA-608
   tables, PAC round trips, known SCC pop-on and roll-up streams, layout).
-- `tests/roundtrip.rs`: property tests — SRT (also with BOM + CRLF), WebVTT (ids, speakers,
+- `tests/it/roundtrip.rs`: property tests — SRT (also with BOM + CRLF), WebVTT (ids, speakers,
   settings, STYLE blocks), SCC and MCC (drop-frame and non-drop, gaps and back-to-back captions;
   MCC also through CEA-708 alone), EBU STL (25 and 29.97 fps, accents, extension blocks), TTML
   (23.976 / 25 / 29.97 / 59.94, ids, speakers) round-trip frame-exactly; DFXP round-trips after

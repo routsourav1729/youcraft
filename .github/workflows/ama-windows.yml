@@ -29,6 +29,12 @@ jobs:
       FILMCRAFT_REQUIRE_WINRES: 1
     steps:
       - uses: actions/checkout@v4
+      - name: Release version
+        shell: pwsh
+        run: |
+          $version = (Get-Content packaging/youcraft-version.txt -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid release version' }
+          "YOUCRAFT_VERSION=$version" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -43,6 +49,8 @@ jobs:
           }
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/file-update.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Incremental updater regression failed' }
+          & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/background-update.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Background update regression failed' }
       - name: External media test tools
         shell: pwsh
         run: |
@@ -160,6 +168,14 @@ jobs:
           Copy-Item ama-backend/packaging/models-3050.example.json release/YouCraft/
           Copy-Item ama-backend/docs/models.md release/YouCraft/MODEL-SETUP.md
           Copy-Item ama-backend/scripts/download_models.py,ama-backend/scripts/configure_local_models.py,ama-backend/scripts/setup_vision.py release/YouCraft/
+      - name: Build incremental update files
+        shell: pwsh
+        run: |
+          python packaging/build_updates.py release/YouCraft release/incremental $env:YOUCRAFT_VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          . ./packaging/ama/Apply-FileUpdate.ps1
+          $manifest = Get-Content "release/incremental/files-$env:YOUCRAFT_VERSION.json" -Raw | ConvertFrom-Json
+          foreach ($file in $manifest.files) { Get-SafeUpdatePath "$env:GITHUB_WORKSPACE/release/YouCraft" $file.path | Out-Null }
       - name: Build Windows installer
         shell: pwsh
         run: |
@@ -168,16 +184,8 @@ jobs:
             choco install innosetup --no-progress -y
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          & $compiler "/DRepoRoot=$env:GITHUB_WORKSPACE" packaging/ama-installer.iss
+          & $compiler "/DRepoRoot=$env:GITHUB_WORKSPACE" "/DYouCraftVersion=$env:YOUCRAFT_VERSION" packaging/ama-installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Build incremental update files
-        shell: pwsh
-        run: |
-          python packaging/build_updates.py release/YouCraft release/incremental 0.1.11
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          . ./packaging/ama/Apply-FileUpdate.ps1
-          $manifest = Get-Content release/incremental/files-0.1.11.json -Raw | ConvertFrom-Json
-          foreach ($file in $manifest.files) { Get-SafeUpdatePath "$env:GITHUB_WORKSPACE/release/YouCraft" $file.path | Out-Null }
       - uses: actions/upload-artifact@v4
         with:
           name: YouCraft-Incremental
@@ -272,3 +280,45 @@ jobs:
         with:
           name: YouCraft-UI-check
           path: release/ui-check/
+
+  publish:
+    needs: windows
+    if: github.ref == 'refs/heads/ama-bartalap' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+      - uses: actions/checkout@v4
+        with:
+          ref: downloads
+          path: site
+      - uses: actions/download-artifact@v4
+        with:
+          name: YouCraft-Incremental
+          path: incremental
+      - uses: actions/download-artifact@v4
+        with:
+          name: YouCraft-Windows
+          path: installer
+      - name: Validate and publish the verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(cat source/packaging/youcraft-version.txt | tr -d '\r\n')
+          python source/packaging/publish_update.py incremental installer/YouCraft-Setup-x64.exe site "$version"
+          gh release create "v${version}-preview.1" installer/YouCraft-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "YouCraft $version" --notes-file source/docs/RELEASE-0.1.12.md
+          git -C site config user.name 'github-actions[bot]'
+          git -C site config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git -C site add .
+          git -C site commit -m "Publish verified YouCraft $version ($GITHUB_SHA)"
+          git -C site push origin HEAD:downloads
+          # GITHUB_TOKEN pushes do not automatically trigger a Pages build.
+          gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"
+      - name: Confirm the public update feed
+        run: |
+          python source/packaging/verify_update_feed.py "$(cat source/packaging/youcraft-version.txt | tr -d '\r\n')"

@@ -181,6 +181,9 @@ pub fn launch_updater() -> Result<(), String> {
         let exe = std::env::current_exe().map_err(|e| e.to_string())?;
         let script = exe.parent().ok_or("Missing app folder")?.join("Update-YouCraft.ps1");
         if !script.is_file() {
+            if std::env::var_os("YOUCRAFT_BACKEND_URL").is_some() {
+                return Err("Source development build: update the Git checkout and rebuild. Use the installed YouCraft app to update your installation.".into());
+            }
             return Err("Updater missing. Install the latest YouCraft once.".into());
         }
         Command::new("powershell.exe")
