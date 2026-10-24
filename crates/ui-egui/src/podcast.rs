@@ -63,6 +63,10 @@ pub struct State {
     pub browser: Vec<Value>,
     pub destination: usize,
     pub samples: Vec<Value>,
+    #[serde(skip)]
+    sample_speaker: String,
+    #[serde(skip)]
+    sample_active: bool,
     pub job: Option<String>,
     pub job_kind: String,
     pub status: String,
@@ -165,6 +169,8 @@ impl Default for State {
             browser: vec![],
             destination: 0,
             samples: vec![],
+            sample_speaker: String::new(),
+            sample_active: false,
             job: None,
             job_kind: String::new(),
             status: String::new(),
@@ -1032,6 +1038,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                     }
                 }
                 "play" => {
+                    if s.job_kind == "sample" && s.step != 2 {
+                        s.sample_active = false;
+                        return;
+                    }
                     s.review_active = false;
                     app.stop();
                     let result = app.session.execute("file.import", json!({"paths":[value["path"]]}));
@@ -1044,7 +1054,12 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                         app.session.execute("source.open", json!({"item":item}))
                     }) {
                         Ok(_) => {
-                            app.show_panel(PanelKind::Source);
+                            if s.job_kind == "sample" {
+                                s.sample_active = true;
+                                app.ui.focused = PanelKind::Podcast;
+                            } else {
+                                app.show_panel(PanelKind::Source);
+                            }
                             app.source_playback.clock.looping = false;
                             if s.job_kind != "reference_frame"
                                 && let Err(e) = app.play_source()
@@ -1324,6 +1339,13 @@ pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
     }
     s.audio_output.tick(app, ctx);
     poll(app, &mut s);
+    if s.sample_active && (s.step != 2 || s.projects_open) {
+        app.stop_source();
+        s.sample_active = false;
+    }
+    if s.sample_active && app.ui.status.starts_with("Source audio") {
+        s.error = app.ui.status.clone();
+    }
     if let Some(text) = s.diagnostics_text.take() {
         ctx.copy_text(text);
     }
@@ -1710,7 +1732,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 1 => true,
                 2 => number(&s.project, "duration") > 0.,
                 3 => s.project["settings"]["roles_locked"] == true,
-                4 => !rows(&s.project, "activity").is_empty() || !rows(&s.project, "captions").is_empty(),
+                4 => {
+                    let cameras = rows(&s.project, "clips");
+                    let cameras: Vec<_> = cameras.iter().filter(|c| c["camera"] == "A" || c["camera"] == "B").collect();
+                    s.project["settings"]["roles_locked"] == true && !cameras.is_empty() && cameras.iter().all(|c| c["sync_reviewed"] == true)
+                }
                 5 => !rows(&s.project, "shots").is_empty() || rows(&s.project, "clips").iter().any(|c| c["camera"] != "master"),
                 _ => s.assembled || !rows(&s.project, "shots").is_empty(),
             };
@@ -1721,6 +1747,10 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                     s.save();
                 }
                 let from_cameras = s.step == 3;
+                if s.sample_active {
+                    app.stop_source();
+                    s.sample_active = false;
+                }
                 s.step = i;
                 s.remember_view();
                 if matches!(i, 3..=5)
@@ -2405,8 +2435,21 @@ fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 });
                 ui.add_space(12.);
                 ui.label(format!("{:.0}–{:.0}s", number(row, "start"), number(row, "end")));
-                if button(app, ui, &format!("listen.{speaker}"), "Play sample") {
-                    sample(s, number(row, "start"), number(row, "end"));
+                let playing = s.sample_active && s.sample_speaker == speaker && app.source_playback.clock.playing;
+                ui.add_enabled_ui(!s.busy(), |ui| {
+                    if button(app, ui, &format!("listen.{speaker}"), if playing { "Stop sample" } else { "Play sample" }) {
+                        app.stop_source();
+                        s.sample_active = false;
+                        if !playing {
+                            s.sample_speaker = speaker.clone();
+                            sample(s, number(row, "start"), number(row, "end"));
+                        }
+                    }
+                });
+                if playing {
+                    let elapsed = app.session.state.source_playhead.seconds();
+                    let duration = (number(row, "end") - number(row, "start")).max(0.001);
+                    ui.add(egui::ProgressBar::new((elapsed / duration).clamp(0., 1.) as f32).text(format!("{elapsed:.1} / {duration:.1}s")));
                 }
                 let r = ui.selectable_label(host, "Choose as host");
                 app.auto.add_response(&format!("podcast.host.{speaker}"), &r, "Choose host");

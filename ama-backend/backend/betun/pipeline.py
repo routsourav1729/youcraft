@@ -91,7 +91,7 @@ def process(store, project, kind, options, directory, cancel, progress):
             raise ValueError('Sample must lie inside the recording')
         destination = directory / 'voice-sample.wav'
         media.run([media.binary('ffmpeg'), '-v', 'error', '-nostdin', '-y', '-ss', str(start),
-                   '-i', master.path, '-t', str(end - start), '-vn', '-ac', '1', '-ar', '16000',
+                   '-i', master.path, '-t', str(end - start), '-vn', '-ac', '2', '-ar', '48000',
                    str(destination)], cancel)
         return dict(files=[destination.name], start=start, end=end)
     if kind == 'attach_cameras':

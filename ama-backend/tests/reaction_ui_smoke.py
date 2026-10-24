@@ -40,6 +40,21 @@ ready()
 ask('podcast.configure',name='Reaction layout check',master=str(media/'master.wav'),camera_a=[str(media/'host.mp4')],camera_b=[str(media/'guest.mp4')])
 ask('podcast.action',action='create',options={'identify':False})
 ready(lambda s:s['project'].get('duration',0)>0)
+# A voice audition must stay on Speakers before any camera is attached.
+ask('podcast.review',activity=[dict(id='sample-host',start=0,end=4,speaker='host')])
+ready()
+ask('ui.set',podcastStep=2)
+ask('podcast.action',action='samples')
+ready(lambda s:bool(s['samples']))
+ask('ui.click',id='podcast.step.4')
+assert ask('podcast.inspect')['step']==2, 'Transcript opened before cameras were ready'
+ask('ui.click',id='podcast.listen.host')
+ready()
+ui=ask('ui.inspect')
+assert ui['ui']['workspace']=='Podcast' and ui['ui']['focused']=='Podcast',ui
+assert any(e['label']=='Stop sample' for e in ask('ui.elements',prefix='podcast.listen.'))
+ask('ui.click',id='podcast.listen.host')
+assert not ask('ui.inspect')['sourcePlayback']['playing']
 ask('podcast.action',action='attach_cameras')
 state=ready(lambda s:len(s['project']['clips'])==3)
 p=state['project'];settings=p['settings']
