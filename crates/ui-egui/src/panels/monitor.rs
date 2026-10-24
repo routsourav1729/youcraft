@@ -26,12 +26,20 @@ pub enum Which {
 }
 
 pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
+    show_with_mode(app, ui, rect, which, false);
+}
+
+pub fn show_guided(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which) {
+    show_with_mode(app, ui, rect, which, true);
+}
+
+fn show_with_mode(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which, guided: bool) {
     let t = app.tokens;
     let ctx = ui.ctx().clone();
     let stacked_controls = rect.width() < 540.0;
     let separate_source_drag = which == Which::Source && stacked_controls && rect.width() < 310.0;
     let source_drag_h = if separate_source_drag { 26.0 } else { 0.0 };
-    let compact = app.ui.workspace == "Podcast" && which == Which::Program;
+    let compact = guided && which == Which::Program;
     let controls_h = if compact { 60.0 } else { 28.0 + 24.0 + 15.0 + 36.0 + if stacked_controls { 26.0 } else { 0.0 } + source_drag_h };
     let video_area = Rect::from_min_max(rect.min + vec2(4.0, 4.0), pos2(rect.max.x - 4.0, rect.max.y - controls_h));
     // the Source monitor's time ruler starts at `origin` (a subclip restricted to its range)
@@ -328,7 +336,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
         follow_playhead(app, which, origin, duration, time);
         mini_timeline(app, ui, bar, which, origin, time, duration, rate, mark_in, mark_out);
         let row = Rect::from_min_size(pos2(rect.left(), rect.bottom() - 34.), vec2(rect.width(), 32.));
-        transport(app, ui, row, which);
+        transport(app, ui, row, which, guided);
         let clock = format_time(time, rate, drop_frame, TimeDisplay::Timecode, 48000);
         ui.painter().text(pos2(row.left() + 14., row.center().y), Align2::LEFT_CENTER, clock, Tokens::timecode(), t.timecode);
         let zoom = Rect::from_min_size(pos2(row.right() - 112., row.top() + 3.), vec2(70., 24.));
@@ -463,7 +471,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect, which: Which)
 
     // ---- transport buttons
     let row3 = Rect::from_min_size(pos2(rect.min.x, zoom_bar.max.y + 4.0), vec2(rect.width(), 32.0));
-    transport(app, ui, row3, which);
+    transport(app, ui, row3, which, guided);
 }
 
 /// How many of a paused monitor's latest requests are remembered ([`asked_before`]): about a
@@ -924,7 +932,7 @@ fn set_transport_visible(hidden: &mut Vec<String>, command: &str, visible: bool)
 /// Width and height of a transport button.
 const TRANSPORT_BUTTON: f32 = 28.0;
 
-fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which) {
+fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which, guided: bool) {
     let t = app.tokens;
     let src = which == Which::Source;
     let buttons: Vec<(Icon, &str, &str)> = if src {
@@ -962,11 +970,16 @@ fn transport(app: &mut FilmcraftApp, ui: &mut egui::Ui, row: Rect, which: Which)
     if !src {
         buttons.push((Icon::Loop, "playback.loop", tl!("Loop")));
     }
+    if guided {
+        buttons.retain(|(_, command, _)| {
+            matches!(*command, "playhead.stepBack" | "playback.toggle" | "playhead.stepForward" | "src.stepBack" | "source.playback.toggle" | "src.stepFwd")
+        });
+    }
     let hidden = monitor_view::view(app, which).transport_hidden.clone();
     let all_buttons = buttons.clone();
     buttons.retain(|(_, command, _)| transport_visible(&hidden, command));
     let prefix = if src { "source" } else { "program" };
-    if row.width() >= 30.0 {
+    if !guided && row.width() >= 30.0 {
         // Keep the existing button-editor affordance only when it has its own space.
         // Customize this monitor's transport separately from the other monitor.
         let r = Rect::from_min_size(pos2(row.max.x - 30.0, row.min.y + 5.0), vec2(22.0, 22.0));

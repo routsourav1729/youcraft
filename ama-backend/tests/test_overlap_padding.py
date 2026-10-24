@@ -9,6 +9,8 @@ def episode():
     p.settings.speaker_camera = {'host':'A', 'guest':'B'}
     p.settings.minimum_shot = 0
     p.settings.acknowledgement = 0
+    p.settings.overlap_padding = 2
+    p.settings.meaningful_overlap = .6
     return p
 
 

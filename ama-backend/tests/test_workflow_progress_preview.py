@@ -63,4 +63,7 @@ def test_lightweight_reactions_do_not_import_torch(tmp_path, monkeypatch):
     request = tmp_path / 'request.json'
     request.write_text(json.dumps(dict(task='reactions', payload={}, config=dict(provider='mediapipe-reference', model_path=str(tmp_path), device='cpu'))))
     main(str(request), str(tmp_path / 'result.json'))
-    assert json.loads((tmp_path / 'result.json').read_text(encoding="utf-8")) == {'candidates':[]}
+    result = json.loads((tmp_path / 'result.json').read_text(encoding="utf-8"))
+    assert result['candidates'] == []
+    assert isinstance(result.get('_resources'), dict)
+    assert sys.modules['torch'] is None

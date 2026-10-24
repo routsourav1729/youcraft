@@ -75,9 +75,9 @@ class Settings(Model):
     host_speaker: str | None = None
     roles_locked: bool = False
     minimum_shot: float = Field(default=4, ge=0, le=30)
-    meaningful_overlap: float = Field(default=0.6, ge=0, le=10)
+    meaningful_overlap: float = Field(default=0, ge=0, le=10)
     acknowledgement: float = Field(default=0.7, ge=0, le=5)
-    overlap_padding: float = Field(default=2, ge=0, le=5)
+    overlap_padding: float = Field(default=1, ge=0, le=5)
     overlap_before: float | None = Field(default=None, ge=0, le=5)
     overlap_after: float | None = Field(default=None, ge=0, le=5)
     speaker_camera: dict[str, Literal["A", "B"]] = Field(default_factory=lambda: {"SPEAKER_00": "A", "SPEAKER_01": "B"})

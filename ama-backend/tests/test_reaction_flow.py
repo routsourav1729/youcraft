@@ -74,6 +74,35 @@ def test_pending_preview_shows_candidate_without_accepting_it():
     assert next(v for v in span['video'] if v['side']=='review-top-full')['asset']=='guest'
 
 
+def test_fragmented_guest_sentence_allows_reaction_but_host_and_long_silence_do_not():
+    from betun.schema import Activity
+    from betun.podcast import eligible
+    p = episode()
+    p.activity = [Activity(start=12,end=16,speaker='SPEAKER_01'),
+                  Activity(start=16.8,end=20,speaker='SPEAKER_01')]
+    assert eligible(p, 14, 19)
+    p.activity.append(Activity(start=17,end=17.05,speaker='SPEAKER_00'))
+    assert not eligible(p, 14, 19)
+    p.activity.pop()
+    p.activity[1].start = 18
+    assert not eligible(p, 14, 19)
+
+
+def test_proposed_output_previews_pending_and_keeps_split_screen_priority():
+    from betun.schema import Reaction, Shot
+    from betun.podcast import TICKS
+    p = episode()
+    p.reactions = [Reaction(id='pending',start=20,end=24,clip_id='host',score=.9,cues=['smile'])]
+    proposed = review_manifest(p, edit=True, include_pending=True)
+    span = next(s for s in proposed['clips'] if s['start']==20*TICKS)
+    assert next(v for v in span['video'] if v['side']=='review-top-full')['asset']=='host'
+    assert p.reactions[0].decision == 'pending'
+    p.shots = [Shot(start=0,end=60,layout='both')]
+    split = review_manifest(p, edit=True, include_pending=True)
+    span = next(s for s in split['clips'] if s['start']==20*TICKS)
+    assert {v['side'] for v in span['video'] if v['side'].startswith('review-top')} == {'review-top-A','review-top-B'}
+
+
 def test_worker_preserves_good_reference_when_another_shard_has_no_face(monkeypatch):
     import sys
     from types import SimpleNamespace as NS

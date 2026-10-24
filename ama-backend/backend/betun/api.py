@@ -220,7 +220,11 @@ def create_app(root=None, token=None):
 
     @app.get('/v1/projects')
     def projects():
-        return [dict(id=p['id'], name=p['name'], revision=p['revision'], duration=p['duration'], project_folder=str(store.directory(p['id']))) for p in store.list()]
+        return [dict(id=p['id'], name=p['name'], revision=p['revision'], duration=p['duration'],
+                     stage='Reactions' if p.get('shots') else 'Transcript' if p.get('captions') else 'Speakers' if p.get('activity') else 'Audio',
+                     native_project=p.get('reaction_calibration', {}).get('native_project'),
+                     native_ready=p.get('reaction_calibration', {}).get('native_ready', False),
+                     project_folder=str(store.directory(p['id']))) for p in store.list()]
 
     @app.get('/v1/projects/{pid}')
     def get(pid: str):
@@ -328,6 +332,11 @@ def create_app(root=None, token=None):
         home.mkdir(parents=True, exist_ok=True)
         return dict(projects_home=str(home), database=str(store.db), data_root=str(store.root))
 
+    @app.post('/v1/storage')
+    def set_storage_home(body: StorageFolder):
+        store.set_project_home(body.path)
+        return storage_locations()
+
     @app.get('/v1/projects/{pid}/storage')
     def project_storage(pid: str):
         return store.storage(pid)
@@ -362,9 +371,9 @@ def create_app(root=None, token=None):
         return playback_plan(pid, manifest(store.get(pid)))
 
     @app.get('/v1/projects/{pid}/review-plan')
-    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None, reaction_id: str | None = None):
+    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None, reaction_id: str | None = None, include_pending: bool = False):
         from .podcast import review_manifest
-        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id, reaction_id))
+        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id, reaction_id, include_pending))
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):

@@ -42,4 +42,5 @@ def test_old_nvidia_auto_config_never_silently_chooses_cpu(tmp_path, monkeypatch
     assert len(seen) == 1
     assert seen[0]['device'] == 'cuda'
     assert seen[0]['allow_cpu_fallback'] is False
-    assert not list(tmp_path.glob('model-*.json'))
+    # Bounded diagnostics survive failures; temporary worker requests do not.
+    assert not [p for p in tmp_path.glob('model-*.json') if p.name != 'model-diagnostics.json']

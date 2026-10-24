@@ -1459,7 +1459,11 @@ impl FilmcraftApp {
                 let cmd = if id == "file.saveCopy" { "file.saveCopy" } else { "file.saveAs" };
                 self.pick(FileDialog::SaveProject { name: suggested }, move |app, paths| {
                     let Some(path) = paths.into_iter().next() else { return Ok(Value::Null) };
-                    app.session.execute(cmd, json!({"path": path})).map_err(|e| e.to_string())
+                    let result = app.session.execute(cmd, json!({"path": path})).map_err(|e| e.to_string())?;
+                    if cmd == "file.saveAs" {
+                        app.podcast.native_saved_as(&path);
+                    }
+                    Ok(result)
                 })
             }
             "file.open" => self.pick(FileDialog::OpenProject, |app, paths| {
@@ -1549,7 +1553,7 @@ impl FilmcraftApp {
             }
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if !paths.is_empty() && self.ui.workspace == "Podcast" && !self.podcast.assembled {
+        if !paths.is_empty() && self.ui.workspace == "Podcast" && (!self.podcast.assembled || self.podcast.projects_open) {
             self.podcast.add_files(paths);
             return;
         }
@@ -1945,7 +1949,7 @@ impl FilmcraftApp {
         match self.ui.mode {
             state::Mode::Edit => {
                 #[cfg(not(target_arch = "wasm32"))]
-                if self.ui.workspace == "Podcast" && !self.podcast.assembled {
+                if self.ui.workspace == "Podcast" && (!self.podcast.assembled || self.podcast.projects_open) {
                     let width = body.width();
                     let centered = egui::Rect::from_center_size(body.center(), egui::vec2(width, body.height()));
                     crate::podcast::show(self, ui, centered);
@@ -2049,7 +2053,7 @@ impl FilmcraftApp {
 
     /// Contextual hint for the status bar (Premiere shows tool/gesture hints here).
     fn hint_text(&self) -> String {
-        if self.ui.workspace == "Podcast" && !self.podcast.assembled {
+        if self.ui.workspace == "Podcast" && (!self.podcast.assembled || self.podcast.projects_open) {
             return String::new();
         }
         let mac = cfg!(target_os = "macos");

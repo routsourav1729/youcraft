@@ -3,6 +3,7 @@ import sqlite3
 import os
 import shutil
 import logging
+import re
 from contextlib import contextmanager
 from contextlib import closing
 from pathlib import Path
@@ -31,6 +32,7 @@ class Store:
                 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, project_id TEXT, kind TEXT,
                     state TEXT, progress REAL, payload TEXT, result TEXT, error TEXT, created REAL);
                 CREATE TABLE IF NOT EXISTS project_folders(project_id TEXT PRIMARY KEY, path TEXT);
+                CREATE TABLE IF NOT EXISTS preferences(key TEXT PRIMARY KEY, value TEXT);
                 PRAGMA user_version=1;
             ''')
 
@@ -82,6 +84,10 @@ class Store:
         return self.save(Project.model_validate_json(row[0]), expected)
 
     def default_project_home(self):
+        with self.connect() as db:
+            row = db.execute("SELECT value FROM preferences WHERE key='projects_home'").fetchone()
+        if row:
+            return Path(row[0])
         if os.name == 'nt' and self.user_folders:
             # Respect redirected Documents (including OneDrive), not a hardcoded username.
             import ctypes
@@ -90,8 +96,24 @@ class Store:
                 return Path(buffer.value) / 'YouCraft' / 'Projects'
         return self.root / 'projects'
 
+    def set_project_home(self, value):
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            raise ValueError('Choose an absolute projects folder')
+        path = path.resolve()
+        path.mkdir(parents=True, exist_ok=True)
+        with self.connect() as db:
+            db.execute("INSERT OR REPLACE INTO preferences VALUES('projects_home', ?)", (str(path),))
+        return path
+
+    @staticmethod
+    def folder_name(project):
+        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '-', project.name).strip(' .')[:60].rstrip(' .')
+        # Prefix also prevents Windows device names (CON, AUX, etc.).
+        return 'Project - ' + (name or 'Untitled') + ' - ' + project.id[:8]
+
     def directory(self, pid):
-        self.get(pid)
+        project = self.get(pid)
         if len(pid) != 32 or any(c not in "0123456789abcdef" for c in pid):
             raise ValueError('Invalid project ID')
         with self.connect() as db:
@@ -100,7 +122,9 @@ class Store:
                 path = Path(row[0])
             else:
                 legacy = self.root / 'projects' / pid
-                path = legacy if legacy.exists() else self.default_project_home() / pid
+                path = legacy if legacy.exists() else self.default_project_home() / self.folder_name(project)
+                if not legacy.exists() and path.exists():
+                    path = self.default_project_home() / (self.folder_name(project) + '-' + pid)
                 db.execute('INSERT INTO project_folders VALUES(?,?)', (pid, str(path)))
         path.mkdir(parents=True, exist_ok=True)
         return path

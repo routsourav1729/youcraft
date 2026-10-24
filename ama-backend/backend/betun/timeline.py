@@ -82,13 +82,16 @@ def generate_shots(project):
     points = sorted(points)
     result = []
     previous = "both"
+    last_solo = "both"
     for start, end in zip(points, points[1:]):
         lock = next((s for s in locked if s.start <= start and s.end >= end), None)
         active = {a.speaker for a in project.activity if a.start < end and a.end > start}
         cams = {project.settings.speaker_camera[s] for s in active if s in project.settings.speaker_camera}
         if active - project.settings.speaker_camera.keys():
             raise ValueError("Assign every detected speaker to a camera before generating shots")
-        desired = "both" if len(cams) > 1 else next(iter(cams), previous)
+        if len(cams) == 1:
+            last_solo = next(iter(cams))
+        desired = "both" if len(cams) > 1 else next(iter(cams), last_solo)
         in_overlap = any(a <= start and b >= end for a, b in padded)
         if in_overlap:
             desired = "both"
@@ -101,9 +104,9 @@ def generate_shots(project):
         duration = end - start
         if not in_overlap and desired == "both" and duration < project.settings.meaningful_overlap:
             desired = previous
-        elif not in_overlap and len(cams) == 1 and duration < project.settings.acknowledgement:
+        elif not in_overlap and len(cams) == 1 and previous not in ('both', 'black') and duration < project.settings.acknowledgement:
             desired = previous
-        if not in_overlap and result and not result[-1].locked and result[-1].layout != desired:
+        if not in_overlap and result and not result[-1].locked and result[-1].layout not in ('both', 'black', desired):
             # Clear speaker turns can override minimum shot; short uncertain turns cannot.
             if start - result[-1].start < project.settings.minimum_shot and duration < project.settings.minimum_shot:
                 desired = previous
@@ -112,7 +115,9 @@ def generate_shots(project):
             result[-1].end = end
         else:
             result.append(Shot(start=start, end=end, layout=layout, warnings=warnings))
-        previous = layout
+        # Missing footage at a sub-frame camera offset must not make black the
+        # preferred layout for the following silence or a short speaker turn.
+        previous = layout if layout != 'black' else 'both'
     return result
 
 

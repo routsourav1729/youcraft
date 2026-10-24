@@ -62,6 +62,14 @@ elements=ask('ui.elements',prefix='podcast.')
 ids={e['id'] for e in elements}
 for name in ['video_height','suggest_references','reference_current','reference_image']:
     assert 'podcast.'+name in ids,(name,ids)
+transport={e['id'] for e in ask('ui.elements',prefix='program.transport.')}
+assert 'program.transport.playback.toggle' in transport
+assert not any('sequence.extract' in item or 'sequence.lift' in item for item in transport)
+assert 'podcast.preview_suggestions' in ids
+assert 'podcast.reaction_marker.candidate' in ids
+ask('engine.execute',command='playhead.set',params={'seconds':2.1})
+time.sleep(.5)
+assert any(e['id']=='podcast.active_reaction_remove' for e in ask('ui.elements',prefix='podcast.'))
 # Capture the installed product, not a separately rebuilt mock UI.
 out=Path('release/ui-check');out.mkdir(parents=True,exist_ok=True)
 ask('ui.screenshot',path=str((out/'reactions-1366.png').resolve()))

@@ -72,6 +72,30 @@ def test_brief_overlap_has_independent_before_after_buffers():
     assert [(q.start,q.end) for q in both] == [(19.5,21.55)]
 
 
+def test_initial_subframe_camera_gap_does_not_leave_output_black():
+    from betun.timeline import generate_shots
+    from betun.schema import Activity
+    p = episode()
+    p.clips[1].offset = .0003
+    p.clips[2].offset = .013
+    p.activity = [Activity(start=10,end=60,speaker='SPEAKER_01')]
+    p.shots = generate_shots(p)
+    assert all(s.layout != 'black' for s in p.shots if s.start >= .0003)
+
+
+def test_overlap_does_not_extend_through_following_pause_or_minimum_shot():
+    from betun.timeline import generate_shots
+    from betun.schema import Activity
+    p = episode()
+    p.settings.overlap_before = 1
+    p.settings.overlap_after = 1
+    p.settings.meaningful_overlap = 0
+    p.activity = [Activity(start=0,end=20.2,speaker='SPEAKER_01'),
+                  Activity(start=20,end=20.05,speaker='SPEAKER_00'),
+                  Activity(start=23,end=60,speaker='SPEAKER_01')]
+    assert [(q.start,q.end) for q in generate_shots(p) if q.layout=='both'] == [(19,21.05)]
+
+
 def test_api_buffer_change_preserves_measured_signals_and_manual_decisions(tmp_path):
     from fastapi.testclient import TestClient
     from betun.api import create_app

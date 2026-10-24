@@ -58,10 +58,18 @@ def eligible(project, start, end, margin=0.5):
         return False
     if any(a.speaker == host and a.start < end + margin and a.end > start - margin for a in project.activity):
         return False
-    guest = [a for a in project.activity if a.speaker != host and a.start <= start and a.end >= end]
-    if not guest:
+    # Diarizers split a sentence into many activity rows. A reaction need not fit
+    # inside one row, but must remain in continuous guest speech (brief pauses
+    # allowed). Host speech is excluded above, including quiet interruptions.
+    guest = []
+    for a in sorted((a for a in project.activity if a.speaker != host), key=lambda a: a.start):
+        if guest and a.start <= guest[-1][1] + 1.5:
+            guest[-1] = (guest[-1][0], max(guest[-1][1], a.end))
+        else:
+            guest.append((a.start, a.end))
+    if not any(a <= start and b >= end for a, b in guest):
         return False
-    return not any(s.start < end and s.end > start and (s.locked or s.layout in ('both', host_camera)) for s in project.shots)
+    return not any(s.start < end and s.end > start and (s.locked or s.layout in ('both', 'black', host_camera)) for s in project.shots)
 
 
 def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6, host_target=None):
@@ -183,7 +191,7 @@ def manifest(project):
                     speakers=[dict(name=('Host' if s == project.settings.host_speaker else 'Guest') + ' · ' + s) for s in speakers], words=words))
 
 
-def review_manifest(project, edit=False, clip_id=None, reaction_id=None):
+def review_manifest(project, edit=False, clip_id=None, reaction_id=None, include_pending=False):
     """Unsaved native review sequence: one clock, master audio, all camera shards.
 
     Reviewing never marks sync, captions or reactions as approved.
@@ -223,7 +231,8 @@ def review_manifest(project, edit=False, clip_id=None, reaction_id=None):
         if edit:
             shot = next((s for s in project.shots if s.start <= mid < s.end), None)
             layout = shot.layout if shot else 'both'
-            if any((r.decision == 'keep' or r.id == reaction_id) and r.start <= mid < r.end for r in project.reactions):
+            if layout != 'both' and any((r.decision == 'keep' or r.id == reaction_id or (include_pending and r.decision == 'pending'))
+                                       and r.start <= mid < r.end for r in project.reactions):
                 layout = project.settings.speaker_camera.get(project.settings.host_speaker, layout)
             if layout in sources and sources[layout] is None:
                 layout = next((key for key,value in sources.items() if value is not None),'both')

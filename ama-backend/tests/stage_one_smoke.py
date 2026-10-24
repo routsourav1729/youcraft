@@ -38,6 +38,8 @@ state = until(lambda s: not s['busy'])
 assert state['projects_open'] and not state['project_id'], state
 ask('ui.click', id='podcast.new_project')
 until(lambda s: not s['projects_open'] and s['step'] == 1 and not s['project_id'])
+ask('ui.click', id='podcast.settings')
+time.sleep(.3)
 ask('ui.click', id='podcast.audio_output')
 until(lambda s: s['audio_output_open'])
 ask('ui.click', id='podcast.audio.default')

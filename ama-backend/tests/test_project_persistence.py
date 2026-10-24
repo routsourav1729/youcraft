@@ -86,3 +86,21 @@ def test_catalog_reports_persistent_project_location(tmp_path):
         catalog = client.get('/v1/projects', headers=headers).json()
         assert catalog[0]['id'] == created['id']
         assert catalog[0]['project_folder'] == directory
+
+
+def test_default_home_is_persistent_and_existing_projects_stay_put(tmp_path):
+    store = Store(tmp_path/'data')
+    old = store.create(Project(name='First'))
+    original = store.directory(old.id)
+    home = tmp_path/'chosen'
+    store.set_project_home(str(home))
+    reopened = Store(tmp_path/'data')
+    assert reopened.default_project_home() == home
+    assert reopened.directory(old.id) == original
+    new = reopened.create(Project(name='Interview: Friday / CON'))
+    directory = reopened.directory(new.id)
+    assert directory.parent == home and 'Interview' in directory.name
+    assert ':' not in directory.name and '/' not in directory.name
+    assert (directory/'project.betun.json').is_file()
+    with pytest.raises(ValueError, match='absolute'):
+        reopened.set_project_home('relative-folder')
