@@ -246,6 +246,8 @@ def process(store, project, kind, options, directory, cancel, progress):
         analysis['interval'] = options['interval']
         analysis['smile_threshold'] = threshold
         analysis['spacing'] = options.get('spacing', analysis['spacing'])
+        project.reaction_calibration.update(interval=analysis['interval'], spacing=analysis['spacing'],
+            smile_threshold=threshold, host_target=options.get('host_target'))
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
     if kind in ('reactions', 'reference_suggestions'):
@@ -282,6 +284,9 @@ def process(store, project, kind, options, directory, cancel, progress):
         project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'],
                                         smile_threshold=options.get('smile_threshold') if options.get('smile_threshold') is not None else .35,
                                         decisions=project.reaction_analysis.get('decisions', {}))
+        project.reaction_calibration.update({key: options[key] for key in
+            ('references', 'reference_samples', 'reference_image', 'tolerance', 'interval', 'spacing', 'host_target') if key in options})
+        project.reaction_calibration['smile_threshold'] = project.reaction_analysis['smile_threshold']
         selected = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'], host_target=options.get('host_target'))
         project.reactions = preserve_choices(project, selected, project.reaction_analysis)
         project.reaction_analysis['selection_counts'] = dict(spans=len(response['candidates']), matching=sum(any(c in row.get('cues', []) for c in ('smile', 'nod')) for row in response['candidates']))

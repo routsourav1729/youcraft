@@ -36,6 +36,8 @@ def test_interval_reselect_never_invokes_model_and_retains_decisions(tmp_path,mo
     assert saved.reactions[0].decision=='keep'
     assert saved.reaction_analysis['interval']==20
     assert saved.reaction_analysis['candidates']==candidates
+    assert saved.reaction_calibration['spacing']==saved.reaction_analysis['spacing']
+    assert saved.reaction_calibration['interval']==20
 
 
 def test_host_is_always_left_even_when_host_camera_is_b():
