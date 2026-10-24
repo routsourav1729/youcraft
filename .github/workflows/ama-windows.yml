@@ -12,11 +12,6 @@ on:
         default: false
   push:
     branches: [ama-bartalap]
-    paths-ignore:
-      - 'packaging/ama/Update-YouCraft.ps1'
-      - 'packaging/tests/updater-handoff.ps1'
-      - '.github/workflows/updater-handoff.yml'
-      - '.github/workflows/ama-windows.yml' 
   pull_request:
     branches: [ama-bartalap]
 concurrency:
