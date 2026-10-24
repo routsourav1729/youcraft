@@ -60,7 +60,7 @@ notices=ask('ui.elements',prefix='graphics.notice')
 if any(e['id']=='graphics.notice.close' for e in notices):ask('ui.click',id='graphics.notice.close')
 elements=ask('ui.elements',prefix='podcast.')
 ids={e['id'] for e in elements}
-for name in ['video_height','gaze_tolerance','reaction_interval','reaction_spacing','reference_image']:
+for name in ['video_height','suggest_references','reference_current','reference_image']:
     assert 'podcast.'+name in ids,(name,ids)
 # Capture the installed product, not a separately rebuilt mock UI.
 out=Path('release/ui-check');out.mkdir(parents=True,exist_ok=True)

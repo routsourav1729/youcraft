@@ -2049,6 +2049,9 @@ impl FilmcraftApp {
 
     /// Contextual hint for the status bar (Premiere shows tool/gesture hints here).
     fn hint_text(&self) -> String {
+        if self.ui.workspace == "Podcast" && !self.podcast.assembled {
+            return String::new();
+        }
         let mac = cfg!(target_os = "macos");
         match self.ui.tool {
             state::Tool::Selection if mac => {

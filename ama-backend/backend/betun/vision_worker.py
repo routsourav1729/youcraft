@@ -38,7 +38,7 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
         base_options=mp.tasks.BaseOptions(model_asset_path=config['face_model']),
         running_mode=mp.tasks.vision.RunningMode.IMAGE, num_faces=2,
         output_face_blendshapes=True, output_facial_transformation_matrixes=True)
-    rows, references, issues, measurements = [], {}, {}, []
+    rows, references, issues, measurements, reference_candidates = [], {}, {}, [], {}
     with mp.tasks.vision.FaceLandmarker.create_from_options(opts) as face:
         def measure(frame):
             if frame.shape[1] > 1280:
@@ -89,21 +89,23 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     raise ValueError('Cannot decode host camera ' + clip['path'])
                 if payload.get('reference_only'):
                     samples = []
-                    times = reference_times(clip['duration'], payload.get('reference_windows', {}).get(clip['id'], []))
+                    times = reference_candidate_times(clip['duration'], payload.get('reference_windows', {}).get(clip['id'], []), payload.get('reference_seed', 0))
                     for sample_index, second in enumerate(times):
                         progress('Choosing host reference', completed=sample_index, total=len(times), units='frames')
                         cap.set(cv2.CAP_PROP_POS_MSEC, second * 1000)
                         ok, image = cap.read()
                         measured = measure(image) if ok else None
                         if measured and measured['blink'] < .95:
-                            samples.append((float(second), measured))
-                            if len(samples) >= 16:
+                            thumbnail = cv2.resize(image, (240, max(1, round(240 * image.shape[0] / image.shape[1]))))
+                            encoded, jpeg = cv2.imencode('.jpg', thumbnail, [cv2.IMWRITE_JPEG_QUALITY, 75])
+                            if encoded and len(jpeg) <= 100000:
+                                samples.append(dict(time=float(second), thumbnail=jpeg.tolist()))
+                            if len(samples) >= 5:
                                 break
                     if not samples:
                         issues[clip['id']] = 'No clear host face found. Use a visible host frame or upload a reference screenshot; other references were kept.'
                         continue
-                    center = np.median([m['gaze'] for _, m in samples], axis=0)
-                    references[clip['id']] = min(samples, key=lambda x: float(np.linalg.norm(np.asarray(x[1]['gaze']) - center)))[0]
+                    reference_candidates[clip['id']] = samples
                     continue
                 sample_times = payload.get('reference_samples', {}).get(clip['id'], [])
                 if len(sample_times) > 8 or any(not math.isfinite(t) or not 0 <= t < clip['duration'] for t in sample_times):
@@ -192,7 +194,25 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
             finally:
                 cap.release()
                 finished_seconds += clip['duration']
-    return dict(candidates=rows, references=references, issues=issues, measurements=measurements)
+    return dict(candidates=rows, references=references, issues=issues, measurements=measurements, reference_candidates=reference_candidates)
+
+
+def reference_candidate_times(duration, speaking_windows, seed=0):
+    """Random host-speech samples, preferring the middle 60%; never label a look automatically."""
+    import random
+    rng = random.Random(seed)
+    valid = [(max(0., a), min(duration - .1, b)) for a, b in speaking_windows if b > a]
+    middle = [(max(a, duration * .2), min(b, duration * .8)) for a, b in valid]
+    windows = [(a, b) for a, b in middle if b > a] or [(a, b) for a, b in valid if b > a]
+    if not windows:
+        return []
+    times = []
+    for _ in range(80):
+        a, b = rng.choices(windows, weights=[b-a for a,b in windows])[0]
+        t = rng.uniform(a, b)
+        if all(abs(t - old) >= 1. for old in times):
+            times.append(t)
+    return times
 
 
 def reference_times(duration, speaking_windows):

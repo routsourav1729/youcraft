@@ -277,11 +277,7 @@ def process(store, project, kind, options, directory, cancel, progress):
             and not any(b.speaker != host and b.start < a.end and b.end > a.start for b in project.activity)] for c in clips}
         response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], reference_windows=windows, reference_only=kind == 'reference_suggestions', **options), cache, cancel, device=project.settings.compute_device, progress=progress)
         if kind == 'reference_suggestions':
-            refs = dict(project.reaction_calibration.get('references', {}))
-            refs.update(response['references'])
-            project.reaction_calibration['references'] = refs
-            saved = store.save(project, base_revision)
-            return dict(references=refs, issues=response.get('issues', {}), project=saved.model_dump())
+            return dict(reference_candidates=response.get('reference_candidates', {}), issues=response.get('issues', {}))
         from .reaction_calibration import preserve_choices
         project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'],
                                         smile_threshold=options.get('smile_threshold') if options.get('smile_threshold') is not None else .35,

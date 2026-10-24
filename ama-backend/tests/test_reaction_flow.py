@@ -91,8 +91,28 @@ def test_worker_preserves_good_reference_when_another_shard_has_no_face(monkeypa
         def set(self,*a):pass
         def read(self):return True,np.full((100,100,3),int(self.good),dtype=np.uint8)
         def release(self):pass
-    monkeypatch.setitem(sys.modules,'cv2',NS(VideoCapture=Capture,CAP_PROP_POS_MSEC=1,COLOR_BGR2RGB=1,cvtColor=lambda x,*a:x))
+    monkeypatch.setitem(sys.modules,'cv2',NS(VideoCapture=Capture,CAP_PROP_POS_MSEC=1,COLOR_BGR2RGB=1,cvtColor=lambda x,*a:x, resize=lambda x,*a:x, IMWRITE_JPEG_QUALITY=1, imencode=lambda *a:(True,np.array([1,2,3],dtype=np.uint8))))
     monkeypatch.setitem(sys.modules,'mediapipe',NS(Image=lambda **kw:NS(**kw),ImageFormat=NS(SRGB=1),tasks=NS(BaseOptions=lambda **kw:kw,vision=NS(FaceLandmarkerOptions=lambda **kw:kw,RunningMode=NS(IMAGE=1),FaceLandmarker=NS(create_from_options=lambda opts:Face())))))
     result=analyze(dict(reference_only=True,clips=[dict(id='first',path='good',duration=60),dict(id='second',path='bad',duration=60)],reference_windows={'first':[[25,35]]}),dict(provider='mediapipe-reference',face_model='test'))
-    assert 'first' in result['references'] and 'first' not in result['issues']
-    assert 'second' in result['issues'] and 'second' not in result['references']
+    assert 'first' in result['reference_candidates'] and 'first' not in result['issues']
+    assert 'second' in result['issues'] and 'second' not in result['reference_candidates']
+
+
+def test_candidate_frames_require_host_speech_and_vary_with_seed():
+    from betun.vision_worker import reference_candidate_times
+    a=reference_candidate_times(1000, [[0,10],[400,450],[600,650],[990,999]], 1)
+    b=reference_candidate_times(1000, [[0,10],[400,450],[600,650],[990,999]], 2)
+    assert a != b and 3 <= len(a) <= 80
+    assert all(400 <= t <= 450 or 600 <= t <= 650 for t in a)
+    assert reference_candidate_times(1000, [], 1) == []
+
+
+def test_reference_candidates_do_not_mutate_calibration(tmp_path, monkeypatch):
+    p=episode(); p.reaction_calibration={'references': {'host': 12.}}
+    store=Store(tmp_path); store.create(p)
+    monkeypatch.setattr(pipeline.media,'fingerprint',lambda path:'h')
+    candidates={'host':[{'time':25.,'thumbnail':[1,2,3]}]}
+    monkeypatch.setattr(pipeline.providers,'invoke',lambda *a,**kw:dict(reference_candidates=candidates))
+    result=pipeline.process(store,p,'reference_suggestions',dict(references={},tolerance=10,interval=60,spacing=15),tmp_path,lambda:False,lambda _:None)
+    assert result['reference_candidates']==candidates
+    assert store.get(p.id).reaction_calibration=={'references':{'host':12.}}

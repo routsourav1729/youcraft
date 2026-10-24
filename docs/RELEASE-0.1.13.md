@@ -1,5 +1,12 @@
 YouCraft 0.1.13 improves podcast reaction calibration and editing.
 
+- Reference-first calibration: find up to five face-checked frames sampled from
+  host speech near the middle of the recording, then select the looks to use.
+  Resampling, current-frame selection and image upload remain available.
+  Suggested frames are never accepted automatically.
+- Compact reaction settings and shorter controls replace instructional paragraphs.
+  Transcript and Reactions retain a large preview even with older saved layouts.
+
 - Confirm 2–3 listening frames per host recording (up to eight). Matching accepts
   the confirmed examples rather than requiring one exact pose. Each example must
   contain one clear face. The blink gate adapts to those confirmed examples so

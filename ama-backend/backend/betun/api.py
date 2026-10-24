@@ -83,6 +83,7 @@ class SyncPreviewOptions(Model):
 
 
 class ReactionOptions(Model):
+    reference_seed: int = Field(default=0, ge=0, le=4294967295)
     references: dict[str, float] = Field(default_factory=dict)
     reference_samples: dict[str, list[float]] = Field(default_factory=dict, max_length=100)
     host_target: float | None = Field(default=None, ge=0, le=1)

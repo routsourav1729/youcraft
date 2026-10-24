@@ -37,10 +37,18 @@ pub struct State {
     diagnostics_text: Option<String>,
     #[serde(skip)]
     reaction_undo: Option<(String, Value, Value)>,
+    #[serde(skip)]
+    reference_candidates: Value,
+    #[serde(skip)]
+    reference_candidate_clip: String,
+    #[serde(skip)]
+    reference_thumbnails: std::collections::BTreeMap<String, egui::TextureHandle>,
     pub reference_image: String,
     pub show_detection: bool,
     #[serde(skip)]
     recalibrating: bool,
+    #[serde(skip)]
+    reaction_settings_open: bool,
     pub project_id: String,
     pub name: String,
     pub project: Value,
@@ -132,9 +140,13 @@ impl Default for State {
             transcript_video_fraction: 0.64,
             diagnostics_text: None,
             reaction_undo: None,
+            reference_candidates: Value::Null,
+            reference_candidate_clip: String::new(),
+            reference_thumbnails: Default::default(),
             reference_image: String::new(),
             show_detection: true,
             recalibrating: false,
+            reaction_settings_open: false,
             token: String::new(),
             remote: false,
             compute_device: "auto".into(),
@@ -882,19 +894,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                                     Ok(json!({"path":dest}))
                                 });
                             } else if s.job_kind == "reference_suggestions" {
-                                if value["result"]["project"].is_object() {
-                                    s.project = value["result"]["project"].clone();
-                                    s.saved_project = s.project.clone();
-                                    s.edited_at = None;
-                                }
-                                if let Some(references) = value["result"]["references"].as_object() {
-                                    for (id, time) in references {
-                                        if let Some(time) = time.as_f64() {
-                                            s.references.insert(id.clone(), time);
-                                        }
-                                    }
-                                }
-                                s.status = "References suggested from host speech · Preview before analysis".into();
+                                s.reference_candidates = value["result"]["reference_candidates"].clone();
+                                s.reference_thumbnails.clear();
+                                s.reference_candidate_clip.clear();
+                                s.status = "Choose a reference".into();
                                 if let Some(issues) = value["result"]["issues"].as_object()
                                     && !issues.is_empty()
                                 {
@@ -1309,8 +1312,8 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let ui = &mut child;
     if guided {
         ui.style_mut().override_font_id = Some(egui::FontId::proportional(15.));
-        ui.spacing_mut().item_spacing = egui::vec2(8., 6.);
-        ui.spacing_mut().button_padding = egui::vec2(10., 5.);
+        ui.spacing_mut().item_spacing = egui::vec2(8., 4.);
+        ui.spacing_mut().button_padding = egui::vec2(8., 4.);
         ui.spacing_mut().text_edit_width = 520.;
         ui.visuals_mut().widgets.inactive.weak_bg_fill = egui::Color32::from_rgb(35, 43, 55);
     }
@@ -1618,7 +1621,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     if matches!(s.step, 3..=5) {
         let bounds = ui.available_rect_before_wrap();
-        let fraction = s.video_fraction.clamp(0.25, 0.82);
+        let fraction = s.video_fraction.clamp(0.58, 0.82);
         let height = if s.focus_video { bounds.height() } else { (bounds.height() * fraction).max(100.).min(bounds.height().max(0.)) };
         let top = Rect::from_min_max(bounds.min, egui::pos2(bounds.right(), bounds.top() + height));
         let bottom = Rect::from_min_max(egui::pos2(bounds.left(), top.bottom() + 8.), bounds.max);
@@ -1632,7 +1635,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
             if drag.dragged()
                 && let Some(pos) = drag.interact_pointer_pos()
             {
-                let fraction = ((pos.y - bounds.top()) / bounds.height().max(1.)).clamp(0.25, 0.82);
+                let fraction = ((pos.y - bounds.top()) / bounds.height().max(1.)).clamp(0.58, 0.82);
                 s.video_fraction = fraction;
                 s.transcript_video_fraction = fraction;
             }
@@ -1782,7 +1785,7 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
         painter.text(
             egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.),
             egui::Align2::CENTER_BOTTOM,
-            "Run analysis\nto see detection",
+            "Not analyzed",
             egui::FontId::proportional(12.),
             egui::Color32::GRAY,
         );
@@ -1811,15 +1814,15 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
     let label = if m["detected"] == true {
         let look = match m["look_distance"].as_f64() {
             Some(distance) => format!("Look {:.1} / {:.1} {}", distance, s.tolerance, if m["look_unit"] == "degrees" { "degrees" } else { "% eye width" }),
-            None => "Eye distance unavailable · re-analyze once".into(),
+            None => "Eye distance —".into(),
         };
         let threshold = s.project["reaction_calibration"]["smile_threshold"]
             .as_f64()
             .or_else(|| s.project["reaction_analysis"]["smile_threshold"].as_f64())
             .unwrap_or(0.35);
-        format!("{look}\nSmile signal {:.2} / {:.2}\nHead pitch {:.0}° · separate cue", number(m, "smile"), threshold, number(m, "pitch"))
+        format!("{look}\nSmile {:.2} / {:.2} · Pitch {:.0}°", number(m, "smile"), threshold, number(m, "pitch"))
     } else {
-        "No clear face\nat this sample".into()
+        "Face not detected".into()
     };
     painter.text(egui::pos2(pic.left() + pic.width() * 0.12, pic.bottom() - 12.), egui::Align2::CENTER_BOTTOM, label, egui::FontId::proportional(12.), color);
 }
@@ -1868,7 +1871,7 @@ fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         if !s.ai_setup.error.is_empty() { ui.colored_label(egui::Color32::LIGHT_RED, &s.ai_setup.error); }
         ui.label("Keep YouCraft open. Claude Code: use a Local session.");
         ui.collapsing("Connection help", |ui| {
-            ui.label("Registration does not launch Claude. Open Claude separately and enable YouCraft in its tools.");
+            ui.label("Enable YouCraft in Claude’s tools.");
             ui.label("Alternative: install YouCraft.mcpb from Claude Settings > Extensions.");
             if button(app, ui, "ai.folder", "Extension folder")
                 && let Ok(path) = std::env::current_exe()
@@ -1876,7 +1879,6 @@ fn ai_connection(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             {
                 open_path(app, s, folder);
             }
-            ui.label("Check tools verifies the local app connection; Claude must still enable the extension.");
             ui.label("Browser chats cannot use this local extension.");
             if button(app, ui, "ai.log", "AI log") {
                 let path = crate::podcast_setup::log_path().with_file_name("ai-setup.log");
@@ -2069,7 +2071,7 @@ fn audio(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if s.setup.capabilities["installed_providers"]["reactions"] != true {
         ui.group(|ui| {
             ui.strong("Model setup · Speech + transcript + reactions");
-            ui.label("Reaction detection is not installed yet. Install it now to avoid interruption later.");
+            ui.label("Reaction model not installed");
             if button(app, ui, "audio.setup_reactions", "Install reactions") {
                 s.setup.start("Setup-vision.ps1", "-Mode", "cpu");
             }
@@ -2118,7 +2120,6 @@ fn speakers(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         s.start("samples", move |c| c.get(&format!("/v1/projects/{id}/speaker-samples")));
     }
     ui.heading("Who is the host?");
-    ui.weak("Listen, choose the host, then add each camera.");
     let samples = s.samples.clone();
     ui.columns(2, |columns| {
         for (index, row) in samples.iter().enumerate() {
@@ -2191,7 +2192,6 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if let Some(master) = rows(&s.project, "clips").iter().find(|c| c["camera"] == "master") {
         ui.label(format!("Episode audio · {}", Path::new(&string(master, "path")).file_name().unwrap_or_default().to_string_lossy()));
     }
-    ui.weak("Each camera follows its own file order. Gaps stay on the audio timeline.");
     let recordings = rows(&s.project, "clips");
     let duration = number(&s.project, "duration");
     let mut edges = vec![0., duration];
@@ -2242,7 +2242,6 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             }
         });
     });
-    ui.weak("Preview with master audio before confirming each recording.");
     egui::CollapsingHeader::new("Add camera files").default_open(!rows(&s.project, "clips").iter().any(|c| c["camera"] != "master")).show(ui, |ui| {
         picker(app, ui, s);
         ui.columns(2, |columns| {
@@ -2337,7 +2336,6 @@ fn cameras(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
 }
 fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Transcript");
-    ui.weak("Play, pause and correct the current segment. Changes save automatically.");
     ui.horizontal_wrapped(|ui| {
         let label = if rows(&s.project, "captions").is_empty() { "Generate transcript" } else { "Regenerate transcript…" };
         if button(app, ui, "generate_transcript", label) {
@@ -2351,8 +2349,6 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             if r.changed() {
                 s.project["settings"]["transcription_segment_seconds"] = json!(seconds);
             }
-            ui.weak("Shorter segments can reduce audio-dependent GPU memory. Models still need memory to load.");
-            ui.label("GPU failure stops processing. Switching to CPU requires your choice.");
         });
     });
     let mut save = false;
@@ -2406,9 +2402,7 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             s.review_page = (s.review_page + 1).min(captions.len().saturating_sub(1));
         }
     });
-    if captions.is_empty() {
-        ui.label("Generate the transcript when you are ready. Existing camera and speaker results are kept.");
-    }
+    if captions.is_empty() {}
     for (i, c) in captions.iter_mut().enumerate().skip(s.review_page).take(1) {
         ui.push_id(i, |ui| {
             ui.group(|ui| {
@@ -2499,7 +2493,6 @@ fn review(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if !s.caption_id.is_empty() && captions.get(s.review_page).is_some_and(|c| string(c, "id") == s.caption_id) {
         ui.separator();
         ui.strong("Latin → Odia");
-        ui.weak("Select a word above, or leave the selection empty to replace this segment.");
         ui.label(if s.target_word.is_empty() { "Replacing the current segment".into() } else { format!("Replacing: {}", s.target_word) });
         ui.horizontal_wrapped(|ui| {
             let r = ui.add(egui::TextEdit::singleline(&mut s.roman).desired_width(260.).hint_text("Type Latin spelling · namaskaara"));
@@ -2605,15 +2598,16 @@ fn smile_calibration(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let mut threshold =
         s.project["reaction_calibration"]["smile_threshold"].as_f64().or_else(|| s.project["reaction_analysis"]["smile_threshold"].as_f64()).unwrap_or(0.35);
     ui.horizontal_wrapped(|ui| {
-        ui.label("Smile signal threshold");
-        let r = ui.add(egui::Slider::new(&mut threshold, 0.0..=1.0).fixed_decimals(2));
+        ui.label("Smile");
+        let r = ui
+            .add(egui::Slider::new(&mut threshold, 0.0..=1.0).fixed_decimals(2))
+            .on_hover_text("Expression intensity, not confidence. Apply suggestions to update matching shots.");
         app.auto.add_response("podcast.smile_threshold", &r, "Smile intensity threshold, not confidence");
         if r.changed() {
             s.project["reaction_calibration"]["smile_threshold"] = json!(threshold);
         }
     });
-    ui.small("0–1 expression intensity, not confidence. Calibrate three neutral and three modest-smile frames from the same camera angle. Apply suggestions to use the threshold.");
-    let calibration_group = ui.collapsing("Calibrate smile from this recording", |ui| {
+    let calibration_group = ui.collapsing("Smile calibration", |ui| {
         let time = app.session.playhead().seconds();
         let sample = s.project["reaction_analysis"]["measurements"]
             .as_array()
@@ -2659,7 +2653,7 @@ fn smile_calibration(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             samples["smile"].as_array().map_or(0, Vec::len)
         ));
     });
-    app.auto.add_response("podcast.smile_calibration", &calibration_group.header_response, "Calibrate smile from this recording");
+    app.auto.add_response("podcast.smile_calibration", &calibration_group.header_response, "Smile calibration");
 }
 
 fn visibility(project: &Value, pending: bool) -> (f64, f64, f64) {
@@ -2707,7 +2701,7 @@ fn visibility_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State)
     }
     ui.horizontal_wrapped(|ui| {
         let mut enabled = s.project["reaction_calibration"]["host_target"].as_f64().is_some();
-        let r = ui.checkbox(&mut enabled, "Aim for host visibility");
+        let r = ui.checkbox(&mut enabled, "Host target");
         app.auto.add_response("podcast.host_target_enabled", &r, "Use a host visibility target instead of one reaction per interval");
         let mut percent = s.project["reaction_calibration"]["host_target"].as_f64().unwrap_or(0.33) * 100.;
         let slider = ui.add_enabled(enabled, egui::Slider::new(&mut percent, 0.0..=100.0).suffix("%"));
@@ -2716,11 +2710,10 @@ fn visibility_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State)
             s.project["reaction_calibration"]["host_target"] = if enabled { json!(percent / 100.) } else { Value::Null };
         }
     });
-    ui.small("25–33% is a useful starting point. Apply suggestions, inspect matching spans, then Keep or Reject.");
 }
 
 fn overlap_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
-    let group = ui.collapsing("Split-screen overlap timing", |ui| {
+    let group = ui.collapsing("Overlap", |ui| {
         ui.horizontal_wrapped(|ui| {
             for (key, label) in [("overlap_before", "Before (s)"), ("overlap_after", "After (s)"), ("meaningful_overlap", "Shortest overlap (s)")] {
                 let fallback = if key == "meaningful_overlap" { 0.6 } else { s.project["settings"]["overlap_padding"].as_f64().unwrap_or(1.) };
@@ -2728,10 +2721,11 @@ fn overlap_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 ui.label(label);
                 let r = ui.add(egui::DragValue::new(&mut value).range(0.0..=5.0).speed(0.05));
                 app.auto.add_response(&format!("podcast.{key}"), &r, label);
-                if r.changed() { s.project["settings"][key] = json!(value); }
+                if r.changed() {
+                    s.project["settings"][key] = json!(value);
+                }
             }
         });
-        ui.small("Set shortest overlap to 0 to include every detected interruption. Buffers apply on both sides; locked cuts stay protected. Inserts crossing new overlap are trimmed.");
         if button(app, ui, "overlap_all", "Include brief interruptions · 1s either side") {
             s.project["settings"]["meaningful_overlap"] = json!(0.);
             s.project["settings"]["overlap_before"] = json!(1.);
@@ -2741,8 +2735,100 @@ fn overlap_controls(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     app.auto.add_response("podcast.overlap_controls", &group.header_response, "Adjust split screen buffers");
 }
 
+fn reference_choices(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State, hosts: &[Value]) {
+    let available: Vec<_> =
+        hosts.iter().take(100).filter(|clip| s.reference_candidates[string(clip, "id")].as_array().is_some_and(|v| !v.is_empty())).collect();
+    if available.is_empty() {
+        return;
+    }
+    if !available.iter().any(|clip| string(clip, "id") == s.reference_candidate_clip) {
+        let middle = number(&s.project, "duration") / 2.;
+        if let Some(clip) = available.iter().min_by(|a, b| {
+            let distance = |c: &&Value| (number(c, "offset") + number(c, "duration") * number(c, "rate") / 2. - middle).abs();
+            distance(a).total_cmp(&distance(b))
+        }) {
+            s.reference_candidate_clip = string(clip, "id");
+        }
+    }
+    if available.len() > 1 {
+        let selector = egui::ComboBox::from_id_salt("reference-recording").selected_text("Recording").show_ui(ui, |ui| {
+            for (index, clip) in available.iter().enumerate() {
+                let id = string(clip, "id");
+                let response = ui.selectable_value(
+                    &mut s.reference_candidate_clip,
+                    id,
+                    format!("{} · {:.0}–{:.0}s", index + 1, number(clip, "offset"), number(clip, "offset") + number(clip, "duration") * number(clip, "rate")),
+                );
+                app.auto.add_response(&format!("podcast.reference_recording.{index}"), &response, "Reference recording");
+            }
+        });
+        app.auto.add_response("podcast.reference_recording", &selector.response, "Choose reference recording");
+    }
+    for clip in available.into_iter().filter(|clip| string(clip, "id") == s.reference_candidate_clip.clone()).collect::<Vec<_>>() {
+        let id = string(clip, "id");
+        let candidates = s.reference_candidates[&id].as_array().cloned().unwrap_or_default();
+        if candidates.is_empty() {
+            continue;
+        }
+        ui.horizontal_wrapped(|ui| {
+            for (index, candidate) in candidates.iter().take(5).enumerate() {
+                let Some(time) = candidate["time"].as_f64().filter(|t| t.is_finite() && *t >= 0. && *t < number(clip, "duration")) else {
+                    continue;
+                };
+                let key = format!("{id}-{index}");
+                if !s.reference_thumbnails.contains_key(&key) {
+                    let bytes: Vec<u8> = candidate["thumbnail"]
+                        .as_array()
+                        .filter(|v| v.len() <= 100_000)
+                        .map(|v| v.iter().filter_map(|b| b.as_u64().and_then(|n| u8::try_from(n).ok())).collect())
+                        .unwrap_or_default();
+                    if let Ok(mut reader) = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format() {
+                        let mut limits = image::Limits::default();
+                        limits.max_image_width = Some(512);
+                        limits.max_image_height = Some(512);
+                        limits.max_alloc = Some(4 * 1024 * 1024);
+                        reader.limits(limits);
+                        if let Ok(image) = reader.decode() {
+                            let image = image.to_rgba8();
+                            let pixels = egui::ColorImage::from_rgba_unmultiplied([image.width() as usize, image.height() as usize], image.as_raw());
+                            s.reference_thumbnails.insert(key.clone(), ui.ctx().load_texture(&key, pixels, Default::default()));
+                        }
+                    }
+                }
+                ui.vertical(|ui| {
+                    let selected = s.project["reaction_calibration"]["reference_samples"][&id]
+                        .as_array()
+                        .is_some_and(|samples| samples.iter().any(|v| v.as_f64().is_some_and(|t| (t - time).abs() < 0.01)));
+                    let response = if let Some(texture) = s.reference_thumbnails.get(&key) {
+                        ui.add(egui::Button::image(egui::Image::new((texture.id(), egui::vec2(144., 81.)))).selected(selected))
+                    } else {
+                        ui.selectable_label(selected, format!("Frame {}", index + 1))
+                    };
+                    app.auto.add_response(&format!("podcast.reference_candidate.{id}.{index}"), &response, "Use this look reference");
+                    if response.on_hover_text("Select a frame looking toward the guest").clicked() {
+                        let mut samples = s.project["reaction_calibration"]["reference_samples"][&id].as_array().cloned().unwrap_or_default();
+                        if selected {
+                            samples.retain(|v| v.as_f64().is_none_or(|t| (t - time).abs() >= 0.01));
+                        } else if samples.len() < 8 {
+                            samples.push(json!(time));
+                        }
+                        if let Some(first) = samples.first().and_then(Value::as_f64) {
+                            s.references.insert(id.clone(), first);
+                        } else {
+                            s.references.remove(&id);
+                        }
+                        s.project["reaction_calibration"]["reference_samples"][&id] = json!(samples);
+                        app.stop();
+                        app.seek_program(filmcraft_time::Tick::from_seconds_f64(number(clip, "offset") + time * number(clip, "rate")));
+                    }
+                    ui.small(format!("{}{:.1}s", if selected { "✓ " } else { "" }, number(clip, "offset") + time * number(clip, "rate")));
+                });
+            }
+        });
+    }
+}
+
 fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
-    ui.heading("Host reactions");
     let host = string(&s.project["settings"], "host_speaker");
     let camera = s.project["settings"]["speaker_camera"][&host].clone();
     let ready = s.setup.capabilities["installed_providers"]["reactions"] == true;
@@ -2751,11 +2837,6 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         s.tolerance = s.project["reaction_analysis"]["tolerance"].as_f64().unwrap_or(s.tolerance);
     }
     let calibration_before = s.project["reaction_calibration"].clone();
-    ui.horizontal_wrapped(|ui| {
-        ui.label("Speaker-led output · Split screen during overlap");
-        let r = ui.checkbox(&mut s.show_detection, "Show host detection");
-        app.auto.add_response("podcast.show_detection", &r, "Show measured host eye and head cues");
-    });
     if !ready {
         ui.horizontal_wrapped(|ui| {
             ui.label("Reaction model missing.");
@@ -2764,49 +2845,16 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             }
         });
     }
-    ui.columns(3, |cols| {
-        cols[0].add_enabled_ui(!analyzed, |ui| {
-            let label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance · % eye width" };
-            ui.label(label);
-            let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0));
-            app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
-            ui.add(egui::Label::new("Allowed difference from the reference look.").wrap());
-        });
-        cols[1].label("One reaction per (s)");
-        let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0));
-        app.auto.add_response("podcast.reaction_interval", &r, "One host reaction per interval");
-        cols[1].add(egui::Label::new("Used when visibility target is switched off.").wrap());
-        cols[2].add_enabled_ui(true, |ui| {
-            ui.label("Minimum gap (s)");
-            let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0));
-            app.auto.add_response("podcast.reaction_spacing", &r, "Minimum gap between reaction inserts");
-            ui.add(egui::Label::new("Gap after one insert before the next.").wrap());
-        });
-    });
-    visibility_controls(app, ui, s);
-    overlap_controls(app, ui, s);
-    smile_calibration(app, ui, s);
     if analyzed {
-        if s.project["reaction_analysis"]["selection_counts"].is_object() {
-            let counts = &s.project["reaction_analysis"]["selection_counts"];
-            let reactions = rows(&s.project, "reactions");
-            ui.label(format!(
-                "Measured spans: {} · Smile/nod matches: {} · Pending: {} · Kept: {} · Rejected: {}",
-                counts["spans"],
-                counts["matching"],
-                reactions.iter().filter(|r| r["decision"] == "pending").count(),
-                reactions.iter().filter(|r| r["decision"] == "keep").count(),
-                reactions.iter().filter(|r| r["decision"] == "reject").count()
-            ));
-            ui.small("Suggestions also need at least 3 seconds of guest-only footage and the requested spacing. Kept shots stay in your edit.");
-        }
         ui.horizontal_wrapped(|ui| {
-            ui.weak("Smile, interval and gap changes reuse cached signals. Kept/manual shots and rejected choices are preserved.");
             if button(app, ui, "reaction_reselect", "Apply suggestions") {
                 let threshold = s.project["reaction_calibration"]["smile_threshold"].as_f64().unwrap_or(0.35);
                 s.job("reaction_select", json!({"interval":s.interval,"spacing":s.spacing,"smile_threshold":threshold,"host_target":s.project["reaction_calibration"]["host_target"]}));
             }
-            if button(app, ui, "reaction_recalibrate", "Change reference / tolerance…") {
+            let r = ui.checkbox(&mut s.show_detection, "Signals");
+            app.auto.add_response("podcast.show_detection", &r, "Show measured host eye and head cues");
+            if button(app, ui, "reaction_settings", "Settings…") { s.reaction_settings_open = true; }
+            if button(app, ui, "reaction_recalibrate", "Reference…") {
                 s.recalibrating = true;
                 s.status = "Existing reactions retained. Adjust settings, then explicitly regenerate analysis.".into();
             }
@@ -2815,9 +2863,12 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         ui.group(|ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.add_enabled_ui(ready, |ui| {
-                    if button(app, ui, "suggest_references", "Suggest from host speech") { s.job("reference_suggestions", json!({})); }
+                    if button(app, ui, "suggest_references", "Find 5 frames") {
+                        let seed = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().subsec_nanos();
+                        s.job("reference_suggestions", json!({"reference_seed":seed}));
+                    }
                 });
-                if button(app, ui, "reference_image", "Choose reference screenshot…") {
+                if button(app, ui, "reference_image", "Upload image…") {
                     if let Some(path) = app.hooks.pick_files.as_mut().and_then(|f| f(&["png", "jpg", "jpeg"]).into_iter().next()) {
                         s.reference_image = path;
                     }
@@ -2828,13 +2879,13 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 }
             });
             let hosts: Vec<Value> = rows(&s.project, "clips").into_iter().filter(|c| c["camera"] == camera).collect();
-            ui.label(format!("{} / {} host sections calibrated · one continuous master timeline", hosts.iter().filter(|c| s.references.contains_key(&string(c,"id"))).count(), hosts.len()));
-            ui.small("Choose a clear listening look toward the guest. Eye tolerance measures iris movement from this reference, not head tilt. A screenshot applies to sections with the same camera angle. Analysis preserves your overlap buffer and kept/manual cuts.");
+            ui.label(format!("{} / {} recordings ready", hosts.iter().filter(|c| s.references.contains_key(&string(c,"id"))).count(), hosts.len()));
+            reference_choices(app, ui, s, &hosts);
             let now = app.session.playhead().seconds();
             if let Some(clip) = hosts.iter().find(|c| number(c,"offset") <= now && now < number(c,"offset")+number(c,"duration")*number(c,"rate")) {
                 let id = string(clip,"id");
                 ui.horizontal_wrapped(|ui| {
-                    if s.review_active && button(app, ui, "reference_current", "Confirm looking at guest") {
+                    if s.review_active && button(app, ui, "reference_current", "Use current frame") {
                         let time = (now-number(clip,"offset"))/number(clip,"rate").max(0.98);
                         s.references.insert(id.clone(), time);
                         if !s.project["reaction_calibration"].is_object() { s.project["reaction_calibration"] = json!({}); }
@@ -2845,7 +2896,7 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                     }
                     if let Some(time) = s.references.get(&id).copied() {
                         let samples = s.project["reaction_calibration"]["reference_samples"][&id].as_array().cloned().unwrap_or_default();
-                        ui.label(format!("{} confirmed examples · add 2–3 clear listening looks", samples.len().max(1)));
+                        ui.label(format!("{} examples", samples.len().max(1)));
                         if button(app, ui, "reference_reset", "Clear examples") {
                             s.project["reaction_calibration"]["reference_samples"][&id] = json!([]);
                             s.references.remove(&id);
@@ -2863,6 +2914,35 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             });
         });
     }
+    let has_reference = !s.reference_image.is_empty() || !s.references.is_empty();
+    if has_reference {
+        if !analyzed && button(app, ui, "reaction_settings", "Settings…") {
+            s.reaction_settings_open = true;
+        }
+        let mut open = s.reaction_settings_open;
+        egui::Window::new("Reaction settings").open(&mut open).default_width(650.).resizable(false).show(ui.ctx(), |ui| {
+            ui.columns(3, |cols| {
+                cols[0].add_enabled_ui(!analyzed, |ui| {
+                    let label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance (%)" };
+                    ui.label(label);
+                    let r = ui.add(egui::Slider::new(&mut s.tolerance, 3.0..=30.0));
+                    app.auto.add_response("podcast.gaze_tolerance", &r, "Gaze tolerance");
+                });
+                cols[1].label("One reaction per (s)");
+                let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0));
+                app.auto.add_response("podcast.reaction_interval", &r, "One host reaction per interval");
+                cols[2].add_enabled_ui(true, |ui| {
+                    ui.label("Minimum gap (s)");
+                    let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0));
+                    app.auto.add_response("podcast.reaction_spacing", &r, "Minimum gap between reaction inserts");
+                });
+            });
+            visibility_controls(app, ui, s);
+            overlap_controls(app, ui, s);
+            smile_calibration(app, ui, s);
+        });
+        s.reaction_settings_open = open;
+    }
     let mut calibration = s.project["reaction_calibration"].clone();
     if !calibration.is_object() {
         calibration = json!({});
@@ -2877,7 +2957,7 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let before_reactions = s.project["reactions"].clone();
     let before_decisions = s.project["reaction_analysis"]["decisions"].clone();
     let mut undoing = false;
-    if s.reaction_undo.as_ref().is_some_and(|(id, _, _)| id == &s.project_id) && button(app, ui, "undo_reaction", "Undo last reaction edit") {
+    if s.reaction_undo.as_ref().is_some_and(|(id, _, _)| id == &s.project_id) && button(app, ui, "undo_reaction", "Undo") {
         if let Some((_, previous, decisions)) = s.reaction_undo.take() {
             s.project["reactions"] = previous;
             if s.project["reaction_analysis"].is_object() {
@@ -2887,18 +2967,19 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         }
     }
     let mut reactions = rows(&s.project, "reactions");
+    let mut insert_host = false;
     ui.horizontal_wrapped(|ui| {
         let mut duration = s.project["reaction_calibration"]["manual_duration"].as_f64().unwrap_or(3.);
-        ui.label("Manual insert length (s)");
+        ui.label("Insert · s");
         let r = ui.add(egui::DragValue::new(&mut duration).range(0.1..=60.).speed(0.1));
         app.auto.add_response("podcast.manual_duration", &r, "Manual host insert duration");
         if r.changed() {
             s.project["reaction_calibration"]["manual_duration"] = json!(duration);
         }
-        if button(app, ui, "manual_in", "Mark start here") {
+        if button(app, ui, "manual_in", "In") {
             s.project["reaction_calibration"]["manual_in"] = json!(app.session.playhead().seconds());
         }
-        if button(app, ui, "manual_out", "Mark end here") {
+        if button(app, ui, "manual_out", "Out") {
             let start = s.project["reaction_calibration"]["manual_in"].as_f64().unwrap_or(app.session.playhead().seconds());
             let length = app.session.playhead().seconds() - start;
             if length > 0. && length <= 60. {
@@ -2909,8 +2990,9 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 s.error = "Mark an end after the start, within 60 seconds.".into();
             }
         }
+        insert_host = s.review_active && button(app, ui, "manual_reaction", "Insert host");
     });
-    if s.review_active && button(app, ui, "manual_reaction", "Insert host at playhead") {
+    if insert_host {
         app.stop();
         let start = app.session.playhead().seconds();
         let clip = rows(&s.project, "clips")
@@ -2936,29 +3018,28 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let mut remove_reaction = None;
     let current = visibility(&s.project, false);
     let proposed = visibility(&s.project, true);
-    ui.label(format!(
-        "Current · Host {:.1} min ({:.0}%) · Guest {:.1} min ({:.0}%)",
-        current.0 / 60.,
-        100. * current.0 / current.2.max(1.),
-        current.1 / 60.,
-        100. * current.1 / current.2.max(1.)
-    ));
-    ui.label(format!(
-        "With pending suggestions · Host {:.1} min ({:.0}%) · Guest {:.1} min ({:.0}%)",
-        proposed.0 / 60.,
-        100. * proposed.0 / proposed.2.max(1.),
-        proposed.1 / 60.,
-        100. * proposed.1 / proposed.2.max(1.)
-    ));
-    ui.small("Split screen counts for both people. Suggestions stay pending until Keep; your target never forces weak matches.");
-    if let Some(target) = s.project["reaction_calibration"]["host_target"].as_f64() {
-        if proposed.0 + 1. < target * proposed.2 {
-            ui.label("Below target: review more examples, reduce the gap, or add a manual insert.");
+    ui.horizontal_wrapped(|ui| {
+        ui.label(format!(
+            "Host {:.1}m · {:.0}%   Guest {:.1}m · {:.0}%",
+            current.0 / 60.,
+            100. * current.0 / current.2.max(1.),
+            current.1 / 60.,
+            100. * current.1 / current.2.max(1.)
+        ))
+        .on_hover_text("Current edit. Split screen counts toward both speakers.");
+        if (current.0 - proposed.0).abs() > 0.1 {
+            ui.weak(format!(
+                "Proposed: host {:.1}m · {:.0}% / guest {:.1}m · {:.0}%",
+                proposed.0 / 60.,
+                100. * proposed.0 / proposed.2.max(1.),
+                proposed.1 / 60.,
+                100. * proposed.1 / proposed.2.max(1.)
+            ));
         }
-    }
+    });
     ui.horizontal_wrapped(|ui| {
         let now = app.session.playhead().seconds();
-        for (id, label, next) in [("previous_reaction", "Previous suggestion", false), ("next_reaction", "Next suggestion", true)] {
+        for (id, label, next) in [("previous_reaction", "Previous", false), ("next_reaction", "Next", true)] {
             if button(app, ui, id, label) {
                 let times = reactions.iter().filter(|r| r["decision"] != "reject").map(|r| number(r, "start"));
                 let target =
@@ -2969,14 +3050,14 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 }
             }
         }
-    });
-    if button(app, ui, "reject_all", "Skip pending") {
-        for r in &mut reactions {
-            if r["decision"] == "pending" {
-                r["decision"] = json!("reject");
+        if button(app, ui, "reject_all", "Skip pending") {
+            for r in &mut reactions {
+                if r["decision"] == "pending" {
+                    r["decision"] = json!("reject");
+                }
             }
         }
-    }
+    });
     let mut previous_interval = None;
     for (i, r) in reactions.iter_mut().enumerate() {
         let interval = (number(r, "start") / s.interval.max(1.)).floor() as u64;
