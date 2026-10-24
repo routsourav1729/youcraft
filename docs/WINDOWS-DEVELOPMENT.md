@@ -159,12 +159,20 @@ Fast verification completed for this follow-up:
 - A new source process restored the copied episode, reaction page, workspace and
   exact 115-second playhead, paused, and wrote the helper startup acknowledgement.
 - Initial Home sizing was visually checked without resizing/minimize/maximize.
-  The final restored-state assertions passed through the authenticated API;
-  its screenshot request timed out and the desktop capture tool rejected its
-  window identity, so a fresh restored-preview visual check remains outstanding.
+  A later visible restart exposed a missing review-player flag despite correct
+  native state. Restart snapshots now preserve preview identity and mode, and
+  refresh model capabilities without leaving the restored page. The development
+  launcher suppresses the debug console without hiding the editor window.
+- A fresh close/reopen with the correction was visually verified: host and guest
+  cameras, the edited center output, 01:55 playhead and installed model state all
+  restored without pressing Reload. The source app was left open on this copied
+  development episode.
+- All three focused Rust update tests passed, including active-preview restoration,
+  failed saves and active-job protection. The first test-cache build took about
+  nine minutes; execution itself took 0.03 seconds.
 
 Full codec suites, model reinstalls and local release packaging were intentionally
-omitted for fast iteration. Newly added Rust update unit tests have not been run;
-the live checkpoint/restore checks above are the executed evidence. Packaged
+omitted for fast iteration. The focused tests and live checkpoint/restore checks
+above are the executed evidence. Packaged
 release checks remain in CI. GPU throughput and reaction usability changes remain
 separate work; this machine cannot validate an RTX 3050 profile.

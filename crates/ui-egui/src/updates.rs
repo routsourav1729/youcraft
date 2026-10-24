@@ -205,7 +205,7 @@ fn save_session(app: &mut FilmcraftApp, root: &std::path::Path) -> Result<(), St
     let snapshot = root.join("resume.fcproj");
     app.session.execute("file.saveCopy", json!({"path":snapshot})).map_err(|e| e.to_string())?;
     let resume = json!({"native":snapshot,"original_path":original_path,"podcast":app.podcast,
-        "projects_open":app.podcast.projects_open,"ui":app.ui,"workspace":app.workspaces.current,
+        "projects_open":app.podcast.projects_open,"podcast_view":app.podcast.restart_view(),"ui":app.ui,"workspace":app.workspaces.current,
         "playhead":app.session.playhead().seconds()});
     let data = serde_json::to_vec(&resume).map_err(|e| e.to_string())?;
     write_resume(&root.join("resume.json"), &data)?;
@@ -257,7 +257,7 @@ fn restore_value(app: &mut FilmcraftApp, value: Value) -> Result<(), String> {
     podcast.token = app.podcast.token.clone();
     podcast.endpoint = app.podcast.endpoint.clone();
     podcast.projects_open = value["projects_open"].as_bool().unwrap_or(true);
-    podcast.restored_after_update();
+    podcast.restored_after_update(&value["podcast_view"], app.session.state.active_sequence.map(|id| id.0));
     app.podcast = podcast;
     app.ui = serde_json::from_value(value["ui"].clone()).map_err(|e| e.to_string())?;
     if let Some(workspace) = value["workspace"].as_str() {
@@ -287,6 +287,8 @@ mod tests {
         app.podcast.projects_open = false;
         app.podcast.step = 5;
         app.podcast.token = "must-not-be-written".into();
+        let sequence = app.session.state.active_sequence.map(|id| id.0);
+        app.podcast.restored_after_update(&json!({"item":sequence,"active":true,"edit":true}), sequence);
         (app, root)
     }
     #[test]
@@ -301,6 +303,8 @@ mod tests {
         assert!(reopened.session.active_sequence().is_some());
         assert_eq!(reopened.session.playhead(), app.session.playhead());
         assert_eq!(reopened.podcast.step, 5);
+        assert_eq!(reopened.podcast.restart_view()["active"], true);
+        assert_eq!(reopened.podcast.restart_view()["edit"], true);
         assert!(!reopened.podcast.projects_open);
         assert!(!reopened.playback.playing);
         assert_eq!(reopened.ui.workspace, "Podcast");

@@ -79,7 +79,7 @@ try {
         if (Test-Path (Join-Path $transaction 'journal.json')) {
             Restore-FileUpdate $InstallDirectory $transaction
             $env:YOUCRAFT_UPDATE_RESUME = Join-Path $UpdateDirectory 'resume.json'
-            Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory | Out-Null
+            Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory -WindowStyle Normal | Out-Null
             Write-Status 'current' 'The previous version was restored. Your saved session is available.'
             return
         }
@@ -88,7 +88,8 @@ try {
         $health = Join-Path $transaction ('healthy-' + [Guid]::NewGuid().ToString('N'))
         $env:YOUCRAFT_UPDATE_RESUME = Join-Path $UpdateDirectory 'resume.json'
         $env:YOUCRAFT_UPDATE_HEALTH = $health
-        $app = Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory -PassThru
+        # The reopened editor is interactive; never inherit a hidden updater window.
+        $app = Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory -WindowStyle Normal -PassThru
         for ($i=0; $i -lt 90; $i++) {
             if (Test-Path $health) {
                 Set-Content (Join-Path $transaction 'committed') 'healthy'
@@ -99,7 +100,7 @@ try {
             if ($app.HasExited) {
                 Restore-FileUpdate $InstallDirectory $transaction
                 Remove-Item Env:YOUCRAFT_UPDATE_HEALTH -ErrorAction SilentlyContinue
-                Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory | Out-Null
+                Start-Process (Join-Path $InstallDirectory 'YouCraft.exe') -WorkingDirectory $InstallDirectory -WindowStyle Normal | Out-Null
                 throw 'The updated app exited before confirming startup. Previous files were restored; your saved session is retained.'
             }
             Start-Sleep -Seconds 1

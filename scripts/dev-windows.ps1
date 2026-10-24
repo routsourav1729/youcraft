@@ -48,7 +48,14 @@ try {
     }
     if (-not $ready) { throw 'Source helper did not become ready.' }
     Write-Host "Source backend ready; launching editor with isolated development data. Control port: $ControlPort"
-    $editor = Start-Process -FilePath $app -ArgumentList @('--empty','--no-recover','--control',"$ControlPort",'--data-dir',"`"$env:FILMCRAFT_DATA_DIR`"") -PassThru
+    # Debug builds use the console subsystem. CREATE_NO_WINDOW suppresses only
+    # that console, unlike WindowStyle Hidden which can hide the editor itself.
+    $editorStart = New-Object Diagnostics.ProcessStartInfo
+    $editorStart.FileName = $app
+    $editorStart.Arguments = "--empty --no-recover --control $ControlPort --data-dir `"$env:FILMCRAFT_DATA_DIR`""
+    $editorStart.UseShellExecute = $false
+    $editorStart.CreateNoWindow = $true
+    $editor = [Diagnostics.Process]::Start($editorStart)
     $editor.WaitForExit()
     if ($editor.ExitCode -ne 0) { throw "Source editor exited with code $($editor.ExitCode)." }
 } finally {

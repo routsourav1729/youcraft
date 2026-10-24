@@ -109,6 +109,8 @@ pub struct State {
     pending_regeneration: Option<(String, Value)>,
     #[serde(skip)]
     retry_job: Option<(String, Value)>,
+    #[serde(skip)]
+    refresh_capabilities: bool,
 }
 impl Default for State {
     fn default() -> Self {
@@ -186,6 +188,7 @@ impl Default for State {
             startup: None,
             pending_regeneration: None,
             retry_job: None,
+            refresh_capabilities: false,
         }
     }
 }
@@ -367,9 +370,21 @@ impl State {
         }
         Ok(true)
     }
-    pub(crate) fn restored_after_update(&mut self) {
+    pub(crate) fn restart_view(&self) -> Value {
+        json!({"item":self.review_item,"active":self.review_active,"edit":self.review_is_edit,
+            "clip":self.review_clip,"reaction":self.review_reaction,"capabilities":self.setup.capabilities})
+    }
+    pub(crate) fn restored_after_update(&mut self, view: &Value, active_sequence: Option<u64>) {
         self.saved_project = self.project.clone();
         self.setup.check_on_start = false;
+        self.setup.checked = true;
+        self.setup.capabilities = view["capabilities"].clone();
+        self.refresh_capabilities = true;
+        self.review_item = view["item"].as_u64();
+        self.review_active = view["active"] == true && active_sequence.is_some() && self.review_item == active_sequence;
+        self.review_is_edit = view["edit"] == true;
+        self.review_clip = view["clip"].as_str().map(str::to_owned);
+        self.review_reaction = view["reaction"].as_str().map(str::to_owned);
     }
     fn busy(&self) -> bool {
         self.pending.is_some() || self.job.is_some() || self.setup.busy()
@@ -1211,7 +1226,8 @@ pub fn tick(app: &mut FilmcraftApp, ctx: &egui::Context) {
     if initial_setup {
         s.setup.advance_on_ready = true;
     }
-    if (initial_setup || setup_finished) && !s.busy() {
+    let refresh_capabilities = !s.busy() && std::mem::take(&mut s.refresh_capabilities);
+    if (initial_setup || setup_finished || refresh_capabilities) && !s.busy() {
         if !s.setup.checked {
             s.step = 0;
         }
