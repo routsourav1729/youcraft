@@ -2,7 +2,7 @@
   #define RepoRoot "..\.."
 #endif
 #ifndef YouCraftVersion
-  #define YouCraftVersion "0.1.12"
+  #define YouCraftVersion "0.1.13"
 #endif
 
 [Setup]

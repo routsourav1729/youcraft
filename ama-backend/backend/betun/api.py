@@ -88,6 +88,7 @@ class ReactionOptions(Model):
     tolerance: float = Field(default=10, gt=0, le=45)
     interval: float = Field(default=60, ge=10, le=600)
     spacing: float = Field(default=15, ge=0, le=120)
+    smile_threshold: float | None = Field(default=None, ge=0, le=1)
 
 
 class TextOptions(Model):

@@ -126,11 +126,12 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     pitches = [s[1]['pitch'] for s in streak]
                     # A nod goes away and returns; a static down-looking pose is not a nod.
                     nod = max(pitches)-min(pitches) >= 7 and abs(pitches[-1]-pitches[0]) < 5
-                    smile = max(s[1]['smile'] for s in streak) > .35
+                    smile_peak = max(s[1]['smile'] for s in streak)
+                    smile = smile_peak >= (payload.get('smile_threshold') if payload.get('smile_threshold') is not None else .35)
                     cues = ['reference look' if lightweight else 'reference gaze'] + (['nod'] if nod else []) + (['smile'] if smile else [])
                     rows.append(dict(clip_id=clip['id'], start=clip['offset']+streak[0][0]*clip['rate'],
                         end=clip['offset']+(streak[-1][0]+stride/fps)*clip['rate'],
-                        score=.5 + .25*nod + .25*smile, cues=cues))
+                        score=.5 + .25*nod + .25*smile, cues=cues, smile_peak=smile_peak))
                 while True:
                     ok = cap.grab()
                     if not ok:
@@ -144,14 +145,14 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     m = measure(image) if ok else None
                     if index % max(1, round(fps * 2)) < stride:
                         progress('Finding reactions', completed=int(finished_seconds + seconds), total=int(total_seconds), units='seconds', fraction=(finished_seconds + seconds) / max(1, total_seconds))
-                    if lightweight:
-                        match = m and np.linalg.norm(np.asarray(m['gaze']) - ref['gaze']) * 100 <= payload['tolerance'] and abs(m['yaw'] - ref['yaw']) <= 20
-                    else:
-                        match = m and angle(m['gaze'], ref['gaze']) <= payload['tolerance']
+                    look_distance = None if not m else (float(np.linalg.norm(np.asarray(m['gaze']) - ref['gaze']) * 100) if lightweight else angle(m['gaze'], ref['gaze']))
+                    match = m and look_distance <= payload['tolerance'] and (not lightweight or abs(m['yaw'] - ref['yaw']) <= 20)
                     good = match and m['blink'] < .6
                     if int(seconds) != last_measurement and len(measurements) < 86400:
                         last_measurement = int(seconds)
-                        row = dict(time=clip['offset']+seconds*clip['rate'], clip_id=clip['id'], detected=m is not None, matching=bool(good))
+                        row = dict(time=clip['offset']+seconds*clip['rate'], clip_id=clip['id'], detected=m is not None, matching=bool(good),
+                                   look_distance=look_distance, look_unit='eye_width_percent' if lightweight else 'degrees',
+                                   head_difference=None if not m else abs(m['yaw'] - ref['yaw']))
                         if m:
                             row.update({key:m[key] for key in ('eyes', 'nose', 'pitch', 'yaw', 'smile', 'blink', 'aspect')})
                         measurements.append(row)

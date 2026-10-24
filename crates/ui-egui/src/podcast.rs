@@ -753,7 +753,10 @@ fn poll(app: &mut FilmcraftApp, s: &mut State) {
                         "open" => {
                             s.step = s.resume_step();
                             s.projects_open = false;
-                            if !rows(&s.project, "activity").is_empty() {
+                            if matches!(s.step, 4 | 5) && !rows(&s.project, "shots").is_empty() {
+                                s.review_seek = 0.;
+                                s.review_preview(s.step == 5);
+                            } else if !rows(&s.project, "activity").is_empty() {
                                 s.load_samples();
                             }
                         }
@@ -1528,7 +1531,7 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
                 }
                 s.step = i;
                 s.remember_view();
-                if i == 5 && s.review_active && !s.review_is_edit && !s.busy() {
+                if i == 5 && (!s.review_active || !s.review_is_edit) && !s.busy() && !rows(&s.project, "shots").is_empty() {
                     s.review_preview(true);
                 }
             }
@@ -1797,7 +1800,15 @@ fn reaction_overlay(app: &FilmcraftApp, ui: &egui::Ui, s: &State) {
         painter.circle_stroke(pos, 5., egui::Stroke::new(1.5, color));
     }
     let label = if m["detected"] == true {
-        format!("Sample · head {:.0}°\nSmile {:.0}%", number(m, "pitch"), number(m, "smile") * 100.)
+        let look = match m["look_distance"].as_f64() {
+            Some(distance) => format!("Look {:.1} / {:.1} {}", distance, s.tolerance, if m["look_unit"] == "degrees" { "degrees" } else { "% eye width" }),
+            None => "Eye distance unavailable · re-analyze once".into(),
+        };
+        let threshold = s.project["reaction_calibration"]["smile_threshold"]
+            .as_f64()
+            .or_else(|| s.project["reaction_analysis"]["smile_threshold"].as_f64())
+            .unwrap_or(0.35);
+        format!("{look}\nSmile signal {:.2} / {:.2}\nHead pitch {:.0}° · separate cue", number(m, "smile"), threshold, number(m, "pitch"))
     } else {
         "No clear face\nat this sample".into()
     };
@@ -2556,6 +2567,92 @@ fn replace_word(text: &str, selected: Option<usize>, expected: &str, replacement
     Err("Select an existing word".into())
 }
 
+fn calibrated_smile_threshold(samples: &Value) -> Result<f64, String> {
+    let median = |key: &str| -> Result<f64, String> {
+        let mut values: Vec<f64> = samples[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .take(20)
+            .filter_map(|row| row["value"].as_f64())
+            .filter(|v| v.is_finite() && (0.0..=1.0).contains(v))
+            .collect();
+        if values.len() < 3 {
+            return Err("Mark at least three different neutral frames and three modest-smile frames from the same camera angle.".into());
+        }
+        values.sort_by(f64::total_cmp);
+        let middle = values.len() / 2;
+        Ok((values.get(middle).copied().unwrap_or(0.) + values.get((values.len() - 1) / 2).copied().unwrap_or(0.)) / 2.)
+    };
+    let neutral = median("neutral")?;
+    let smile = median("smile")?;
+    if smile - neutral < 0.03 {
+        return Err("These samples are too similar. Choose clearer modest smiles or more relaxed neutral frames.".into());
+    }
+    Ok((neutral + smile) / 2.)
+}
+
+fn smile_calibration(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
+    let mut threshold =
+        s.project["reaction_calibration"]["smile_threshold"].as_f64().or_else(|| s.project["reaction_analysis"]["smile_threshold"].as_f64()).unwrap_or(0.35);
+    ui.horizontal_wrapped(|ui| {
+        ui.label("Smile signal threshold");
+        let r = ui.add(egui::Slider::new(&mut threshold, 0.0..=1.0).fixed_decimals(2));
+        app.auto.add_response("podcast.smile_threshold", &r, "Smile intensity threshold, not confidence");
+        if r.changed() {
+            s.project["reaction_calibration"]["smile_threshold"] = json!(threshold);
+        }
+    });
+    ui.small("0–1 expression intensity, not confidence. Calibrate three neutral and three modest-smile frames from the same camera angle. Apply suggestions to use the threshold.");
+    let calibration_group = ui.collapsing("Calibrate smile from this recording", |ui| {
+        let time = app.session.playhead().seconds();
+        let sample = s.project["reaction_analysis"]["measurements"]
+            .as_array()
+            .and_then(|rows| rows.iter().find(|m| m["detected"] == true && number(m, "time") <= time && time - number(m, "time") < 1.))
+            .cloned();
+        ui.horizontal_wrapped(|ui| {
+            for (key, label) in [("neutral", "Mark neutral frame"), ("smile", "Mark modest smile")] {
+                if button(app, ui, &format!("smile_sample.{key}"), label) {
+                    if let Some(m) = &sample {
+                        let samples = &mut s.project["reaction_calibration"]["smile_samples"][key];
+                        if !samples.is_array() {
+                            *samples = json!([]);
+                        }
+                        if let Some(rows) = samples.as_array_mut() {
+                            if rows.len() >= 20 {
+                                s.error = "Twenty samples are enough. Reset samples to start again.".into();
+                            } else if !rows.iter().any(|r| r["time"] == m["time"] && r["clip_id"] == m["clip_id"]) {
+                                rows.push(json!({"time":m["time"],"clip_id":m["clip_id"],"value":m["smile"]}));
+                            }
+                        }
+                    } else {
+                        s.error = "Choose a measured frame with a clear host face. Run analysis first if no measurements are available.".into();
+                    }
+                }
+            }
+            if button(app, ui, "smile_calibrate", "Use calibrated threshold") {
+                match calibrated_smile_threshold(&s.project["reaction_calibration"]["smile_samples"]) {
+                    Ok(value) => {
+                        s.project["reaction_calibration"]["smile_threshold"] = json!(value);
+                        s.error.clear();
+                    }
+                    Err(error) => s.error = error,
+                }
+            }
+            if button(app, ui, "smile_reset", "Reset samples") {
+                s.project["reaction_calibration"]["smile_samples"] = json!({});
+            }
+        });
+        let samples = &s.project["reaction_calibration"]["smile_samples"];
+        ui.label(format!(
+            "Neutral frames: {} · Modest smiles: {}",
+            samples["neutral"].as_array().map_or(0, Vec::len),
+            samples["smile"].as_array().map_or(0, Vec::len)
+        ));
+    });
+    app.auto.add_response("podcast.smile_calibration", &calibration_group.header_response, "Calibrate smile from this recording");
+}
+
 fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.heading("Host reactions");
     let host = string(&s.project["settings"], "host_speaker");
@@ -2564,7 +2661,6 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     let analyzed = !s.recalibrating && s.project["reaction_analysis"].as_object().is_some_and(|a| !a.is_empty());
     if analyzed {
         s.tolerance = s.project["reaction_analysis"]["tolerance"].as_f64().unwrap_or(s.tolerance);
-        s.spacing = s.project["reaction_analysis"]["spacing"].as_f64().unwrap_or(s.spacing);
     }
     let calibration_before = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing});
     ui.horizontal_wrapped(|ui| {
@@ -2592,18 +2688,33 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         let r = cols[1].add(egui::Slider::new(&mut s.interval, 15.0..=180.0));
         app.auto.add_response("podcast.reaction_interval", &r, "One host reaction per interval");
         cols[1].add(egui::Label::new("At most one smile/nod in each interval.").wrap());
-        cols[2].add_enabled_ui(!analyzed, |ui| {
+        cols[2].add_enabled_ui(true, |ui| {
             ui.label("Minimum gap (s)");
             let r = ui.add(egui::Slider::new(&mut s.spacing, 0.0..=60.0));
             app.auto.add_response("podcast.reaction_spacing", &r, "Minimum gap between reaction inserts");
             ui.add(egui::Label::new("Gap after one insert before the next.").wrap());
         });
     });
+    smile_calibration(app, ui, s);
     if analyzed {
+        if s.project["reaction_analysis"]["selection_counts"].is_object() {
+            let counts = &s.project["reaction_analysis"]["selection_counts"];
+            let reactions = rows(&s.project, "reactions");
+            ui.label(format!(
+                "Measured spans: {} · Smile/nod matches: {} · Pending: {} · Kept: {} · Rejected: {}",
+                counts["spans"],
+                counts["matching"],
+                reactions.iter().filter(|r| r["decision"] == "pending").count(),
+                reactions.iter().filter(|r| r["decision"] == "keep").count(),
+                reactions.iter().filter(|r| r["decision"] == "reject").count()
+            ));
+            ui.small("Suggestions also need at least 3 seconds of guest-only footage and the requested spacing. Kept shots stay in your edit.");
+        }
         ui.horizontal_wrapped(|ui| {
-            ui.weak("Reference and tolerance are frozen. Interval changes reuse saved measurements.");
-            if button(app, ui, "reaction_reselect", "Apply interval") {
-                s.job("reaction_select", json!({"interval":s.interval}));
+            ui.weak("Smile, interval and gap changes reuse cached signals. Kept/manual shots and rejected choices are preserved.");
+            if button(app, ui, "reaction_reselect", "Apply suggestions") {
+                let threshold = s.project["reaction_calibration"]["smile_threshold"].as_f64().unwrap_or(0.35);
+                s.job("reaction_select", json!({"interval":s.interval,"spacing":s.spacing,"smile_threshold":threshold}));
             }
             if button(app, ui, "reaction_recalibrate", "Change reference / tolerance…") {
                 s.recalibrating = true;
@@ -2628,7 +2739,7 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             });
             let hosts: Vec<Value> = rows(&s.project, "clips").into_iter().filter(|c| c["camera"] == camera).collect();
             ui.label(format!("{} / {} host sections calibrated · one continuous master timeline", hosts.iter().filter(|c| s.references.contains_key(&string(c,"id"))).count(), hosts.len()));
-            ui.small("Suggestions prioritize clear, open eyes while the host speaks near the middle of the conversation. A screenshot applies to all host sections recorded from the same camera angle. Analysis uses a 2-second overlap buffer and preserves locked cuts.");
+            ui.small("Choose a clear listening look toward the guest. Eye tolerance measures iris movement from this reference, not head tilt. A screenshot applies to sections with the same camera angle. Analysis preserves your overlap buffer and kept/manual cuts.");
             let now = app.session.playhead().seconds();
             if let Some(clip) = hosts.iter().find(|c| number(c,"offset") <= now && now < number(c,"offset")+number(c,"duration")*number(c,"rate")) {
                 let id = string(clip,"id");
@@ -2644,12 +2755,14 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
             }
             ui.add_enabled_ui(ready && (!s.reference_image.is_empty() || hosts.iter().all(|c| s.references.contains_key(&string(c, "id")))), |ui| {
                 if button(app, ui, "analyze_reactions", "Find smiles & nods") {
-                    s.job("reactions", json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"interval":s.interval,"spacing":s.spacing}));
+                    let threshold = s.project["reaction_calibration"]["smile_threshold"].as_f64().unwrap_or(0.35);
+                    s.job("reactions", json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"interval":s.interval,"spacing":s.spacing,"smile_threshold":threshold}));
                 }
             });
         });
     }
-    let calibration = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing});
+    let calibration = json!({"references":s.references,"reference_image":s.reference_image,"tolerance":s.tolerance,"spacing":s.spacing,
+        "smile_threshold":s.project["reaction_calibration"]["smile_threshold"],"smile_samples":s.project["reaction_calibration"]["smile_samples"]});
     if !analyzed && calibration != calibration_before {
         s.project["reaction_calibration"] = calibration;
     }
@@ -3075,5 +3188,15 @@ mod tests {
     fn roman_correction_targets_the_selected_unicode_occurrence() {
         assert_eq!(super::replace_word("ବାର  ବାର", Some(1), "ବାର", "ଥର").unwrap(), "ବାର  ଥର");
         assert!(super::replace_word("ବାର ବାର", Some(1), "ବଦଳ", "ଥର").is_err());
+    }
+    #[test]
+    fn smile_calibration_uses_separated_sample_groups_not_a_fixed_cutoff() {
+        let samples = serde_json::json!({"neutral":[{"value":0.02},{"value":0.04},{"value":0.06}],
+            "smile":[{"value":0.18},{"value":0.22},{"value":0.24}]});
+        assert!((super::calibrated_smile_threshold(&samples).unwrap() - 0.13).abs() < 1e-6);
+        assert!(super::calibrated_smile_threshold(&serde_json::json!({})).is_err());
+        let identical = serde_json::json!({"neutral":[{"value":0.2},{"value":0.2},{"value":0.2}],
+            "smile":[{"value":0.21},{"value":0.21},{"value":0.21}]});
+        assert!(super::calibrated_smile_threshold(&identical).is_err());
     }
 }

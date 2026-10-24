@@ -68,7 +68,7 @@ jobs:
           python -m pip install '.[packaging,test]'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ('${{ inputs.full_checks }}' -eq 'true') { python -m pytest -q tests }
-          else { python -m pytest -q tests/test_project_persistence.py }
+          else { python -m pytest -q tests/test_project_persistence.py tests/test_reaction_flow.py tests/test_reaction_calibration.py }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/betun.spec --noconfirm
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -311,7 +311,7 @@ jobs:
           set -euo pipefail
           version=$(cat source/packaging/youcraft-version.txt | tr -d '\r\n')
           python source/packaging/publish_update.py incremental installer/YouCraft-Setup-x64.exe site "$version"
-          gh release create "v${version}-preview.1" installer/YouCraft-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "YouCraft $version" --notes-file source/docs/RELEASE-0.1.12.md
+          gh release create "v${version}-preview.1" installer/YouCraft-Setup-x64.exe --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "YouCraft $version" --notes-file "source/docs/RELEASE-$version.md"
           git -C site config user.name 'github-actions[bot]'
           git -C site config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git -C site add .

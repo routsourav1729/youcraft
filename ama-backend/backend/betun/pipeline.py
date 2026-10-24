@@ -232,17 +232,20 @@ def process(store, project, kind, options, directory, cancel, progress):
         return make_proxies(project, cache, directory, cancel, progress)
     if kind == 'reaction_select':
         from .podcast import suggestions
+        from .reaction_calibration import rescore_candidates, preserve_choices
         analysis = project.reaction_analysis
         if not analysis:
             raise ValueError('Find reactions first; interval changes then reuse the saved analysis')
-        previous = analysis.setdefault('decisions', {})
-        previous.update({f'{r.clip_id}:{r.start}:{r.end}': r.decision for r in project.reactions})
-        manual = [r for r in project.reactions if 'manual' in r.cues]
-        selected = suggestions(project, analysis['candidates'], interval=options['interval'], spacing=analysis['spacing'])
-        for r in selected:
-            r.decision = previous.get(f'{r.clip_id}:{r.start}:{r.end}', 'pending')
-        project.reactions = sorted(manual + [r for r in selected if not any(r.start < m.end and r.end > m.start for m in manual)], key=lambda r:r.start)
+        threshold = options.get('smile_threshold')
+        if threshold is None:
+            threshold = analysis.get('smile_threshold', .35)
+        candidates = rescore_candidates(analysis, threshold)
+        selected = suggestions(project, candidates, interval=options['interval'], spacing=options.get('spacing', analysis['spacing']))
+        project.reactions = preserve_choices(project, selected, analysis)
+        analysis['selection_counts'] = dict(spans=len(candidates), matching=sum(any(c in row.get('cues', []) for c in ('smile', 'nod')) for row in candidates))
         analysis['interval'] = options['interval']
+        analysis['smile_threshold'] = threshold
+        analysis['spacing'] = options.get('spacing', analysis['spacing'])
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
     if kind in ('reactions', 'reference_suggestions'):
@@ -276,11 +279,13 @@ def process(store, project, kind, options, directory, cancel, progress):
             project.reaction_calibration['references'] = refs
             saved = store.save(project, base_revision)
             return dict(references=refs, issues=response.get('issues', {}), project=saved.model_dump())
-        if project.settings.overlap_padding != 2:
-            project.settings.overlap_padding = 2
-            project.shots = generate_shots(project)
-        project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'])
-        project.reactions = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'])
+        from .reaction_calibration import preserve_choices
+        project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'],
+                                        smile_threshold=options.get('smile_threshold') if options.get('smile_threshold') is not None else .35,
+                                        decisions=project.reaction_analysis.get('decisions', {}))
+        selected = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'])
+        project.reactions = preserve_choices(project, selected, project.reaction_analysis)
+        project.reaction_analysis['selection_counts'] = dict(spans=len(response['candidates']), matching=sum(any(c in row.get('cues', []) for c in ('smile', 'nod')) for row in response['candidates']))
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
     if kind == 'shots':
