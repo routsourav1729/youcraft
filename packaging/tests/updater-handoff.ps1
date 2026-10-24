@@ -29,7 +29,7 @@ if (-not $rejected -or $global:sleeps -ne 30) { throw 'Save cancellation must le
 $helper = [pscustomobject]@{Path='C:\YouCraft\BetunBackend\BetunBackend.exe';ProcessName='BetunBackend';Id=101}
 $global:helperStopped = $false
 function Get-Process { param($Name, $ErrorAction) if (-not $global:helperStopped) { $helper }; $other }
-function Stop-Process { param([Parameter(ValueFromPipeline=$true)]$InputObject, $ErrorAction) process {
+function Stop-Process { param([Parameter(ValueFromPipeline=$true)]$InputObject) process {
     if ($InputObject.Id -ne 101) { throw 'Attempted to stop unrelated process' }
     $global:helperStopped = $true
 } }
