@@ -2,7 +2,8 @@ YouCraft 0.1.13 improves podcast reaction calibration and editing.
 
 - Confirm 2–3 listening frames per host recording (up to eight). Matching accepts
   the confirmed examples rather than requiring one exact pose. Each example must
-  contain one clear face. Eye-distance units now match the tolerance control;
+  contain one clear face. The blink gate adapts to those confirmed examples so
+  elevated side-view/glasses signals do not reject all listening frames. Eye-distance units now match the tolerance control;
   head pitch is separate, and old caches explicitly request re-analysis.
 - Smile intensity is a 0–1 expression signal, not a probability. Capture neutral
   and modest-smile examples to calculate a threshold, or adjust it directly.

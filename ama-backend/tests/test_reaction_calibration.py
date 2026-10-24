@@ -89,3 +89,10 @@ def test_api_buffer_change_preserves_measured_signals_and_manual_decisions(tmp_p
         saved=response.json()
         assert saved['reaction_analysis']==p.reaction_analysis
         assert saved['reactions'][0]['decision']=='keep'
+
+
+def test_blink_gate_adapts_to_confirmed_side_view_without_accepting_full_blinks():
+    from betun.vision_worker import calibrated_blink_limit
+    assert calibrated_blink_limit([{'blink':.7},{'blink':.72},{'blink':.75}]) == .84
+    assert calibrated_blink_limit([{'blink':.1}]) == .6
+    assert calibrated_blink_limit([{'blink':.9}]) == .95

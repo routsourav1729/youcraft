@@ -30,7 +30,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
     if not config:
         raise ValueError('Open Models → Install reactions first' if task == 'reactions' else 'Open Models and finish speech setup first' if task in ('diarize', 'transcribe') else f'{task.title()} is not installed in this version')
     if task == 'reactions':
-        config = dict(config, reaction_policy='host-reference-v4-multiple-look-nod')
+        config = dict(config, reaction_policy='host-reference-v5-calibrated-blink')
         if config.get('provider') == 'mediapipe-reference':
             device = 'cpu'  # This lightweight face model has a CPU runtime, not a GPU fallback.
     if device not in ('auto', 'cpu', 'cuda'):

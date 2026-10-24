@@ -95,7 +95,7 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                         cap.set(cv2.CAP_PROP_POS_MSEC, second * 1000)
                         ok, image = cap.read()
                         measured = measure(image) if ok else None
-                        if measured and measured['blink'] < .4:
+                        if measured and measured['blink'] < .95:
                             samples.append((float(second), measured))
                             if len(samples) >= 16:
                                 break
@@ -117,7 +117,7 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     cap.set(cv2.CAP_PROP_POS_MSEC, reference*1000)
                     ok, image = cap.read()
                     ref = measure(image) if ok else None
-                if ref is None:
+                if ref is None or ref['blink'] >= .95:
                     raise ValueError('Host reference has no usable single face. Suggest another reference or upload a clear host screenshot with both eyes visible.')
                 reference_faces = [ref]
                 if image_ref is None:
@@ -125,9 +125,10 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                         cap.set(cv2.CAP_PROP_POS_MSEC, second * 1000)
                         ok, image = cap.read()
                         extra = measure(image) if ok else None
-                        if extra is None or extra['blink'] >= .6:
-                            raise ValueError('A confirmed look example is unclear or blinking. Remove it and choose a clear frame.')
+                        if extra is None or extra['blink'] >= .95:
+                            raise ValueError(f'Look example at {second:.2f}s in host recording {clip["id"]} is unclear. Remove that example and choose a clear frame.')
                         reference_faces.append(extra)
+                blink_limit = calibrated_blink_limit(reference_faces)
                 fps = float(cap.get(cv2.CAP_PROP_FPS))
                 if not math.isfinite(fps) or fps <= 0:
                     raise ValueError('Invalid camera frame rate')
@@ -167,8 +168,8 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     look_distance = None if not m else (float(np.linalg.norm(np.asarray(m['gaze']) - closest['gaze']) * 100) if lightweight else angle(m['gaze'], closest['gaze']))
                     match = m and look_distance <= payload['tolerance'] and (not lightweight or abs(m['yaw'] - closest['yaw']) <= 20)
                     if m:
-                        m['matching'] = bool(match and m['blink'] < .6)
-                    good = match and m['blink'] < .6
+                        m['matching'] = bool(match and m['blink'] < blink_limit)
+                    good = match and m['blink'] < blink_limit
                     if int(seconds) != last_measurement and len(measurements) < 86400:
                         last_measurement = int(seconds)
                         row = dict(time=clip['offset']+seconds*clip['rate'], clip_id=clip['id'], detected=m is not None, matching=bool(good),
@@ -227,3 +228,10 @@ def is_nod(samples):
             if excursion and .3 <= t-start <= 2.5 and delta <= 3 and measured.get('matching'):
                 return True
     return False
+
+
+def calibrated_blink_limit(reference_faces):
+    """Side views/glasses can elevate this coefficient even in confirmed open-eye examples."""
+    values = sorted(float(r['blink']) for r in reference_faces)
+    baseline = values[len(values)//2] if values else 0.
+    return min(.95, max(.6, baseline + .12))
