@@ -1,1 +1,1 @@
-bcc1bf95ffab7a2d39864cbec9d06ef40a23394f4698b2f0e73dcedcbabfde0d  YouCraft-Setup-x64.exe
+99a562719a5ac81c7b3145d296ae09d1c60b3dedf8769497dfa7d93a171cc572  YouCraft-Setup-x64.exe
