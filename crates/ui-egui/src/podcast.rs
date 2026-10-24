@@ -544,8 +544,12 @@ impl State {
         });
     }
     fn import_metadata(&mut self, path: String) {
+        if self.assembled {
+            self.error = "Open the workflow project before importing corrections.".into();
+            return;
+        }
         let id = self.project_id.clone();
-        self.follow_up = "review".into();
+        self.follow_up = if self.review_active { "review" } else { "" }.into();
         self.start("project", move |c| {
             let mut bytes = Vec::new();
             std::fs::File::open(path).and_then(|f| f.take(8 * 1024 * 1024 + 1).read_to_end(&mut bytes)).map_err(|e| e.to_string())?;
@@ -3058,6 +3062,8 @@ fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     if s.recalibrating || !s.project["reaction_analysis"]["candidates"].is_array() {
         egui::ScrollArea::vertical().id_salt("reaction-reference-setup").show(ui, |ui| {
             ui.set_min_width(ui.available_width());
+            let manual = ui.collapsing("Manual shots", |ui| reaction_review(app, ui, s));
+            app.auto.add_response("podcast.manual_shots", &manual.header_response, "Edit host shots without running detection");
             reaction_setup(app, ui, s);
         });
         return;
@@ -3183,7 +3189,6 @@ fn reaction_setup(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
                 app.auto.add_response("podcast.reaction_interval", &r, "One reaction per interval");
             }
         });
-        overlap_controls(app, ui, s);
         let extra = ui.collapsing("Face signals", |ui| {
             ui.add_enabled_ui(!analyzed, |ui| {
                 let label = if s.setup.capabilities["reaction_provider"] == "mediapipe-l2cs" { "Gaze tolerance °" } else { "Eye tolerance (%)" };
@@ -3195,6 +3200,7 @@ fn reaction_setup(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
         });
         app.auto.add_response("podcast.reaction_settings", &extra.header_response, "Face signal settings");
     }
+    overlap_controls(app, ui, s);
     let mut calibration = s.project["reaction_calibration"].clone();
     if !calibration.is_object() {
         calibration = json!({});
