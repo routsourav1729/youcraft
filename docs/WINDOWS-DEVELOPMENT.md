@@ -176,3 +176,40 @@ omitted for fast iteration. The focused tests and live checkpoint/restore checks
 above are the executed evidence. Packaged
 release checks remain in CI. GPU throughput and reaction usability changes remain
 separate work; this machine cannot validate an RTX 3050 profile.
+
+
+## 0.1.13 workflow and next performance work
+
+Look calibration accepts 2–3 user-confirmed frames per camera shard, maximum eight.
+Re-analyze after look changes; smile threshold, target and spacing reuse candidates.
+Target visibility is advisory: rank eligible smile/nod spans until the approximate
+budget, preserve existing kept edits, and disclose when quality/spacing prevents it.
+The UI reports current and proposed visibility separately, including both cameras
+in overlap. Split buffers rebuild base shots without dropping measured signals.
+
+CPU/GPU audit: MediaPipe reference matching currently uses the CPU worker. Speech
+has explicit CPU/CUDA runtimes, bounded transcription segments and serial worker
+execution, but nemotron-transformers prepares the complete audio feature input.
+It is not an adaptive VRAM implementation. Do not promise arbitrary laptop support
+or RTX 3050 6 GB throughput from the Intel-only development machine. GPU diagnostics
+record free/total VRAM on successful worker execution; worker failures record their
+category and elapsed time without copying source paths or transcript text.
+
+Next performance milestone: benchmark the existing diarizer on RTX 3050 6 GB at
+realistic episode lengths; select streaming/chunked inference only if speaker
+identity remains continuous across chunks. Reserve VRAM for rendering, recheck free
+VRAM at job boundaries, use validated mixed precision, retry smaller ASR chunks
+with checkpoints and explicit CPU fallback choice. Increase batch size only from
+measured headroom and keep OOM retries bounded. Compare alternatives on Odia speech,
+overlap recall and measured wall-clock time before changing the default model.
+
+References: https://docs.pytorch.org/docs/stable/generated/torch.cuda.memory.mem_get_info.html
+and https://docs.pytorch.org/docs/stable/notes/cuda ; MediaPipe expression outputs
+are coefficients, not probabilities: https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker .
+NVIDIA streaming diarization parameters are documented at
+https://docs.nvidia.com/nemo/labs-voice-agent/about/core-concepts/speech-pipeline/speaker-diarization .
+
+Next UI milestone after workflow validation: visual hierarchy, consistent spacing,
+compact grouped settings, accessible contrast, reaction strip editing and keyboard
+shortcuts. Keep native rendering and existing engine commands; no framework switch
+is justified solely by the current styling.

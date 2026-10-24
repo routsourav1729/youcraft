@@ -31,6 +31,7 @@ def main(request_path, result_path):
     model = Path(config.get('model_path', '.')).resolve()
     if not model.exists():
         raise ValueError('Configured model files are missing')
+    resources = {}
     device = config.get('device', 'cpu')
     if task in ('diarize', 'transcribe') or (task == 'reactions' and provider == 'mediapipe-l2cs'):
         import torch
@@ -42,6 +43,9 @@ def main(request_path, result_path):
                 raise ValueError('NVIDIA GPU is unavailable in this runtime. Choose CPU or install the NVIDIA runtime in Models.')
             selected = torch.device(device).index
             device = f'cuda:{torch.cuda.current_device() if selected is None else selected}'
+        if device.startswith('cuda'):
+            free, total = torch.cuda.mem_get_info(device)
+            resources = dict(gpu_name=torch.cuda.get_device_name(device), free_vram_mb=round(free/1024**2), total_vram_mb=round(total/1024**2))
         if device.startswith('cuda') and config.get('max_vram_gb'):
             total = torch.cuda.get_device_properties(device).total_memory
             fraction = min(.9, float(config['max_vram_gb']) * 1024**3 / total)
@@ -145,6 +149,7 @@ def main(request_path, result_path):
         raise ValueError(f'Unsupported built-in provider: {task}/{provider}; configure an external command for extensions')
     if task in ('diarize', 'transcribe'):
         result['_device'] = device
+    result['_resources'] = resources
     Path(result_path).write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
 
 

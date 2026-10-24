@@ -64,8 +64,8 @@ def generate_shots(project):
     for start, end in raw_overlap:
         if end - start < project.settings.meaningful_overlap:
             continue
-        start = max(0., start - project.settings.overlap_padding)
-        end = min(project.duration, end + project.settings.overlap_padding)
+        start = max(0., start - (project.settings.overlap_before if project.settings.overlap_before is not None else project.settings.overlap_padding))
+        end = min(project.duration, end + (project.settings.overlap_after if project.settings.overlap_after is not None else project.settings.overlap_padding))
         if padded and padded[-1][1] >= start:
             padded[-1] = (padded[-1][0], max(padded[-1][1], end))
         else:

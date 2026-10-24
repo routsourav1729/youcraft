@@ -105,6 +105,11 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     center = np.median([m['gaze'] for _, m in samples], axis=0)
                     references[clip['id']] = min(samples, key=lambda x: float(np.linalg.norm(np.asarray(x[1]['gaze']) - center)))[0]
                     continue
+                sample_times = payload.get('reference_samples', {}).get(clip['id'], [])
+                if len(sample_times) > 8 or any(not math.isfinite(t) or not 0 <= t < clip['duration'] for t in sample_times):
+                    raise ValueError('Reference samples must be within the host recording (maximum eight)')
+                if sample_times:
+                    reference = sample_times[0]
                 if reference is None and image_ref is None:
                     raise ValueError('Choose a host reference frame or upload a reference screenshot')
                 ref = image_ref
@@ -114,6 +119,15 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     ref = measure(image) if ok else None
                 if ref is None:
                     raise ValueError('Host reference has no usable single face. Suggest another reference or upload a clear host screenshot with both eyes visible.')
+                reference_faces = [ref]
+                if image_ref is None:
+                    for second in sample_times[1:]:
+                        cap.set(cv2.CAP_PROP_POS_MSEC, second * 1000)
+                        ok, image = cap.read()
+                        extra = measure(image) if ok else None
+                        if extra is None or extra['blink'] >= .6:
+                            raise ValueError('A confirmed look example is unclear or blinking. Remove it and choose a clear frame.')
+                        reference_faces.append(extra)
                 fps = float(cap.get(cv2.CAP_PROP_FPS))
                 if not math.isfinite(fps) or fps <= 0:
                     raise ValueError('Invalid camera frame rate')
@@ -123,9 +137,13 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                 def finish():
                     if len(streak) < 16:
                         return
+                    while streak and not streak[-1][1].get('matching', False):
+                        streak.pop()
+                    if len(streak) < 16 or sum(bool(m.get('matching')) for _, m in streak) / len(streak) < .75:
+                        return
                     pitches = [s[1]['pitch'] for s in streak]
                     # A nod goes away and returns; a static down-looking pose is not a nod.
-                    nod = max(pitches)-min(pitches) >= 7 and abs(pitches[-1]-pitches[0]) < 5
+                    nod = is_nod(streak)
                     smile_peak = max(s[1]['smile'] for s in streak)
                     smile = smile_peak >= (payload.get('smile_threshold') if payload.get('smile_threshold') is not None else .35)
                     cues = ['reference look' if lightweight else 'reference gaze'] + (['nod'] if nod else []) + (['smile'] if smile else [])
@@ -145,14 +163,17 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                     m = measure(image) if ok else None
                     if index % max(1, round(fps * 2)) < stride:
                         progress('Finding reactions', completed=int(finished_seconds + seconds), total=int(total_seconds), units='seconds', fraction=(finished_seconds + seconds) / max(1, total_seconds))
-                    look_distance = None if not m else (float(np.linalg.norm(np.asarray(m['gaze']) - ref['gaze']) * 100) if lightweight else angle(m['gaze'], ref['gaze']))
-                    match = m and look_distance <= payload['tolerance'] and (not lightweight or abs(m['yaw'] - ref['yaw']) <= 20)
+                    closest = min(reference_faces, key=lambda r: float(np.linalg.norm(np.asarray(m['gaze']) - r['gaze']))) if m else ref
+                    look_distance = None if not m else (float(np.linalg.norm(np.asarray(m['gaze']) - closest['gaze']) * 100) if lightweight else angle(m['gaze'], closest['gaze']))
+                    match = m and look_distance <= payload['tolerance'] and (not lightweight or abs(m['yaw'] - closest['yaw']) <= 20)
+                    if m:
+                        m['matching'] = bool(match and m['blink'] < .6)
                     good = match and m['blink'] < .6
                     if int(seconds) != last_measurement and len(measurements) < 86400:
                         last_measurement = int(seconds)
                         row = dict(time=clip['offset']+seconds*clip['rate'], clip_id=clip['id'], detected=m is not None, matching=bool(good),
                                    look_distance=look_distance, look_unit='eye_width_percent' if lightweight else 'degrees',
-                                   head_difference=None if not m else abs(m['yaw'] - ref['yaw']))
+                                   head_difference=None if not m else abs(m['yaw'] - closest['yaw']))
                         if m:
                             row.update({key:m[key] for key in ('eyes', 'nose', 'pitch', 'yaw', 'smile', 'blink', 'aspect')})
                         measurements.append(row)
@@ -160,7 +181,11 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
                         streak.append((seconds,m)); missed=0
                     else:
                         missed += 1
-                    if missed > 2 or len(streak) >= 48:
+                        # Allow a short look excursion during a nod, but require
+                        # confirmed listening before/after and stable head yaw.
+                        if streak and m and missed <= 6 and abs(m['yaw'] - streak[0][1]['yaw']) <= 10:
+                            streak.append((seconds, m))
+                    if missed > 6 or len(streak) >= 48:
                         finish(); streak=[]; missed=0
                 finish()
             finally:
@@ -182,3 +207,23 @@ def reference_times(duration, speaking_windows):
         if key not in seen:
             seen.add(key); result.append(t)
     return result
+
+
+def is_nod(samples):
+    """A brief pitch excursion and return with stable yaw, bracketed by listening."""
+    for begin in range(len(samples)):
+        start, baseline = samples[begin]
+        if not baseline.get('matching'):
+            continue
+        window = [(t, m) for t, m in samples[begin:begin+21] if t-start <= 2.5]
+        if len(window) < 4:
+            continue
+        if max(m['yaw'] for _, m in window) - min(m['yaw'] for _, m in window) > 10:
+            continue
+        excursion = False
+        for t, measured in window[1:]:
+            delta = abs(measured['pitch'] - baseline['pitch'])
+            excursion = excursion or delta >= 7
+            if excursion and .3 <= t-start <= 2.5 and delta <= 3 and measured.get('matching'):
+                return True
+    return False

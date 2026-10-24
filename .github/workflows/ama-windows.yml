@@ -131,6 +131,16 @@ jobs:
           } finally { $env:HTTPS_PROXY = $savedProxy }
       - name: Rust toolchain
         run: rustup toolchain install 1.95.0 --profile minimal
+      - name: Reuse native compilation cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-youcraft-rust195-${{ hashFiles('Cargo.lock', '.cargo/config.toml') }}-${{ github.sha }}
+          restore-keys: |
+            windows-youcraft-rust195-${{ hashFiles('Cargo.lock', '.cargo/config.toml') }}-
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true

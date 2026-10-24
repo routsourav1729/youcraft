@@ -84,6 +84,8 @@ class SyncPreviewOptions(Model):
 
 class ReactionOptions(Model):
     references: dict[str, float] = Field(default_factory=dict)
+    reference_samples: dict[str, list[float]] = Field(default_factory=dict, max_length=100)
+    host_target: float | None = Field(default=None, ge=0, le=1)
     reference_image: str = Field(default='', max_length=4096)
     tolerance: float = Field(default=10, gt=0, le=45)
     interval: float = Field(default=60, ge=10, le=600)
@@ -252,7 +254,14 @@ def create_app(root=None, token=None):
         if body.activity != old.activity:
             for caption in body.captions:
                 caption.reviewed = False
-        if body.activity != old.activity or body.settings != old.settings:
+        buffer_fields = {'overlap_padding', 'overlap_before', 'overlap_after', 'meaningful_overlap'}
+        changed_settings = {key for key, value in body.settings.model_dump().items() if value != old.settings.model_dump().get(key)}
+        if body.activity == old.activity and changed_settings and changed_settings <= buffer_fields:
+            from .timeline import generate_shots
+            from .reaction_calibration import fit_reactions_to_shots
+            body.shots = generate_shots(body)
+            body.reactions = fit_reactions_to_shots(body)
+        elif body.activity != old.activity or body.settings != old.settings:
             body.reactions = []
             body.reaction_analysis = {}
             body.shots = [s for s in body.shots if s.locked]
@@ -284,6 +293,13 @@ def create_app(root=None, token=None):
     def evaluate(pid: str, baseline: Project):
         from .evaluation import compare
         return compare(baseline, store.get(pid))
+
+    @app.get('/v1/projects/{pid}/diagnostics')
+    def diagnostics(pid: str):
+        import json
+        path = store.directory(pid) / 'cache' / 'model-diagnostics.json'
+        records = json.loads(path.read_text(encoding='utf-8')) if path.is_file() and path.stat().st_size < 1024*1024 else []
+        return dict(scope='Model execution only; no media, transcripts, paths or credentials', runs=records)
 
     @app.get('/v1/projects/{pid}/waveform')
     def waveform_file(pid: str):

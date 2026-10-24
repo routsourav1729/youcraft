@@ -174,7 +174,8 @@ def test_gpu_budget_resolves_current_cuda_index(tmp_path, monkeypatch, device):
         assert selected == 'cuda:2'
         return SimpleNamespace(total_memory=6 * 1024**3)
     cuda = SimpleNamespace(is_available=lambda: True, current_device=lambda: 2,
-        get_device_properties=properties,
+        get_device_properties=properties, mem_get_info=lambda device: (4*1024**3,6*1024**3),
+        get_device_name=lambda device:'Synthetic GPU',
         set_per_process_memory_fraction=lambda fraction, selected: limited.append((fraction, selected)))
     monkeypatch.setitem(sys.modules, 'torch', SimpleNamespace(cuda=cuda,
         set_num_threads=lambda _: None, device=lambda _: SimpleNamespace(index=None)))
@@ -187,7 +188,9 @@ def test_gpu_budget_resolves_current_cuda_index(tmp_path, monkeypatch, device):
         provider='mediapipe-l2cs', model_path=str(tmp_path), device=device, max_vram_gb=4.5))))
     main(str(request), str(result))
     assert limited == [(0.75, 'cuda:2')]
-    assert json.loads(result.read_text()) == {'candidates': []}
+    data = json.loads(result.read_text())
+    assert data['candidates'] == []
+    assert data['_resources']['free_vram_mb'] == 4096
 
 
 def test_reference_preview_validates_shard_bounds_before_decoding(tmp_path,monkeypatch):

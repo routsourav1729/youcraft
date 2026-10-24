@@ -29,7 +29,9 @@ def rescore_candidates(analysis, threshold):
 
 def preserve_choices(project, selected, analysis):
     """Kept/manual edits survive recalculation; rejected spans cannot silently return."""
-    history = analysis.setdefault('decisions', {})
+    if not isinstance(analysis.get('decisions'), dict):
+        analysis['decisions'] = {}
+    history = analysis['decisions']
     history.update({f'{r.clip_id}:{r.start}:{r.end}': r.decision for r in project.reactions})
     preserved = [r for r in project.reactions if r.decision == 'keep' or 'manual' in r.cues]
     rejected = []
@@ -52,3 +54,21 @@ def preserve_choices(project, selected, analysis):
             reaction.decision = 'reject'
         result.append(reaction)
     return sorted(result, key=lambda r: r.start)
+
+
+def fit_reactions_to_shots(project):
+    """Keep decisions, trimming inserts where newly padded speech must take priority."""
+    host_camera = project.settings.speaker_camera.get(project.settings.host_speaker)
+    result = []
+    for reaction in project.reactions:
+        pieces = []
+        for shot in project.shots:
+            if shot.locked or shot.layout in (host_camera, 'both', 'black'):
+                continue
+            start, end = max(reaction.start, shot.start), min(reaction.end, shot.end)
+            if end > start:
+                pieces.append((start, end))
+        for index, (start, end) in enumerate(pieces):
+            result.append(reaction.model_copy(update=dict(start=start, end=end,
+                id=reaction.id if index == 0 else reaction.id + '-part-' + str(index))))
+    return result

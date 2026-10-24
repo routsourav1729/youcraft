@@ -30,7 +30,7 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
     if not config:
         raise ValueError('Open Models → Install reactions first' if task == 'reactions' else 'Open Models and finish speech setup first' if task in ('diarize', 'transcribe') else f'{task.title()} is not installed in this version')
     if task == 'reactions':
-        config = dict(config, reaction_policy='host-reference-v3-measured-look')
+        config = dict(config, reaction_policy='host-reference-v4-multiple-look-nod')
         if config.get('provider') == 'mediapipe-reference':
             device = 'cpu'  # This lightweight face model has a CPU runtime, not a GPU fallback.
     if device not in ('auto', 'cpu', 'cuda'):
@@ -82,12 +82,15 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
         command = [python, str(worker)]
     if not isinstance(command, list) or not all(isinstance(x, str) for x in command) or not command:
         raise ValueError('Provider command must be a nonempty argument array')
+    started = time.monotonic()
+    diagnostic = dict(task=task, provider=config.get('provider'), device=config.get('device', 'cpu'), status='failed')
     try:
         try:
             run([*command, str(request), str(partial)], cancel, timeout=86400, on_poll=report)
         except RuntimeError as exc:
             if cancel():
                 raise Cancelled('Job cancelled')
+            diagnostic['error_category'] = 'gpu_out_of_memory' if 'cuda out of memory' in str(exc).lower() else 'worker_error'
             if 'cuda out of memory' in str(exc).lower():
                 raise RuntimeError('GPU memory is full. Your saved results are unchanged. '
                     'Retry on GPU after closing other GPU apps; for transcription, choose shorter segments. '
@@ -104,11 +107,21 @@ def invoke(task, payload, directory, cancel=lambda: False, device='auto', progre
         result = json.loads(partial.read_text(encoding='utf-8'))
         if not isinstance(result, dict):
             raise ValueError('Worker result must be a JSON object')
+        diagnostic.update(status='succeeded', device=result.get('_device', config.get('device','cpu')), resources=result.pop('_resources', {}))
         result['_execution'] = dict(worker_exited=True, cpu_fallback=False, device=result.pop('_device', config.get('device', 'cpu')))
         partial.write_text(json.dumps(result, ensure_ascii=False), encoding='utf-8')
         partial.replace(destination)
         return result
     finally:
+        diagnostic['elapsed_seconds'] = round(time.monotonic() - started, 2)
+        diagnostic['utc'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        try:
+            log = directory / 'model-diagnostics.json'
+            history = json.loads(log.read_text(encoding='utf-8')) if log.is_file() else []
+            if not isinstance(history, list): history = []
+            log.write_text(json.dumps((history + [diagnostic])[-100:]), encoding='utf-8')
+        except (OSError, ValueError):
+            pass  # Diagnostic storage must never lose a successful edit.
         status_path.unlink(missing_ok=True)
         request.unlink(missing_ok=True)
         partial.unlink(missing_ok=True)

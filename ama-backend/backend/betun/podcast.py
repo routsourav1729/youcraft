@@ -64,7 +64,7 @@ def eligible(project, start, end, margin=0.5):
     return not any(s.start < end and s.end > start and (s.locked or s.layout in ('both', host_camera)) for s in project.shots)
 
 
-def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6):
+def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6, host_target=None):
     """Rank measured contiguous spans, at most one per interval; never synthesize gaze scores."""
     ranked = []
     for row in rows:
@@ -83,11 +83,20 @@ def suggestions(project, rows, interval=60, spacing=15, minimum=3, maximum=6):
         ranked.append(Reaction(start=a, end=b, clip_id=clip.id,
             score=min(1, max(0, row['score'])), cues=row.get('cues', [])))
     chosen, counts = [], {}
+    host_camera = project.settings.speaker_camera.get(project.settings.host_speaker)
+    base = sum(s.end - s.start for s in project.shots if s.layout in (host_camera, 'both'))
+    kept = [r for r in project.reactions if r.decision == 'keep']
+    budget = None if host_target is None else max(0., project.duration * host_target - base - sum(r.end-r.start for r in kept))
+    used = 0.
+
     for r in sorted(ranked, key=lambda r: (-r.score, r.start)):
         bucket = int(r.start // interval)
-        if counts.get(bucket, 0) >= 1 or any(r.start < x.end + spacing and r.end > x.start - spacing for x in chosen):
+        if budget is not None and (used >= budget or any(r.start < x.end and r.end > x.start for x in kept)):
+            continue
+        if (budget is None and counts.get(bucket, 0) >= 1) or any(r.start < x.end + spacing and r.end > x.start - spacing for x in [*chosen, *kept]):
             continue
         chosen.append(r)
+        used += r.end - r.start
         counts[bucket] = counts.get(bucket, 0) + 1
     return sorted(chosen, key=lambda r: r.start)
 

@@ -78,6 +78,8 @@ class Settings(Model):
     meaningful_overlap: float = Field(default=0.6, ge=0, le=10)
     acknowledgement: float = Field(default=0.7, ge=0, le=5)
     overlap_padding: float = Field(default=2, ge=0, le=5)
+    overlap_before: float | None = Field(default=None, ge=0, le=5)
+    overlap_after: float | None = Field(default=None, ge=0, le=5)
     speaker_camera: dict[str, Literal["A", "B"]] = Field(default_factory=lambda: {"SPEAKER_00": "A", "SPEAKER_01": "B"})
     speaker_channel: dict[str, int] = Field(default_factory=dict)
 

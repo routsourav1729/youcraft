@@ -240,7 +240,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         if threshold is None:
             threshold = analysis.get('smile_threshold', .35)
         candidates = rescore_candidates(analysis, threshold)
-        selected = suggestions(project, candidates, interval=options['interval'], spacing=options.get('spacing', analysis['spacing']))
+        selected = suggestions(project, candidates, interval=options['interval'], spacing=options.get('spacing', analysis['spacing']), host_target=options.get('host_target'))
         project.reactions = preserve_choices(project, selected, analysis)
         analysis['selection_counts'] = dict(spans=len(candidates), matching=sum(any(c in row.get('cues', []) for c in ('smile', 'nod')) for row in candidates))
         analysis['interval'] = options['interval']
@@ -257,7 +257,10 @@ def process(store, project, kind, options, directory, cancel, progress):
         if not clips or any(not c.sync_reviewed for c in clips):
             raise ValueError('Review host camera synchronization before reaction analysis')
         for clip in clips:
-            reference = options['references'].get(clip.id)
+            samples = options.get('reference_samples', {}).get(clip.id, [])
+            if len(samples) > 8 or any(not isinstance(t, (int, float)) or not 0 <= t < clip.duration for t in samples):
+                raise ValueError('Use up to eight reference samples within each host recording')
+            reference = samples[0] if samples else options['references'].get(clip.id)
             if kind == 'reactions' and not options.get('reference_image') and (reference is None or not 0 <= reference < clip.duration):
                 raise ValueError('Choose a reference frame within every host camera shard')
             if media.fingerprint(clip.path) != clip.fingerprint:
@@ -283,7 +286,7 @@ def process(store, project, kind, options, directory, cancel, progress):
         project.reaction_analysis = dict(candidates=response['candidates'], measurements=response.get('measurements', []), references=options['references'], reference_image=options.get('reference_image', ''), tolerance=options['tolerance'], interval=options['interval'], spacing=options['spacing'],
                                         smile_threshold=options.get('smile_threshold') if options.get('smile_threshold') is not None else .35,
                                         decisions=project.reaction_analysis.get('decisions', {}))
-        selected = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'])
+        selected = suggestions(project, response['candidates'], interval=options['interval'], spacing=options['spacing'], host_target=options.get('host_target'))
         project.reactions = preserve_choices(project, selected, project.reaction_analysis)
         project.reaction_analysis['selection_counts'] = dict(spans=len(response['candidates']), matching=sum(any(c in row.get('cues', []) for c in ('smile', 'nod')) for row in response['candidates']))
         store.save(project, base_revision)
