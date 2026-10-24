@@ -140,6 +140,8 @@ def manifest(project):
     clips = []
     cursor = 0
     for a, b in zip(spans, spans[1:]):
+        if round((b-a)*TICKS) <= 0:
+            continue
         mid = (a + b) / 2
         if any(c.approved and c.start <= mid < c.end for c in project.cuts):
             continue
@@ -219,6 +221,8 @@ def review_manifest(project, edit=False, clip_id=None, reaction_id=None, include
     spans = sorted(t for t in boundaries if 0 <= t <= project.duration)
     clips = []
     for start, end in zip(spans, spans[1:]):
+        if round(end*TICKS) <= round(start*TICKS):
+            continue
         mid = (start + end) / 2
         sources = {camera: next((c for c in cameras if c.camera == camera and c.offset <= start + tolerance
                    and c.offset + c.duration * c.rate >= end - tolerance), None) for camera in ('A', 'B')}

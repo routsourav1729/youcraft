@@ -3186,12 +3186,23 @@ fn reference_choices(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State, h
 
 fn reactions(app: &mut FilmcraftApp, ui: &mut egui::Ui, s: &mut State) {
     ui.set_min_width(ui.available_width());
+    let cameras = rows(&s.project, "clips");
+    let cameras: Vec<_> = cameras.iter().filter(|c| c["camera"] == "A" || c["camera"] == "B").collect();
+    let sync_ready = !cameras.is_empty() && cameras.iter().all(|c| c["sync_reviewed"] == true);
     ui.horizontal(|ui| {
         ui.strong("Reactions");
+        ui.add_enabled_ui(!s.busy(), |ui| {
+            if button(app, ui, "reactions.check_sync", if sync_ready { "Check sync" } else { "Check sync · required" }) {
+                app.stop();
+                s.review_seek = app.session.playhead().seconds();
+                s.step = 3;
+                s.review_preview(false);
+            }
+        });
         let pending = rows(&s.project, "reactions").iter().filter(|r| r["decision"] == "pending").count();
         ui.weak(format!("{pending} to review"));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_enabled_ui(pending == 0 && !s.busy(), |ui| {
+            ui.add_enabled_ui(pending == 0 && sync_ready && !s.busy(), |ui| {
                 if s.remote && button(app, ui, "open_editor", "Open editor") {
                     s.job("proxies", json!({}));
                 }

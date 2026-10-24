@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 from betun import media, pipeline, sync
-from betun.podcast import review_manifest, TICKS
-from betun.schema import Clip, Project
+from betun.podcast import manifest, review_manifest, TICKS
+from betun.schema import Clip, Project, Shot
 from betun.store import Store
 
 
@@ -26,6 +26,43 @@ def test_selected_shard_preview_has_only_its_picture_and_continuous_master():
     assert p.model_dump()==before
     with pytest.raises(ValueError,match='not found'):
         review_manifest(p,clip_id='missing')
+
+
+def test_reaction_preview_keeps_both_cameras_on_master_clock_with_drift_and_shards():
+    p=Project(name='1080p podcast',duration=20,clips=[
+        Clip(id='master',path='master.wav',camera='master',duration=20,fingerprint='m'),
+        Clip(id='host1',path='host1.mp4',camera='A',duration=10,offset=0,rate=1.001,
+             frame_rate=25,has_video=True,fingerprint='h1'),
+        Clip(id='host2',path='host2.mp4',camera='A',duration=10,offset=10.01,rate=.999,
+             frame_rate=25,has_video=True,fingerprint='h2'),
+        Clip(id='guest',path='guest.mp4',camera='B',duration=21,offset=-.2,rate=1.0002,
+             frame_rate=25,has_video=True,fingerprint='g')])
+    p.settings.roles_locked=True
+    p.shots=[Shot(start=0,end=20,layout='both')]
+    for clip in p.clips:
+        clip.sync_reviewed=True
+    for offset in (10.01,10.09):
+        p.clips[2].offset=offset
+        plan=review_manifest(p,edit=True)
+        assert plan['master']=='master' and plan['fps']==25
+        assert plan['clips'][0]['start']==0 and plan['clips'][-1]['end']==20*TICKS
+        assert all(s['end']>s['start'] for s in plan['clips'])
+        assert all(a['end']==b['start'] for a,b in zip(plan['clips'],plan['clips'][1:]))
+        for span in plan['clips']:
+            for picture in span['video']:
+                source=next(c for c in p.clips if c.id==picture['asset'])
+                assert picture['speed']==pytest.approx(1/source.rate)
+                master_time=source.offset+picture['source_in']/TICKS*source.rate
+                assert master_time==pytest.approx(span['start']/TICKS,abs=1/TICKS)
+        final=manifest(p)
+        assert all(s['end']>s['start'] for s in final['clips'])
+        assert final['master']==plan['master'] and final['fps']==25
+        for span in final['clips']:
+            preview=next(s for s in plan['clips'] if s['start']==span['start'] and s['end']==span['end'])
+            for picture in span['video']:
+                reference=next(v for v in preview['video'] if v['asset']==picture['asset'])
+                assert picture['source_in']==reference['source_in']
+                assert picture['speed']==reference['speed']
 
 
 def test_sync_searches_each_shard_independently_and_clears_stale_failure(tmp_path,monkeypatch):
