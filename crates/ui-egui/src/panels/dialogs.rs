@@ -33,8 +33,8 @@ pub fn show(app: &mut FilmcraftApp, ctx: &egui::Context) {
     let mut open = true;
     match d {
         Dialog::About => {
-            egui::Window::new(tl!("About FilmCraft"))
-                .id(egui::Id::new("About FilmCraft"))
+            egui::Window::new(tl!("About YouCraft"))
+                .id(egui::Id::new("About YouCraft"))
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
@@ -409,7 +409,7 @@ fn delete_tracks(app: &mut FilmcraftApp, ctx: &egui::Context) -> bool {
     keep
 }
 
-/// Help ▸ About FilmCraft, in three tabs: About (version and the ArtCraft community links),
+/// Help ▸ About YouCraft, in three tabs: About (version and the ArtCraft community links),
 /// Contributors and Models (the credits compiled in from `contributors/contributors.json`, see
 /// `crate::credits` and docs/contributors.md).
 ///
@@ -459,7 +459,7 @@ fn about_tab(app: &mut FilmcraftApp, ui: &mut egui::Ui) {
     crate::brand::paint_wordmark(ui, egui::pos2(r.min.x, r.center().y), 20.0, app.ui.dark);
     ui.add_space(6.0);
     ui.heading("YouCraft");
-    ui.label(tlf!("Version {version}", version = env!("CARGO_PKG_VERSION")));
+    ui.label(tlf!("Version {version}", version = include_str!("../../../../packaging/youcraft-version.txt").trim()));
     ui.label("Odia podcast editing, based on FilmCraft by the ArtCraft team. An independent customized build.");
     ui.add_space(10.0);
     let mut link = |ui: &mut egui::Ui, id: &str, icon: Icon, label: &str, url: &str, primary: bool| {

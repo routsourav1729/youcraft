@@ -27,7 +27,7 @@ def angle(a, b):
 def analyze(payload, config, progress=lambda *args, **kwargs: None):
     import cv2
     import mediapipe as mp
-    lightweight = config['provider'] == 'mediapipe-reference'
+    lightweight = config['provider'] == 'mediapipe-reference' or payload.get('framing_only', False)
     gaze = None
     if not lightweight:
         import torch
@@ -38,7 +38,7 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
         base_options=mp.tasks.BaseOptions(model_asset_path=config['face_model']),
         running_mode=mp.tasks.vision.RunningMode.IMAGE, num_faces=2,
         output_face_blendshapes=True, output_facial_transformation_matrixes=True)
-    rows, references, issues, measurements, reference_candidates = [], {}, {}, [], {}
+    rows, references, issues, measurements, reference_candidates, framing = [], {}, {}, [], {}, {}
     with mp.tasks.vision.FaceLandmarker.create_from_options(opts) as face:
         def measure(frame):
             if frame.shape[1] > 1280:
@@ -87,6 +87,22 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
             try:
                 if not cap.isOpened():
                     raise ValueError('Cannot decode host camera ' + clip['path'])
+                if payload.get('framing_only'):
+                    centers = []
+                    for index in range(9):
+                        progress('Framing cameras', completed=index, total=9, units='frames')
+                        cap.set(cv2.CAP_PROP_POS_MSEC, clip['duration'] * (.1 + index * .1) * 1000)
+                        ok, image = cap.read()
+                        if not ok:
+                            continue
+                        if image.shape[1] > 640:
+                            image = cv2.resize(image, (640, max(1, round(image.shape[0]*640/image.shape[1]))))
+                        result = face.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)))
+                        if len(result.face_landmarks) == 1:
+                            points = result.face_landmarks[0]
+                            centers.append([float((points[33].x+points[263].x)/2), float((points[33].y+points[263].y)/2)])
+                    framing[clip['id']] = centers
+                    continue
                 if payload.get('reference_only'):
                     samples = []
                     times = reference_candidate_times(clip['duration'], payload.get('reference_windows', {}).get(clip['id'], []), payload.get('reference_seed', 0))
@@ -194,7 +210,7 @@ def analyze(payload, config, progress=lambda *args, **kwargs: None):
             finally:
                 cap.release()
                 finished_seconds += clip['duration']
-    return dict(candidates=rows, references=references, issues=issues, measurements=measurements, reference_candidates=reference_candidates)
+    return dict(candidates=rows, references=references, issues=issues, measurements=measurements, reference_candidates=reference_candidates, framing=framing)
 
 
 def reference_candidate_times(duration, speaking_windows, seed=0):

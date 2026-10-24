@@ -146,7 +146,7 @@ def manifest(project):
         shot = next((s for s in project.shots if s.start <= mid < s.end), None)
         layout = shot.layout if shot else 'both'
         reaction = next((r for r in keep if r.start <= mid < r.end), None)
-        if reaction:
+        if reaction and layout != 'both':
             layout = project.settings.speaker_camera[project.settings.host_speaker]
         video = []
         for camera in ('A', 'B') if layout == 'both' else (layout,):
@@ -155,6 +155,8 @@ def manifest(project):
             if source:
                 video.append(dict(asset=source.id, source_in=round(max(0.,(a-source.offset)/source.rate)*TICKS),
                                   speed=1/source.rate, side=camera if layout == 'both' else 'full'))
+                if layout == 'both' and project.settings.split_framing == 'fill':
+                    video[-1]['frame_center'] = [source.frame_x, source.frame_y]
         if not video:
             fallback = next((c for c in cameras if c.offset <= a+tolerance and c.offset+c.duration*c.rate >= b-tolerance),None)
             if fallback:
@@ -191,7 +193,7 @@ def manifest(project):
                     speakers=[dict(name=('Host' if s == project.settings.host_speaker else 'Guest') + ' · ' + s) for s in speakers], words=words))
 
 
-def review_manifest(project, edit=False, clip_id=None, reaction_id=None, include_pending=False):
+def review_manifest(project, edit=False, clip_id=None, reaction_id=None, include_pending=False, framing=False):
     """Unsaved native review sequence: one clock, master audio, all camera shards.
 
     Reviewing never marks sync, captions or reactions as approved.
@@ -226,11 +228,15 @@ def review_manifest(project, edit=False, clip_id=None, reaction_id=None, include
             if source:
                 video.append(dict(asset=source.id, source_in=round(max(0.,(start-source.offset)/source.rate)*TICKS),
                                   speed=1/source.rate, side=side))
+                if side in ('review-top-A', 'review-top-B') and project.settings.split_framing == 'fill':
+                    video[-1]['frame_center'] = [source.frame_x, source.frame_y]
         for camera in ('A', 'B'):
             picture(camera, 'full' if clip_id is not None else 'review-bottom-' + ('A' if camera == project.settings.speaker_camera.get(project.settings.host_speaker, 'A') else 'B') if edit else camera)
         if edit:
             shot = next((s for s in project.shots if s.start <= mid < s.end), None)
             layout = shot.layout if shot else 'both'
+            if framing:
+                layout = 'both'
             if layout != 'both' and any((r.decision == 'keep' or r.id == reaction_id or (include_pending and r.decision == 'pending'))
                                        and r.start <= mid < r.end for r in project.reactions):
                 layout = project.settings.speaker_camera.get(project.settings.host_speaker, layout)

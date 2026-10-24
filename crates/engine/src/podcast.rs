@@ -19,6 +19,8 @@ struct Picture {
     source_in: i64,
     speed: f64,
     side: String,
+    #[serde(default)]
+    frame_center: Option<[f64; 2]>,
 }
 #[derive(Deserialize)]
 struct Span {
@@ -75,6 +77,7 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
         }
         for v in &span.video {
             if v.source_in < 0
+                || v.frame_center.is_some_and(|p| p.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
                 || !v.speed.is_finite()
                 || !(0.98..=1.03).contains(&v.speed)
                 || !(["A", "B", "full"].contains(&v.side.as_str())
@@ -149,7 +152,36 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
                     }
                     Ok(())
                 })?;
-                if picture.side.starts_with("review-") {
+                let split = matches!(picture.side.as_str(), "A" | "B" | "review-top-A" | "review-top-B");
+                if let Some(center) = picture.frame_center.filter(|_| split) {
+                    let (sw, sh) = s.project.source_size(ItemId(item)).ok_or_else(|| bad("podcast.assemble", "camera dimensions missing"))?;
+                    if sw == 0 || sh == 0 { return Err(bad("podcast.assemble", "camera dimensions must be positive")); }
+                    let display = s.project.conformed_source_size(ItemId(item), (1, 1)).unwrap_or((sw as f64, sh as f64));
+                    let (dw, dh) = (display.0.max(1.0), display.1.max(1.0));
+                    let (tw, th) = if plan.review { (480.0, 540.0) } else { (960.0, 1080.0) };
+                    let cover = (tw / dw).max(th / dh);
+                    let fraction = [(tw / (dw * cover)).min(1.0), (th / (dh * cover)).min(1.0)];
+                    let cx = center[0].clamp(fraction[0] / 2.0, 1.0 - fraction[0] / 2.0);
+                    let cy = center[1].clamp(fraction[1] / 2.0, 1.0 - fraction[1] / 2.0);
+                    let left = (cx - fraction[0] / 2.0).max(0.0) * 100.0;
+                    let right = (1.0 - cx - fraction[0] / 2.0).max(0.0) * 100.0;
+                    let top = (cy - fraction[1] / 2.0).max(0.0) * 100.0;
+                    let bottom = (1.0 - cy - fraction[1] / 2.0).max(0.0) * 100.0;
+                    let frame_height = if plan.review { 540.0 } else { 1080.0 };
+                    let fit = (1920.0 / dw).min(frame_height / dh);
+                    let x = if plan.review {
+                        if picture.side.ends_with('A') { 720.0 } else { 1200.0 }
+                    } else if picture.side == "A" { 480.0 } else { 1440.0 };
+                    for id in &clips {
+                        s.execute("effects.apply", json!({"clips":[id.0],"effect":"crop"}))?;
+                        for (param, value) in [("left", left), ("right", right), ("top", top), ("bottom", bottom)] {
+                            s.execute("effects.setParam", json!({"clip":id.0,"effect":"crop","param":param,"value":value}))?;
+                        }
+                        for (param, value) in [("scale", json!(cover / fit * 100.0)), ("anchor", json!([cx * sw as f64, cy * sh as f64])), ("position", json!([x, th / 2.0]))] {
+                            s.execute("effects.setParam", json!({"clip":id.0,"effect":"motion","param":param,"value":value}))?;
+                        }
+                    }
+                } else if picture.side.starts_with("review-") {
                     let source_view = picture.side.starts_with("review-bottom-");
                     let full = picture.side == "review-top-full";
                     let x = if source_view {
@@ -300,6 +332,40 @@ mod tests {
                 {"text":"ନମସ୍କାର","start":sec/2,"end":sec,"speaker":0},{"text":"ଓଡ଼ିଶା","start":5*sec/2,"end":3*sec,"speaker":0}]}});
         (root, plan)
     }
+    #[test]
+    fn split_framing_fills_equal_panes_without_distortion_or_bleed() {
+        let (root, mut plan) = fixture();
+        let guest = root.join("guest.png");
+        image::RgbImage::from_pixel(32, 18, image::Rgb([10, 200, 30])).save(&guest).unwrap();
+        plan["assets"].as_array_mut().unwrap().push(json!({"id":"guest","path":guest}));
+        for review in [false, true] {
+            plan["review"] = json!(review);
+            plan["review_edit"] = json!(review);
+            for span in plan["clips"].as_array_mut().unwrap() {
+                span["video"] = json!([
+                    {"asset":"camera","source_in":0,"speed":1.,"side":if review {"review-top-A"}else{"A"},"frame_center":[0.8,0.5]},
+                    {"asset":"guest","source_in":0,"speed":1.,"side":if review {"review-top-B"}else{"B"},"frame_center":[0.1,0.5]}
+                ]);
+            }
+            let mut s = Session::default();
+            s.execute("podcast.assemble", plan.clone()).unwrap();
+            let path = root.join(if review { "review.png" } else { "output.png" });
+            s.execute("file.exportFrame", json!({"target":"program","path":path})).unwrap();
+            let pixels = image::open(path).unwrap().to_rgb8();
+            let (left, right, height) = if review { (490, 1430, 540) } else { (10, 1910, 1080) };
+            assert_eq!(pixels.dimensions(), (1920, height));
+            for y in [10, height / 2, height - 10] {
+                assert_eq!(pixels.get_pixel(left, y).0, [40, 80, 120]);
+                assert_eq!(pixels.get_pixel(right, y).0, [10, 200, 30]);
+                assert_eq!(pixels.get_pixel(950, y).0, [40, 80, 120]);
+                assert_eq!(pixels.get_pixel(970, y).0, [10, 200, 30]);
+            }
+        }
+        plan["clips"][0]["video"][0]["frame_center"] = json!([2.0, 0.5]);
+        assert!(Session::default().execute("podcast.assemble", plan).is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn review_sequence_keeps_master_audio_through_gaps_and_three_views() {
         let (root, mut plan) = fixture();

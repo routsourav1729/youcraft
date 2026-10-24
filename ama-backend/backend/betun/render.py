@@ -60,7 +60,12 @@ def render(project, directory, preview=False, start=0., end=None, cancel=lambda:
         else:
             for i, source in enumerate(sources):
                 w = width // 2 if len(sources) == 2 else width
-                filters.append(f'[{i}:v:0]setpts=(PTS-STARTPTS)*{source["rate"]},scale={w}:{height}:force_original_aspect_ratio=decrease,pad={w}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},tpad=stop_mode=clone:stop_duration=1[v{i}]')
+                sizing = f'scale={w}:{height}:force_original_aspect_ratio=decrease,pad={w}:{height}:(ow-iw)/2:(oh-ih)/2'
+                if len(sources) == 2 and project.settings.split_framing == 'fill':
+                    clip = next(c for c in project.clips if c.id == source['clip_id'])
+                    sizing = (f'scale={w}:{height}:force_original_aspect_ratio=increase,'
+                              f"crop={w}:{height}:'min(max(iw*{clip.frame_x}-ow/2,0),iw-ow)':'min(max(ih*{clip.frame_y}-oh/2,0),ih-oh)'")
+                filters.append(f'[{i}:v:0]setpts=(PTS-STARTPTS)*{source["rate"]},{sizing},setsar=1,fps={fps},tpad=stop_mode=clone:stop_duration=1[v{i}]')
             filters.append('[v0][v1]hstack=inputs=2[v]' if len(sources) == 2 else '[v0]null[v]')
         args += ['-filter_complex', ';'.join(filters), '-map', '[v]', '-an', '-frames:v', str(frames), '-c:v', codec, '-threads', '2', '-pix_fmt', 'yuv420p']
         if codec == 'libx264':

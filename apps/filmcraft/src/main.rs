@@ -164,8 +164,12 @@ fn main() -> eframe::Result {
 
 /// The main window's options; built for each start attempt (they hold a one-shot hook).
 fn native_options(agent: bool) -> eframe::NativeOptions {
+    let mut viewport = egui::ViewportBuilder::default();
+    if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../../../assets/youcraft/logo.png")) {
+        viewport = viewport.with_icon(icon);
+    }
     eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
+        viewport: viewport
             .with_title(if std::env::var_os("YOUCRAFT_BACKEND_URL").is_some() { "YouCraft · Source development" } else { "YouCraft" })
             .with_inner_size([1280.0, 720.0])
             .with_maximized(true)

@@ -250,6 +250,24 @@ def process(store, project, kind, options, directory, cancel, progress):
             smile_threshold=threshold, host_target=options.get('host_target'))
         store.save(project, base_revision)
         return dict(revision=base_revision+1, suggestions=len(project.reactions))
+    if kind == 'framing':
+        clips = [c for c in project.clips if c.camera in ('A', 'B') and c.has_video and not c.framing_reviewed]
+        if not clips:
+            raise ValueError('No unconfirmed camera framing. Unlock framing to suggest it again.')
+        for clip in clips:
+            if media.fingerprint(clip.path) != clip.fingerprint:
+                raise ValueError('Camera source changed; reimport before framing')
+        response = providers.invoke('reactions', dict(clips=[c.model_dump() for c in clips], framing_only=True),
+            cache, cancel, device='cpu', progress=progress)
+        from .framing import stable_center
+        changed = 0
+        for clip in clips:
+            center = stable_center(response.get('framing', {}).get(clip.id, []))
+            if center is not None:
+                clip.frame_x, clip.frame_y = center
+                changed += 1
+        store.save(project, base_revision)
+        return dict(revision=base_revision+1, framed=changed, needs_review=len(clips))
     if kind in ('reactions', 'reference_suggestions'):
         from .podcast import suggestions
         if not project.settings.roles_locked or not project.shots:

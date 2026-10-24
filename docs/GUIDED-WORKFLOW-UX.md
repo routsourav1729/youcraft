@@ -30,14 +30,21 @@ frontend migration. That migration is not necessary for these workflow repairs.
   recorded native project. Native edits must save successfully before switching.
 - Metadata exchange is available in Project files and through the control API.
 
-## Remaining layout work
+## Added in 0.1.15
 
-Audio, Speakers and Cameras still need a full composition pass using the above
-responsibilities. Refine them while testing a complete new episode, with primary
-actions at the end of each completed step, technical settings collapsed, and
-two-column source/assignment layouts where space allows. Transcript needs the
-same refinement of its correction tools; its large two-camera preview remains.
-Do not call this broader redesign complete based on the reaction page alone.
+Audio now separates recording and processing; Speakers uses paired role cards;
+Cameras uses host/guest columns with per-recording sync and framing controls.
+The grid stacks at narrow widths. Camera preview height is independent from the
+larger Transcript/Reactions view. Input-dependent actions are disabled until
+usable. Native editor branding consistently identifies YouCraft.
+
+## Remaining refinement
+
+Transcript correction tools and full editor discoverability still need further
+refinement. Automatic framing is a stable camera crop for seated recordings, not
+continuous subject tracking or a guarantee that hands remain visible. Always
+allow Fit full image and manual correction. Do not call this a complete design
+system or a frontend migration.
 
 ## Verification rules
 

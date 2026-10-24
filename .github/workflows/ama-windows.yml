@@ -68,7 +68,7 @@ jobs:
           python -m pip install '.[packaging,test]'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if ('${{ inputs.full_checks }}' -eq 'true') { python -m pytest -q tests }
-          else { python -m pytest -q tests/test_project_persistence.py tests/test_reaction_flow.py tests/test_reaction_calibration.py }
+          else { python -m pytest -q tests/test_project_persistence.py tests/test_reaction_flow.py tests/test_reaction_calibration.py tests/test_framing.py tests/test_podcast_workflow.py tests/test_podcast_render.py }
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m PyInstaller packaging/betun.spec --noconfirm
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

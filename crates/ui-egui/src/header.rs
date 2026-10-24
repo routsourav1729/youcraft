@@ -29,6 +29,11 @@ pub fn show(app: &mut FilmcraftApp, ui: &mut egui::Ui, rect: Rect) {
         return;
     }
     let mut x = rect.min.x + if app.integrated_titlebar { 104.0 } else { 14.0 };
+    if let Some(texture) = crate::brand::wordmark(ui.ctx(), app.ui.dark) {
+        let logo = Rect::from_center_size(pos2(x + 12., rect.center().y), vec2(24., 24.));
+        p.image(texture.id(), logo, Rect::from_min_max(pos2(0.28, 0.20), pos2(0.72, 0.62)), Color32::WHITE);
+        x += 34.;
+    }
     // Home
     let home = Rect::from_center_size(pos2(x + 10.0, rect.center().y), vec2(26.0, 26.0));
     let hresp = ui.interact(home, egui::Id::new("hdr-home"), Sense::click()).on_hover_text(tl!("Home"));

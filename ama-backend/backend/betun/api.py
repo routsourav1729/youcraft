@@ -39,7 +39,7 @@ class Revision(Model):
 
 
 class JobRequest(Model):
-    kind: Literal['import', 'attach_cameras', 'sample', 'sync_preview', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'reaction_select', 'reference_suggestions', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
+    kind: Literal['import', 'attach_cameras', 'sample', 'sync_preview', 'reference_frame', 'filmcraft_export', 'reaction_preview', 'proxies', 'reactions', 'reaction_select', 'reference_suggestions', 'framing', 'sync', 'waveform', 'diarize', 'transcribe', 'shots', 'translate', 'transliterate', 'preview', 'export']
     options: dict = Field(default_factory=dict)
 
 
@@ -371,9 +371,9 @@ def create_app(root=None, token=None):
         return playback_plan(pid, manifest(store.get(pid)))
 
     @app.get('/v1/projects/{pid}/review-plan')
-    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None, reaction_id: str | None = None, include_pending: bool = False):
+    def review_plan(pid: str, edit: bool = False, clip_id: str | None = None, reaction_id: str | None = None, include_pending: bool = False, framing: bool = False):
         from .podcast import review_manifest
-        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id, reaction_id, include_pending))
+        return playback_plan(pid, review_manifest(store.get(pid), edit, clip_id, reaction_id, include_pending, framing))
 
     @app.get('/v1/projects/{pid}/proxies/{filename}')
     def proxy(pid: str, filename: str):

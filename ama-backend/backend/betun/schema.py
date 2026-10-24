@@ -39,6 +39,9 @@ class Clip(Model):
     sync_reviewed: bool = False
     sync_locked: bool = False
     warnings: list[str] = Field(default_factory=list)
+    frame_x: float = Field(default=0.5, ge=0, le=1)
+    frame_y: float = Field(default=0.5, ge=0, le=1)
+    framing_reviewed: bool = False
 
 
 class Activity(Span):
@@ -70,6 +73,7 @@ class Cut(Span):
 
 
 class Settings(Model):
+    split_framing: Literal['fill', 'fit'] = 'fill'
     compute_device: Literal['auto', 'cpu', 'cuda'] = 'auto'
     transcription_segment_seconds: float = Field(default=28, ge=8, le=28)
     host_speaker: str | None = None
