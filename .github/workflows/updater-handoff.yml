@@ -18,3 +18,20 @@ jobs:
           if ($LASTEXITCODE) { throw 'Transaction regression failed' }
           & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File packaging/tests/updater-handoff.ps1
           if ($LASTEXITCODE) { throw 'Handoff regression failed' }
+      - name: Package standalone updater repair
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory repair | Out-Null
+          $source = Get-Content packaging/ama/Update-YouCraft.ps1 -Raw
+          $source = $source.Replace('param([string]$InstallDirectory = $PSScriptRoot)', 'param([string]$InstallDirectory = (Join-Path $env:LOCALAPPDATA "Programs/YouCraft"))')
+          $source = $source.Replace(". (Join-Path `$PSScriptRoot 'Apply-FileUpdate.ps1')", (Get-Content packaging/ama/Apply-FileUpdate.ps1 -Raw))
+          $source | Set-Content repair/Repair-YouCraft-Update.ps1 -Encoding utf8
+          $tokens = $null; $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$pwd/repair/Repair-YouCraft-Update.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count) { throw ($errors | Out-String) }
+          '@echo off' + "`r`npowershell.exe -NoProfile -ExecutionPolicy Bypass -File `"%~dp0Repair-YouCraft-Update.ps1`" %*`r`n" | Set-Content repair/Update-YouCraft.cmd -Encoding ascii
+          Compress-Archive repair/* YouCraft-Updater-Repair.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YouCraft-Updater-Repair
+          path: YouCraft-Updater-Repair.zip
