@@ -1,0 +1,1860 @@
+{
+  "version": "0.1.12",
+  "files": [
+    {
+      "path": "AI-WORKFLOW.md",
+      "size": 5249,
+      "sha256": "34ff117c1304cccb469ed406df31f21765c1653f6f6c6615ee7ee90b9cbc450b",
+      "download_size": 2516,
+      "download_sha256": "6399a8cc744cfce6f7fce92fbe397345bb0661bf86565a9f17f1bd649f79ae99"
+    },
+    {
+      "path": "Apply-FileUpdate.ps1",
+      "size": 3567,
+      "sha256": "d755ebade7798a727b045527dff0b786690a4ed63b612605e1faf2ee32828e68",
+      "download_size": 1224,
+      "download_sha256": "596bcdc5f57331caa4943fec9489b5ceeff70c372e6aebab293657c2a4e74c34"
+    },
+    {
+      "path": "ATTRIBUTION.md",
+      "size": 25563,
+      "sha256": "5fad2c62e6bec84486ea9fde40a61fd248d86e73b7c1cdd81c9af984de1e13ed",
+      "download_size": 5317,
+      "download_sha256": "0dbf451225144f02ecea276e4b160e2e7e025c5ff0567cd426e327837e0319a3"
+    },
+    {
+      "path": "Background-Update.ps1",
+      "size": 12102,
+      "sha256": "9dcb08c8b65a0e29719c07e9f2a886aabab577e94dc02d7bf08607e3e26268a7",
+      "download_size": 3701,
+      "download_sha256": "86af262ab4c19dc6e7481f4a7795cbdf9cdbcec07207718ff91acc6042ecd620"
+    },
+    {
+      "path": "BetunBackend/_internal/_asyncio.pyd",
+      "size": 65304,
+      "sha256": "746bc8fa88282afe19dc60e426cc0a75bea3bd137cca06a0b57a30bd31459403",
+      "download_size": 30382,
+      "download_sha256": "0de9f01523a3698c3f37e173acee97b63aadfe4bbb8ea4d2609a0be1f79d8e5d"
+    },
+    {
+      "path": "BetunBackend/_internal/_bz2.pyd",
+      "size": 84760,
+      "sha256": "00b8ca9a338d2b47285c9e56d6d893db2a999b47216756f18439997fb80a56e3",
+      "download_size": 45313,
+      "download_sha256": "9696cc94e44a81770d5218b13d3bd36609d4578e8fe0308f88a252cf0e7c8fd6"
+    },
+    {
+      "path": "BetunBackend/_internal/_ctypes.pyd",
+      "size": 124696,
+      "sha256": "c148292328f0aab7863af82f54f613961e7cb95b7215f7a81cafaf45bd4c42b7",
+      "download_size": 57661,
+      "download_sha256": "3f812aeb56c2ae678f19da025bd12d702aa6075230d675f897bbd27b76119e0c"
+    },
+    {
+      "path": "BetunBackend/_internal/_decimal.pyd",
+      "size": 255768,
+      "sha256": "980a63f2b39cf16910f44384398e25f24482346a482addb00de42555b17d4278",
+      "download_size": 123120,
+      "download_sha256": "5f2fa82dff5959e40dd3e1bad6a409bab2dbde28f7d7c30f7b0266617bb9e372"
+    },
+    {
+      "path": "BetunBackend/_internal/_hashlib.pyd",
+      "size": 65304,
+      "sha256": "87dd0c858620287454fd6d31d52b6a48eddbb2a08e09e8b2d9fdb0b92200d766",
+      "download_size": 29910,
+      "download_sha256": "e8702da119df8fe9399ee043fd02515d102490e0c789cf7a7c731614bda53bf0"
+    },
+    {
+      "path": "BetunBackend/_internal/_lzma.pyd",
+      "size": 159512,
+      "sha256": "f5e01b516c2c23035f7703e23569dec26c5616c05a929b2580ae474a5c6722c5",
+      "download_size": 88672,
+      "download_sha256": "65d8ded7aefd1762a16082000e90495ebe148963035d2f560bd792a2299100c9"
+    },
+    {
+      "path": "BetunBackend/_internal/_multiprocessing.pyd",
+      "size": 34584,
+      "sha256": "975c1947798e3c39898c86675ca1eb68249f77361f41f172f9800275227213b9",
+      "download_size": 19061,
+      "download_sha256": "be0ac2a12a87bea552a4df656deb69ce83cba95806ec3242bb29001f2ad70ce7"
+    },
+    {
+      "path": "BetunBackend/_internal/_overlapped.pyd",
+      "size": 51480,
+      "sha256": "ca106e4dfdeafeabf9e98956d3d8d0cb73e109f1a96f1a7e35bc47dbd7c7e164",
+      "download_size": 26085,
+      "download_sha256": "c0599d0f10601c9cbaaaa0e24b421263216234017f9c1a2966e625fc5fe3bdf9"
+    },
+    {
+      "path": "BetunBackend/_internal/_queue.pyd",
+      "size": 32024,
+      "sha256": "3f8e7e6aa13b417acc78b63434fb1144e6319a010a9fc376c54d6e69b638fe4c",
+      "download_size": 17887,
+      "download_sha256": "05a03f740f642dcc5c7ffb80fae3fc135a5ecdf38d6d9ae9012ad14ca90a485c"
+    },
+    {
+      "path": "BetunBackend/_internal/_socket.pyd",
+      "size": 79640,
+      "sha256": "a19e3c7c03ef1b5625790b1c9c42594909311ab6df540fbf43c6aa93300ab166",
+      "download_size": 38327,
+      "download_sha256": "ddd42d07cdc40ce0b5fe44ac70af6f1d60925c56b0f501dff0b6ec48a55eb645"
+    },
+    {
+      "path": "BetunBackend/_internal/_sqlite3.pyd",
+      "size": 120600,
+      "sha256": "ff6a2a2f38b21b7784f97d604c99961d8c07ef455f7908110a4e893835d42b76",
+      "download_size": 55890,
+      "download_sha256": "5c77ddcf533f4947d82831947219c8d699077f891a8c6bb225734dd6801a0518"
+    },
+    {
+      "path": "BetunBackend/_internal/_ssl.pyd",
+      "size": 178456,
+      "sha256": "ba5388d6a6557d431e086734a3323621dc447f63ba299b0a815e5837cf869678",
+      "download_size": 71199,
+      "download_sha256": "aebc0271f1011383246a38df7449bb5d72712eb62e31f5ca7ea2aa1de1e9f68d"
+    },
+    {
+      "path": "BetunBackend/_internal/_uuid.pyd",
+      "size": 25368,
+      "sha256": "e6aa7f1637e211251c9d6f467203b2b6d85e5bc2d901699f2a55af637fa89250",
+      "download_size": 14768,
+      "download_sha256": "d95c7fc010e1b7782af2af27522f9c7a5075959779abfde49891c41a5213a447"
+    },
+    {
+      "path": "BetunBackend/_internal/_zoneinfo.pyd",
+      "size": 45848,
+      "sha256": "7e7b4157e401f8281fd85b68f2e21c828bf739c91416b2824dd22cb385eef819",
+      "download_size": 24859,
+      "download_sha256": "1eee1a887b6bb41ca8bc2ad786f657b2be2188ee187dc7d4a6381b08a62580e3"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-console-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "88ace577a9c51061cb7d1a36babbbefa48212fadc838ffde98fdfff60de18386",
+      "download_size": 7730,
+      "download_sha256": "2d9e1e71057517c96c58e38b3a11d6fe0e36c64a8c9cfdf083dce44dad62ce41"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-datetime-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "1bd81dfd19204b44662510d9054852fb77c9f25c1088d647881c9b976cc16818",
+      "download_size": 7544,
+      "download_sha256": "312f97515444433b108db865d97a461f76918295330ff77bd024b19dbd27def8"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-debug-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "591358eb4d1531e9563ee0813e4301c552ce364c912ce684d16576eabf195dc3",
+      "download_size": 7433,
+      "download_sha256": "189078284a9441ecb5da3949de5dcf671eeef1b9edb495bf35115a80591c6dba"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-errorhandling-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "d56ce7b1cd76108ad6c137326ec694a14c99d48c3d7b0ace8c3ff4d9bcee3ce8",
+      "download_size": 7628,
+      "download_sha256": "59f874c6cbf9ad02e2000665b0a4ae66959fa09d00f5207dd8a76e68fff9712e"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-fibers-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "91d249d7bc0e38ef6bcb17158b1fdc6dd8888dc086615c9b8b750b87e52a5fb3",
+      "download_size": 7570,
+      "download_sha256": "9bc2c5c872570743a1fbd240e4fb51a7a607088155b593f9908cf1b08283b087"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-fibers-l1-1-1.dll",
+      "size": 22072,
+      "sha256": "fc9d86cec621383eab636ebc87ddd3f5c19a3cb2a33d97be112c051d0b275429",
+      "download_size": 7524,
+      "download_sha256": "5656c374d3b613f17366eacda00d010baec6cae16b59536ec60d967bdfd51d19"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-file-l1-1-0.dll",
+      "size": 26152,
+      "sha256": "1ca895aba4e7435563a6b43e85eba67a0f8c74aa6a6a94d0fc48fa35535e2585",
+      "download_size": 8704,
+      "download_sha256": "c1b8d943b61917446c9b7567f3024c0756aecb36096f17ff41805bb674f28d0f"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-file-l1-2-0.dll",
+      "size": 22056,
+      "sha256": "4cadbc0c39da7c6722206fdcebd670abe5b8d261e7b041dd94f9397a89d1990d",
+      "download_size": 7580,
+      "download_sha256": "55d57edfa573f2b450bf811d1af5c5e1681eb6679ab755f019460f937b173b3a"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-file-l2-1-0.dll",
+      "size": 21960,
+      "sha256": "93c624b366ba16c643fc8933070a26f03b073ad0cf7f80173266d67536c61989",
+      "download_size": 7582,
+      "download_sha256": "6b993e04a1d2d202de05d44974117414219d22bed7b3fe683f29f28a44fcfa8b"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-handle-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "39095f59c41d76ec81bb2723d646fde4c148e7cc3402f4980d2ade95cb9c84f9",
+      "download_size": 7458,
+      "download_sha256": "371d958b82358a302f75ab5fe2346e6ce6b4e58db5af47bc489964511238dc17"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-heap-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "8f105771b236dbcb859de271f0a6822ce1cb79c36988dd42c9e3f6f55c5f7eb9",
+      "download_size": 7767,
+      "download_sha256": "6dd9a7912b9f0ad69caac2e5897a9806dbc95ca432e068f1bf8111d7cf7af912"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-interlocked-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "53b25e753ca785bf8b695d89dde5818a318890211dc992a89146f16658f0b606",
+      "download_size": 7627,
+      "download_sha256": "b15ffd9ed49978565017c96ea1375ccb136590afe36e6eec17f28b2d470f2f53"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-kernel32-legacy-l1-1-1.dll",
+      "size": 22080,
+      "sha256": "a9b13a1cd1b8c19b0c6b4afcd5bb0dd29c0e2288231ac9e6db8510094ce68ba6",
+      "download_size": 7863,
+      "download_sha256": "ae8495b0f19585af6e9a21bcc964a006978242392cffdda41364a4765059d896"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-libraryloader-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "7f39ba298b41e4963047341288cab36b6a241835ee11ba4ad70f44dacd40906c",
+      "download_size": 7911,
+      "download_sha256": "c5e1ad364073078670e414a4b8fc664612f0feb0e8a0fad90a97da80a432b228"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-localization-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "6ee44dd0d8510dc024c9f7c79b1b9fa88c987b26b6beb6653ddd11751c34e5dc",
+      "download_size": 8461,
+      "download_sha256": "0cceef12a4dc23268dfa51fab2bde79c7de335f3030f9c14e1c2adfe9c7f5aa0"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-memory-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "0512a35316ec9180437f86696a84c5c06a7e4e82e050055a656e5bf9fca206f9",
+      "download_size": 7744,
+      "download_sha256": "1d47f366c0dcd4c2fb71f15c3a11cbb5f73dd445332e976143e9b5d0d5eda8d9"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-namedpipe-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "c05f1fffe3b5a2738ea54ce9485cca026fb9635f982626fba1e1dcc531897273",
+      "download_size": 7687,
+      "download_sha256": "9225aaf66969ac65e0b0c68886191ed8e7bb7f87685a82e2ea2ddf522f5e73d1"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-processenvironment-l1-1-0.dll",
+      "size": 21968,
+      "sha256": "c4eca98c3c67b6395d5b005b00ac1eb0318b86b23aa71035a44c2b1602befba9",
+      "download_size": 7717,
+      "download_sha256": "fc4821495021ea4ea329443605f680570b7d326391eefacb04deb70abe35c91e"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-processthreads-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "5ccb89e93d67bc3288d4e84649c5346e66e15e3d7cd65d989daf3f4cb584be9a",
+      "download_size": 8351,
+      "download_sha256": "3dcd3a044ef37a655997ed357cb93d4bcd9279ac6f81b1975372b9e7471bb690"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-processthreads-l1-1-1.dll",
+      "size": 22072,
+      "sha256": "4ad565a8ba3ef0ea8ab87221ad11f83ee0bc844ce236607958406663b407333e",
+      "download_size": 7797,
+      "download_sha256": "fae372aa50b890a497dce7232ea20705703c26be1a4af0ea0dcbbb3ca37b1d13"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-profile-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "7809160932f44e59b021699f5bc68799eb7293ee1fa926d6fcca3c3445302e61",
+      "download_size": 7551,
+      "download_sha256": "c344f0a12dc0b5ca22751facda3597a2bc29692c16369c504667a21984f43c4b"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-rtlsupport-l1-1-0.dll",
+      "size": 21960,
+      "sha256": "9dc1e91e71c7c054854bd1487cb4e6946d82c9f463430f1c4e8d1471005172b1",
+      "download_size": 7663,
+      "download_sha256": "b782b1bb6c25ca8f130e54fb0da12a66983800ddfb27c1a45067e3f975b2c4ff"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-string-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "60fc31d2a0c634412f529dba76af3b9bf991352877c6dae528186d3935704cfd",
+      "download_size": 7629,
+      "download_sha256": "fb866a5d6f0e8f3dd8cbaa68bcf7d8a574e18c027d1d2b030a829234b31e2f74"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-synch-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "3a72b4f29f39a265d32ad12f0ce15dbf60129c840e10d84d427829ede45e78ad",
+      "download_size": 8152,
+      "download_sha256": "a8df5240cb0d6ac839d73f0efcae8982729381688671b04e74ca39440f4b2bdf"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-synch-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "efc1e4460984a73cf47a3def033af1c8f3b1dbc1a56cd27781d3aacf3e3330cb",
+      "download_size": 7830,
+      "download_sha256": "f389b8bfeb4337a4f09cc7eb2213c010ee7cab0577e08547fc17d5efd1d13caf"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-sysinfo-l1-1-0.dll",
+      "size": 22072,
+      "sha256": "b203d862ddef1dd62bf623fc866c7f7a9c317c1c2ae30d1f52cb41f955b5698e",
+      "download_size": 7883,
+      "download_sha256": "d6ee06e7824b29df3ee976d19cfe93b39c3bcee2d00bc5b5275e92a3f711ad9a"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-sysinfo-l1-2-0.dll",
+      "size": 22080,
+      "sha256": "2703635d835396afd0f138d7c73751afe7e33a24f4225d08c1690b0a371932c0",
+      "download_size": 7711,
+      "download_sha256": "c3901c09b667c5ff73b332efbe82b938cfba420a62224cc355187cc306d4c370"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-timezone-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "33f4fddc181066fce06b2227bded813f95e94ed1f3d785e982c6b6b56c510c57",
+      "download_size": 7736,
+      "download_sha256": "7215153d77cfbed89494d963e0022af38b9dff3870ff465d0ee2301b6479df63"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-core-util-l1-1-0.dll",
+      "size": 21944,
+      "sha256": "6eda016742a6171205a387a14b3c0b331841567740376f56768f8c151724207d",
+      "download_size": 7444,
+      "download_sha256": "a0695974b8c5cabe6bfa3e47e33b32c78fc08abc66970c4e78d13370e1aefa7e"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-conio-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "b762061b688aae679afe788904d2c9970f74a7dac98f3b42463d08f25e483d3f",
+      "download_size": 7898,
+      "download_sha256": "7a123cfc3b61bee4abdf2e7a5343e889d3b060dfdae030fd850397c1114baa54"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-convert-l1-1-0.dll",
+      "size": 26056,
+      "sha256": "ebb2ae5535a64f65daeab8235585114fc9dd2cf1a49f5852d446250b998b6ae4",
+      "download_size": 8858,
+      "download_sha256": "708a5c8220266bf7a1fb10bd3cc96a6ce0bf110989f955fdaadb1dd862bffc12"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-environment-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "17d63275d00bdd8670422b95bd264c532998e0a1b041079e54fce4b6b7a55819",
+      "download_size": 7751,
+      "download_sha256": "788d5885d43aa0235adeb6f3699f71611e60707f2f15ea3c83d85d707278c376"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-filesystem-l1-1-0.dll",
+      "size": 22056,
+      "sha256": "9a9e2a65a281644e368d0f272b95ba5f6b445d1c35910d06056c5ebeb77402db",
+      "download_size": 8360,
+      "download_sha256": "35d64a6145ccc4f48e1d1d2b2699525eb7f933b3a3ac8eb24e0bc4b041a392ae"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-heap-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "bab9ac3ec83e380ae51e4295ef3bf2c738627812d3a49d1e713661abbc8dc57a",
+      "download_size": 7898,
+      "download_sha256": "e8574b7db98f7bad8fa7873de779cff8169d104c84388e66d7c8f4e55e27f00d"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-locale-l1-1-0.dll",
+      "size": 22080,
+      "sha256": "bd14c67ea28e21d6257ad780a37122c9b5773f69e693f5db6bffaee4d839526e",
+      "download_size": 7866,
+      "download_sha256": "7ee5f470e3efcb515d5424d7158783128f627418230d83059e231e93885cb1bb"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-math-l1-1-0.dll",
+      "size": 30248,
+      "sha256": "606d66d82db562ea7979179d06486a0f94d079941d26b80a1e2c49d29959df6f",
+      "download_size": 10857,
+      "download_sha256": "9473e5eec0e54108258ddd2294f5463bf7a28d8dcbffae213619af38756470f4"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-private-l1-1-0.dll",
+      "size": 75328,
+      "sha256": "1bc82bed6143d2bf1b6b08a7809f4a5e29317d6fddd338a7da3c0223522e4bbf",
+      "download_size": 22482,
+      "download_sha256": "7685119718855896cfcc14cec5f453fffaf88436f3019508c2e098d857a2598a"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-process-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "f6156b1020380ec4f0e48577ebedaaef5fb1ab1f337d8b4e72e6a33a7567a9cc",
+      "download_size": 7942,
+      "download_sha256": "a01a211af0b3012ca4c770d16307d58437b96bbffa71f4478300af3cbaded011"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-runtime-l1-1-0.dll",
+      "size": 26152,
+      "sha256": "c5902934d026d7e15fbe9917d474f3322846a41a25e66f4b2b1f758801879f4b",
+      "download_size": 9157,
+      "download_sha256": "f773adcd6fa2ddfd6f715ef976f030833491a92fb7b0212ec1ce6f5e88b1f6f3"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-stdio-l1-1-0.dll",
+      "size": 26168,
+      "sha256": "a9c5a153d8c0286f9b41a2b1c65854ad9e6471b8755b7de87bae4470e60bcab6",
+      "download_size": 9605,
+      "download_sha256": "e4ca25c7db51a254e76866627f487764984a5a5a08b567fd0841ddd84f413b26"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-string-l1-1-0.dll",
+      "size": 26176,
+      "sha256": "25b8f83a7767211b11132775a0e27a45aa4ec8ab4e6572599f9c172ae3606b40",
+      "download_size": 9764,
+      "download_sha256": "e244d0e6924ca5c714cd719c905d38c1df49bf4c9ae9fdfb351387619bee028c"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-time-l1-1-0.dll",
+      "size": 22096,
+      "sha256": "7c7f6393f06de11750adb09cc5698ae55cd9fb27b2e51e207286feb1b5b2b156",
+      "download_size": 8441,
+      "download_sha256": "e194382faa908012320b76f29e96b3aebfa56ec42c251ae9b58b7931bef964d1"
+    },
+    {
+      "path": "BetunBackend/_internal/api-ms-win-crt-utility-l1-1-0.dll",
+      "size": 21952,
+      "sha256": "d8ba5f17b9ffcbf3aeaf3fa1da226832d2fa90f81acce0cd669464e76ce434ac",
+      "download_size": 7768,
+      "download_sha256": "10170e9d850fac09e4df1567e22f59c75575a5d8e0dc85f255a69920579de262"
+    },
+    {
+      "path": "BetunBackend/_internal/base_library.zip",
+      "size": 1443565,
+      "sha256": "5a715b830efdd434659dd7122d4b3143660506e79dda46c366a5569692d10af9",
+      "download_size": 418384,
+      "download_sha256": "8008ffd97d8f6ed7bda95d171b2482d023369d19da07fab7c549868faac40d8a"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/model_worker.py",
+      "size": 8939,
+      "sha256": "58dfc1a343cd6555d1999a66b47f620d7b471e7264f1e1ef90814fae3e1e27c9",
+      "download_size": 3094,
+      "download_sha256": "686945536f3ab1eec3ce212b39690a57099306761c65d20531f670e40299a99a"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/ui/app.js",
+      "size": 20700,
+      "sha256": "5ade686407a12c812b6f71964376f33455ee59f93c8fe9e22f71389d4b0ff38e",
+      "download_size": 7040,
+      "download_sha256": "f4a0fbd35a209d02301bbfc3c2dbb2acfb49a0a94f6bd538c340cd7804a28cdd"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/ui/index.html",
+      "size": 3969,
+      "sha256": "79fb0d3171bbef327c186530b3474672c71b31a25ee70d1a9433b3ff2e4718a4",
+      "download_size": 1688,
+      "download_sha256": "7ed8b80e08b63c96bf84f023f570ec89a707dd435abfaf7ac117c56201d274ef"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/ui/review-data.js",
+      "size": 80,
+      "sha256": "964203ab9e454167441a6e2a991c45a94bfe279427fa09ede1a1725f06f766d6",
+      "download_size": 90,
+      "download_sha256": "36803fb9c5e83c414dc554ad024801616f315aaeef118bbf4a32761dc9dbf8a0"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/ui/style.css",
+      "size": 4401,
+      "sha256": "8f1cf326b61a9f810e72a009bd06088271210bbd0bfbd9304d744466ab72b253",
+      "download_size": 1465,
+      "download_sha256": "0c4251748b5401ddd4edb133c0ecbf7930a61a84503b01f7c9c55059e6605c0b"
+    },
+    {
+      "path": "BetunBackend/_internal/betun/vision_worker.py",
+      "size": 10576,
+      "sha256": "34dc1fde9c43f06f522791350bd8a3ee10100323da223b2ed484945a092b1b0e",
+      "download_size": 3458,
+      "download_sha256": "dbd4d721801a0eac36fdc226b9851ec3ee8f394c8e549f7705cb566c74e20f71"
+    },
+    {
+      "path": "BetunBackend/_internal/click-8.5.0.dist-info/INSTALLER",
+      "size": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
+      "download_size": 24,
+      "download_sha256": "4b981a6384e76c634a72c12ce50f5901eeb31c650b422277e1cbad64f5a90841"
+    },
+    {
+      "path": "BetunBackend/_internal/click-8.5.0.dist-info/licenses/LICENSE.txt",
+      "size": 1475,
+      "sha256": "9a8ad106a394e853bfe21f42f4e72d592819a22805d991b5f3275029292b658d",
+      "download_size": 787,
+      "download_sha256": "a8b7f9a713fc880749ee54b124c265a3b659c081fb9784fc17cef505b7a130f3"
+    },
+    {
+      "path": "BetunBackend/_internal/click-8.5.0.dist-info/METADATA",
+      "size": 2567,
+      "sha256": "e87bce0bd194de70dfb8e708e0a6b0483009f25611804eaf87bfeb63e6c20501",
+      "download_size": 1294,
+      "download_sha256": "94684fa229e2c3b4ba607addfb2ccd3b301f4b1f67b47179be7bf5ce86a11a30"
+    },
+    {
+      "path": "BetunBackend/_internal/click-8.5.0.dist-info/RECORD",
+      "size": 2533,
+      "sha256": "4a422099194046f68c30cc3d7ef8eea6f91185842623182989406a652fe69272",
+      "download_size": 1212,
+      "download_sha256": "e0599c1808b5beac8c81e516b4c2f04aef4c1c2974c50b4ca0adccd326e49a4f"
+    },
+    {
+      "path": "BetunBackend/_internal/click-8.5.0.dist-info/WHEEL",
+      "size": 82,
+      "sha256": "1b68144734c4b66791f27add5d425f3620775585718a03d0f9b110ba3a4d88db",
+      "download_size": 101,
+      "download_sha256": "2b54e3a290dc21df36128c11784bd82cb94cf33464f85ac59ecd13d454c0c1d4"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/.git",
+      "size": 45,
+      "sha256": "453033b93eabf211feabc0fc4f6ee4c52a3d6f8a10f058cf2eb719df93407b16",
+      "download_size": 56,
+      "download_sha256": "6a9be585cc245472af0e47b5a7c0cec150f6b47980bc795ccdd737eaef274986"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/.github/FUNDING.yml",
+      "size": 141,
+      "sha256": "647442eed9f8f5334f9bd4695855599b9c5bf906ac2284603ab5f0e8d86117db",
+      "download_size": 138,
+      "download_sha256": "131abc1f4ecd8ac84be50dab5a8a766be49f530a3aca40d0d9eb4c2ed5b8c29e"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/.github/workflows/check_and_release.yml",
+      "size": 1380,
+      "sha256": "d7dff24143cb637e49bfe41c86fb0a3056820f3c33f5da32fd94e9629e336045",
+      "download_size": 645,
+      "download_sha256": "79e483e3a371b9dc33793c19ab3160e9990f650ca44fe80bd01fa5dc34c548f3"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/_devanagari_vowel_to_marks.toml",
+      "size": 237,
+      "sha256": "d31773022f02ad52c6b0819e1fe13c4854a0041756b718e68edf2c309965cbad",
+      "download_size": 111,
+      "download_sha256": "1ce79bc0ea679c9e2d7916f09e916bd085410e5172aa023f9f22053127826e3b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/ahom.toml",
+      "size": 1726,
+      "sha256": "674342feb64937fb8da60c5adc73e98b7a93d5faeb2d63601fc24c081092f065",
+      "download_size": 585,
+      "download_sha256": "376b07c60efb44800ef38ac8252093e58945fec3de4ca9f393548bd17ffc684b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/assamese.toml",
+      "size": 1583,
+      "sha256": "21c5ac853c6bc9c946fd663f5206ac9938a866220d30a07f22ef96920a6ca35f",
+      "download_size": 612,
+      "download_sha256": "ad52e30cc602b7c00139292fbf9cc4b8d22e7c8f8afc189ae10129ff476b35e5"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/balinese.toml",
+      "size": 1573,
+      "sha256": "6722f3c2808231600948870711e4e955c6daed245972f294f16e1e2e9722025c",
+      "download_size": 582,
+      "download_sha256": "425ec5fd56c5f9b218835dba5f4e9a9c8f153c52a83e9df97ce1ad2a45573606"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/bengali.toml",
+      "size": 1577,
+      "sha256": "7e4b09b63030aa3a4b256ca3496d6d8a90e5d968516e7d832895cb79c70d4620",
+      "download_size": 607,
+      "download_sha256": "c2c14699b9ce0e5b9e6e33dea89d17206b5b23778ae351a61197d20c4994308f"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/bhaiksuki.toml",
+      "size": 1645,
+      "sha256": "390dec5c9f17521ec15bb4b24a963bfcacfb77d22a5599eec3d0e1094782b42f",
+      "download_size": 574,
+      "download_sha256": "070418e4e751d6fe6aa69568f080241bd4aec1cf96b0f582b3ef51fc40e88c35"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/brahmi.toml",
+      "size": 1649,
+      "sha256": "5dab972880b88d883bce880fe67bf39097f152d8f6d9cf0f764b6fd484718481",
+      "download_size": 587,
+      "download_sha256": "729fb645b89e53656ebc0d711ce2be744fc25ec03af1cef4fccc4258f482aeae"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/brahmi_tamil.toml",
+      "size": 1605,
+      "sha256": "e96ecfa57c72109df69c48bc4ee2d5bfe3584dc348f4d2f1a6e95a743ef08103",
+      "download_size": 548,
+      "download_sha256": "d1dcb7f3649e33200b432eaf7cad7c3d48e1d0ae937cb1cd87b0d9097c75be1b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/burmese.toml",
+      "size": 1561,
+      "sha256": "2757a0ec4f6019ed5157fbfeda4b0f239cfdb1e2906462f1872ee9ab5b1a82d2",
+      "download_size": 593,
+      "download_sha256": "b2cd26f5c2b7af1d46047ae7bac48dc3e695c51182edf7429ab857eb7214484f"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/cham.toml",
+      "size": 1602,
+      "sha256": "b292ab8f1e36b99698ce022dec52824f352f87229b6b78e3877da8efeaa678a9",
+      "download_size": 595,
+      "download_sha256": "0a02eeab64e1f04fd72f838f488953dc37ffbbecab9082ac65f6c5b67666e703"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/devanagari.toml",
+      "size": 2254,
+      "sha256": "2c63667c00175961d03407d4338c28e1ef945a46708991aa9c56842d94ce259a",
+      "download_size": 785,
+      "download_sha256": "d4229ac8b23754d05aee9d18d374d22f5118a10b782e79555937f6583d9ed11d"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/dogra.toml",
+      "size": 1700,
+      "sha256": "2747f86bebd97026ffd7fef06f681afc1999fefe8f1224658a4162ab488cf273",
+      "download_size": 590,
+      "download_sha256": "9d2a858486c741215ae9533a4e4d0410365e5987ce1bc2984796f469288119b3"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/gondi_gunjala.toml",
+      "size": 1676,
+      "sha256": "db4d33d14c82f7434467c86a718a5aa77e7c651ac23b019eeaf58efdb57abcf7",
+      "download_size": 605,
+      "download_sha256": "7e4ddfb6a29f2474c2daecdd5a3c1d288fa59baab23569dadf20e34f37dcb3a2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/gondi_masaram.toml",
+      "size": 1699,
+      "sha256": "0f22ea8ea3fc5ee730fcb430c68c4f53b9ce6b526e5859c54d5d792090ebc492",
+      "download_size": 600,
+      "download_sha256": "244b6389c5600773d7416420859753f0c17fe2c3dcef3f2b994eca89a3ef44db"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/grantha.toml",
+      "size": 1633,
+      "sha256": "df9bd120fb7a65900b116eb72d63da95bb20fe61648d52351c392a3f7160819c",
+      "download_size": 587,
+      "download_sha256": "9080eecba8bf5348b652d756ce2e50c2f18ba1d6c2c8e224ad0cb14c8361ad18"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/grantha_pandya.toml",
+      "size": 1525,
+      "sha256": "5dca7304dcf232ea2bda4778290b8cd7fed37fbd6669cbc98a8882fc75bcc8a6",
+      "download_size": 586,
+      "download_sha256": "1ef2d9f6ce76b5b8000e8c9bfba92449c68a4b9a7f5c4e2bac05fb581477ace9"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/gujarati.toml",
+      "size": 1580,
+      "sha256": "d2da0eac022eaccff6dac9901f11fbd4eddb2a7fc0ec90c7f8baf7511f488206",
+      "download_size": 601,
+      "download_sha256": "0d7bf97b6f980b051cbac9f5912e9519cdf5c493a2fb57b2b9365c912d23d5da"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/gurmukhi.toml",
+      "size": 1517,
+      "sha256": "6940df9f69f99b02968e5354db53bea031390a53afec571e92cb32d393300bc9",
+      "download_size": 574,
+      "download_sha256": "3747aacf52c6459f3fa1bb92e6302468284d5a02e6445d76356f0a75f3789f71"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/javanese.toml",
+      "size": 1333,
+      "sha256": "b8c56581fe213ac7ff949d6d85928071609579ba80cebe13cb3c9ee2fbbb0f13",
+      "download_size": 500,
+      "download_sha256": "6d66ed2165f033268c0a6eac19fb0a3814f4736911f4fa3fc31b02dc7bbb0ae6"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/kaithi.toml",
+      "size": 1734,
+      "sha256": "30793387d98ef2dddb9672c6eb702aeb8a66e349677f2d763b4f6d1b651d3fbd",
+      "download_size": 601,
+      "download_sha256": "f9ed82057ad60fc4c92592b3d65891ce2047ce3a02e8ea1d2aecaacc15059c6f"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/kannada.toml",
+      "size": 1632,
+      "sha256": "2a8d2e3e788fb719cd03dda4fe5ba9833f5240b204a7b650666132efe787c5a5",
+      "download_size": 653,
+      "download_sha256": "79232d6070f561ef4ecfd290832bc39ed5dbb5e2928a128fc2e8346235c2f9ae"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/khamti_shan.toml",
+      "size": 1387,
+      "sha256": "ee50e2adcb0d672d8d5b690a486f33c141d3a6353fc92998274596ce2a7a1ff8",
+      "download_size": 519,
+      "download_sha256": "a281df0b4419618cc475b23373bac22582ba3821b330b40a052a64a313354667"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/kharoshthi.toml",
+      "size": 1523,
+      "sha256": "f54903f5823cb339f9b3d696c53cb1cfd1132bfda3d18e6b85aeba60d24b815d",
+      "download_size": 494,
+      "download_sha256": "30bad1de73bee0d15bebae583cc50288ab97a75a2fd0b95cf359e2c685d563ac"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/khmer.toml",
+      "size": 1317,
+      "sha256": "96f2741ff53a0ea61a66a5b97ecda869fe8f8ab8d01b1eb0a4b8e22a5f75f52d",
+      "download_size": 491,
+      "download_sha256": "2a0edc459229997dac0a1dee06d600d608e2bcf47e04d8e6effe0ec1ce69b634"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/khom_thai.toml",
+      "size": 1374,
+      "sha256": "241940fa35e8122e78580a570011595b6cc516cd558939002adfe74b4945237e",
+      "download_size": 506,
+      "download_sha256": "1c6317306ca06aa61e0872318831bfc3fbbaa7ca6d8187ddb16e273bfee793ee"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/khudawadi.toml",
+      "size": 1450,
+      "sha256": "5e70e3cdc6bbf19b946170fb6017ef62d00150014f6042ca6f7fc17aacaed74b",
+      "download_size": 508,
+      "download_sha256": "ae254f4b6cd91cb4a837fb2d40a1d63c72dfb673d850cacda85f5125692096d1"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/lao.toml",
+      "size": 1471,
+      "sha256": "930775d8576c08901242748f7f8dd122579060117ab50974433d51b11e67e32b",
+      "download_size": 501,
+      "download_sha256": "0b800e5d52ca9adc670f0660b67fc57fef883b2eddafc3438b2a56d9d9f159a3"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/lao_pali.toml",
+      "size": 1384,
+      "sha256": "f179c1cbcb7c747d350b9a891cf1aa55223c0f9a68f9db46353e9ff9a45761be",
+      "download_size": 515,
+      "download_sha256": "3dca421d692b8c1113c99c23280c19be2b45950298412632b9b699b8d234683c"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/lepcha.toml",
+      "size": 1360,
+      "sha256": "97fbbdda6447e60b2a26235c9cb07780051eb80125323271ff180539f613616f",
+      "download_size": 496,
+      "download_sha256": "012d770db00e4638546f88cd3a17fc3f34d752fdd7fd13221c1f0bfc6d680b64"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/limbu.toml",
+      "size": 1387,
+      "sha256": "d69dab0a34c5f6aaa8cbf8382ba0d55f15b073ac99122c2d8a13639ea20f5658",
+      "download_size": 496,
+      "download_sha256": "421f8b45b4f7dbc2920e62a88a49db82d949827e29e41660a08c9740433ed022"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/malayalam.toml",
+      "size": 1429,
+      "sha256": "90523575f17b1d4d55d2b59703cf6ce1bfdabb42e119892bb43243267e206fc2",
+      "download_size": 525,
+      "download_sha256": "a84c1c2da483f1cccd74e4e428cada87d6deeca03cd76a035804ca1db950b242"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/manipuri.toml",
+      "size": 1354,
+      "sha256": "6b27e722c991d7795f6de9bd9805d3adb023d005a0a4319f13919d2318f300d7",
+      "download_size": 473,
+      "download_sha256": "da84941a24994a49598bcd8c54479bb03cca33fbd074c106746f9bbe33acb71e"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/marchen.toml",
+      "size": 1501,
+      "sha256": "ff35f323a37f05faecbcb1b623eb0424300fc10b4ed1276d4035df9d4c99080e",
+      "download_size": 501,
+      "download_sha256": "f15bc782bdddb37904d31f1c34507e4073a0b55583c58355e81af2e6f22b25cd"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/modi.toml",
+      "size": 1434,
+      "sha256": "de709b44c8c99008ecea33f903b6b098ee558a0eca753a14affa68652e2252b3",
+      "download_size": 488,
+      "download_sha256": "144a766d4cee49187618c9a7e82264e7737ebeb1cbc6f3b5fe5266c91a3df480"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/mon.toml",
+      "size": 1321,
+      "sha256": "201c4dcb662c484e7ae95e67775d494091404c514fc9fd550adec5ce51ac9580",
+      "download_size": 516,
+      "download_sha256": "fce8bec97fa3af8e250040acb6b8ec032af4faa8e943aa98f9232bfc423cc24e"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/mro.toml",
+      "size": 1555,
+      "sha256": "7136a7cd4aab79c65e9fc7f392cae00a493c8dc11587949b614fc5094287b8e7",
+      "download_size": 457,
+      "download_sha256": "d4e4e9e9d567875e48251415af8451ec7ea3b27bbf71efb77c39151aa4ca767d"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/nandinagari.toml",
+      "size": 1392,
+      "sha256": "63f02e76ec9acc17b04435f6abbd9c982c38276996158b7be8d2a8868029920b",
+      "download_size": 489,
+      "download_sha256": "fc49228d140e8215ff58f82797e723ccd9762e34bbdafeb745775c972b7f92b2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/newa.toml",
+      "size": 1387,
+      "sha256": "5d9f198749abcf3ff6d847a72370da82c0a8447aff0f8827f03f9d0903b5f3ef",
+      "download_size": 489,
+      "download_sha256": "5947bb665858004a3ff35f56eb982ba5f8a6b73b3559a7fbfd6a2470849bf77c"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/ol_chiki.toml",
+      "size": 1692,
+      "sha256": "c77a0bdc5dc429eefda99c781eb4733a081d9eb84551761da00fbb8c994416f7",
+      "download_size": 540,
+      "download_sha256": "167c89e828cc8af7a0ba65d7d759c2730d7598a0e0819c95a72dd5de5cd4f614"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/oriya.toml",
+      "size": 1574,
+      "sha256": "fa9a575ff348e368ab2023d6e8ba68132e230cf36503a1a732ac034c0f7c0ef1",
+      "download_size": 603,
+      "download_sha256": "efc6a9947e3ec80cd3594e10025efbfc9381eac231c4f5c161c6a0f40da44ada"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/phags_pa.toml",
+      "size": 1348,
+      "sha256": "81e2d58d043280890fce2ca2c89c44c4e4f89d657bae789ed5719b58fe09402f",
+      "download_size": 490,
+      "download_sha256": "e675f257c0f49add9eb2a51f395fc8b3fb71d46c36747860dcefbe200652ee9d"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/ranjana.toml",
+      "size": 1299,
+      "sha256": "558b718a736f358520868664cc06eb7d4f36d2fb046b3358598c1f6095ab7692",
+      "download_size": 476,
+      "download_sha256": "a273cc13fe93511a336a4c1f1d2e8a8f2c1b31593eebc2009c28de1a3465fed1"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/rohingya.toml",
+      "size": 1711,
+      "sha256": "7671fc3c24b16ebaf5ad3e2933d6743a21d732a3e314348aa0c94f38050c5ed3",
+      "download_size": 489,
+      "download_sha256": "8331787215730a5ee2ee1d05aa8c4fb9ae9872327e1b84cb5fdb36a8308e6fa9"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/saurashtra.toml",
+      "size": 1550,
+      "sha256": "5e378092fe2243773d9e9edbc3708687700e2f86b82a5dbdcf98afa9275280f4",
+      "download_size": 571,
+      "download_sha256": "67415a654e9e43c4afb94cd9756c8a4a1f7973ec1c6cbcacb2bbc0f194488b12"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/shan.toml",
+      "size": 1530,
+      "sha256": "7bd7b9189b6b015151f28a81b7f04485dad139c2c9d9114a90b93b88254d9477",
+      "download_size": 573,
+      "download_sha256": "2ef4e8e4e0bfa32b885f16bb33773c19ee5dcebaf6f2dd396247167d120443e6"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/sharada.toml",
+      "size": 1716,
+      "sha256": "06ba08ff1a669137ca24501324efd4487ee40743fef47099025b5adc69e2de65",
+      "download_size": 600,
+      "download_sha256": "4f70ed611f5fc8285ee982732d786edb3e077b8ad1b54d1252d0a8cc24d8bd30"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/siddham.toml",
+      "size": 1585,
+      "sha256": "1ac9f87547101d201632f70f827d4b46fc57dd84a734d8ca8daab56bc8e7b904",
+      "download_size": 552,
+      "download_sha256": "0ad73adf0fa5bb1ad2ab069b81555aea4702e3c1503f5827862e1de8adbeb854"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/sinhala.toml",
+      "size": 1279,
+      "sha256": "06269d3acd05da214081e637e3e82480c86c74b35cda595bf06d2d3f3f807a12",
+      "download_size": 500,
+      "download_sha256": "89ba40cd8d3228d5981af63476c245adbb46ce28c6d5bda4a1919e79e3798187"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/sora_sompeng.toml",
+      "size": 1683,
+      "sha256": "9249dbab4ab595f4752445a6cf9408c26a6f058226048d88174ee5c15275d0d6",
+      "download_size": 519,
+      "download_sha256": "0f0395438ea31c126ac4d04d85e9db4ced638b6bcf83806d7934069e4a700aa0"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/soyombo.toml",
+      "size": 1452,
+      "sha256": "e9ba67486b05ef4153d5de92f88cc883b298866286c282e7aea2c1dff110a7de",
+      "download_size": 496,
+      "download_sha256": "b6779ab5492aaef4681337b1f55e770b18670e98317cc68c77a8c6ae146e092b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tai_laing.toml",
+      "size": 1548,
+      "sha256": "4d8ea99b8ed4aee63a68f3712304d8afca363f6dfb52eb103ec5f89474a6aa98",
+      "download_size": 568,
+      "download_sha256": "953cbde1aca938cb8bf46bab7233e207a53da8a9e13cfcc77be1a60c9870afcf"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tai_tham.toml",
+      "size": 1336,
+      "sha256": "dac7b8ab3eb4ef9a8283287c73019b5e9574d38d2eaae835c652db7d70b07da1",
+      "download_size": 492,
+      "download_sha256": "b0986079725505ad734cc1f3c04394b39d6618e78b938a9aa620a6aea3a64206"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/takri.toml",
+      "size": 1644,
+      "sha256": "065e450795841689faa52920ccd477263cd944530b3e045dd63c8646b8687a5f",
+      "download_size": 554,
+      "download_sha256": "1df64cb320e0f74f12f173015973d56037d7148e163b8d08395edaa8b7b3452a"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tamil.toml",
+      "size": 1665,
+      "sha256": "0465fa65233412596551d7616ca2012b18e4535d7b882bcf8f6e4149171e9998",
+      "download_size": 657,
+      "download_sha256": "8590630775ea077b092bff1ac700f3bdc3af70aa10bc7c0eb0b7001a65e4163b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tamil_extended.toml",
+      "size": 1551,
+      "sha256": "0ab048b9e01767f1d7db6aa87d9107883e3633a3cf44b45a8c2ced2459cb52e3",
+      "download_size": 574,
+      "download_sha256": "771398437b761281af355ec1c11663fd5169ee1e042f139d63f1cf628c172657"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tamil_subscripted.toml",
+      "size": 1629,
+      "sha256": "f7e2c1dddf3de0481029b8fc755bc0dd7dc0c1807828139eebd503e65d68947d",
+      "download_size": 601,
+      "download_sha256": "9a0a53a6e65450463784e487d08b87225f65c5da23dce3aac4c5e8762d6e636d"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tamil_superscripted.toml",
+      "size": 1615,
+      "sha256": "25b3f0b81f416036497bad0431ddf168d9de746a404823718679c90151fd9910",
+      "download_size": 598,
+      "download_sha256": "78db629b58b48c47d8d8212484b5b77352e1ec40400c9a9fad26f6139c2b1aed"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/telugu.toml",
+      "size": 1504,
+      "sha256": "dc61e6cff50098343c1be83884b324b2bcb636b2b3e1327928f76795667d5c23",
+      "download_size": 602,
+      "download_sha256": "0cf63f022f0aa405fd08f4a953b1bbeb895f4781c5982b702fc60cae17fae0e2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/thai.toml",
+      "size": 1551,
+      "sha256": "efadb12a4e1cf93f53a117a7c10c52e87c4563f06740fc2aca228d74f4bc3163",
+      "download_size": 564,
+      "download_sha256": "02d3fb00470eef34b89ce15115e7274d9cb063095f02825e6bb4e2d626d32c9a"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tibetan.toml",
+      "size": 1842,
+      "sha256": "67a4d6c36c92cc60f8a96f1eada100ab6c70e44dabf91a9b3a4a366e8c3e106c",
+      "download_size": 751,
+      "download_sha256": "be2d1f88e8054d235d59d38f5a6a91047aa76bbf0f88fe7b965577c3145a2ab6"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/tirhuta_maithili.toml",
+      "size": 1601,
+      "sha256": "872f1613f92980f293ebbf104ba71f142c565137f5e43e318fde4751ee35d8ee",
+      "download_size": 553,
+      "download_sha256": "8e010158532729a5a86531998c0c2a1831449632ec54ccb1db7ef478fa2f6486"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/urdu.toml",
+      "size": 1545,
+      "sha256": "298bfda82dde5445316a9f72d6efa2cb82b19b83bd2a7c52f7b498e6298b53f2",
+      "download_size": 555,
+      "download_sha256": "7711f0e54587f30978a8b8c3fb025e0090532d1dda106f4be02d58a4d4d1de92"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/vattelutu.toml",
+      "size": 1482,
+      "sha256": "099fd9d91608ea6461a8cff81222b3c1e2a32735065314c390e029a69ee39e08",
+      "download_size": 529,
+      "download_sha256": "0827fe2fb4b2b9487a9818a4be918c12f281e4b26792669187c78a5848f1cb5b"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/wancho.toml",
+      "size": 1758,
+      "sha256": "6d91186bc931ce7a2be03182d1fa46ea0f7b5d326b0e0ec8e372548548c7d971",
+      "download_size": 508,
+      "download_sha256": "6178fc343d8c3814d48394710b9b56a621257297fc98b45ed4ac279a72d136c5"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/warang_citi.toml",
+      "size": 1579,
+      "sha256": "56e694d5bc7bd39e1274b0416692dfb48e188bbddbc3b512162f53da42f19000",
+      "download_size": 495,
+      "download_sha256": "a4f27168fc559a900bcaafe71c09041d695f557b11e4e5276a744d6c50f119b2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/brahmic/zanbazar_square.toml",
+      "size": 1665,
+      "sha256": "3b2900e1c16f6559e34352e1499abb72ab0f4a3c1d4876ae4a9d9d4f11c3eee5",
+      "download_size": 560,
+      "download_sha256": "f35ede7c5e33ee6b61f3fa675c7a3d57dc9f779ff851f14a9f1709890be11f84"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/language_code_to_script.json",
+      "size": 283,
+      "sha256": "18329d272d19f0ebfde42f949c6954c69feb9c6d0f98166818c62ced5d3cb804",
+      "download_size": 146,
+      "download_sha256": "3d5c0f12bca55b675ace02d06f8327f67fc7c5cceef75994b107d7f4a954b066"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/LICENSE",
+      "size": 1106,
+      "sha256": "c4765e8fcd16018d6ef1fa0ea28ec80b060db5b462b2d83f65e0a5aa0888a07a",
+      "download_size": 669,
+      "download_sha256": "c78a66aecf893121356db19932f57eecf83961e439ecb3e0d2b00e221549b7d6"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/package-lock.json",
+      "size": 255,
+      "sha256": "690ece9eb9d8a6ffa41a882bde34087109772573198cbf91f9fbb14c2fd9e24e",
+      "download_size": 155,
+      "download_sha256": "99c0fbb4f33e963ed975985d914d019d7ad672c7d94ea6985b7c66fca30340bd"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/package.json",
+      "size": 734,
+      "sha256": "2e75ab0c1f3c72b83310deb704b0a9bb5533fcb616443ba91042562c1c5ed9fd",
+      "download_size": 332,
+      "download_sha256": "47e0e405cb87ee51a043629bef3f31c584647c1483c7b0da382f5afd10bb7204"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/README.md",
+      "size": 572,
+      "sha256": "36898c384c04d553c80c3cedbd7fef4f4dc7dcc11e805795d0bb3cd000d14b6a",
+      "download_size": 336,
+      "download_sha256": "e41bfd84814a1af0f7fb7c49bce8c0d881ac4d31a7f651477d843e1410f363c5"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/avestan.toml",
+      "size": 1871,
+      "sha256": "a32bc006343421a2e02b60383c99cee3747a201ed7fd294e7b3d5591c26748e0",
+      "download_size": 602,
+      "download_sha256": "65ea56df59cb982b5daa7477011ddd8042021af7183488b628241ecd9ab9f479"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/baraha.toml",
+      "size": 1904,
+      "sha256": "49ee29af1be8a8dfe4127d938cac821ae3b68ba2b5a695672bf78c74ce210ad6",
+      "download_size": 796,
+      "download_sha256": "58ed7a3d953a5db82f7f723a0e937c7d412f870df4ae1bfa794ff1daf6126262"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/cyrillic.toml",
+      "size": 1516,
+      "sha256": "30575662c538ebfbb14f71e54f463118cdd9fccb3d64540792f9804aa2a94f3a",
+      "download_size": 603,
+      "download_sha256": "cab74c5b57b66b9144f872163d275246484c1f95d9d8e3bcf66d7dbd63418ac4"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/hk.toml",
+      "size": 1095,
+      "sha256": "bd73f81ae6fe7c43bc94584352e9b548d69b768ad664f943a10c58374b02bb57",
+      "download_size": 449,
+      "download_sha256": "7f32b1a1bb09bf2869a0ff889a99c93559e259a737b901530ed85cc2e4a4491a"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/hk_dravidian.toml",
+      "size": 1093,
+      "sha256": "0995362381a1e51de434d8fd1cf790a2abf43bd5333b8f0152519fa26f87a91c",
+      "download_size": 445,
+      "download_sha256": "0a452914e9f58649eb8e73428ff74a26c1a62c5f8401af8d6b516cf35dc1a059"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/iast.toml",
+      "size": 2197,
+      "sha256": "06cf0558424ed5d82adc5562a03ba24740b231f531b220ff9bcc561241f58905",
+      "download_size": 919,
+      "download_sha256": "cc8ba2ea2a84760987c67f2887eba4ebcbc3645825db31902815b706e4d6b812"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/iast_iso_m.toml",
+      "size": 2189,
+      "sha256": "1ccfdd7221aa608a221418b31b143b4a2843470d611285fc48468303c7d32ce3",
+      "download_size": 920,
+      "download_sha256": "2bf0e475b2bccc2be1ca03734d50ca8f58457581c0025f3c2cfc8ed504bdcca2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/iso.toml",
+      "size": 3280,
+      "sha256": "19c7e8d67745798f0e0bd53c0813a7618f2cad0d2b7cd538d4f884df332ce75e",
+      "download_size": 1352,
+      "download_sha256": "6f17bb8e3f8b42c817a4ec457cdaad9ea90930463e2893d6b525c11d713f0c23"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/iso_vedic.toml",
+      "size": 3290,
+      "sha256": "f265cf52f1c7d8bc703abebf5bd92dec62af35adc4eca17dc1b41cc3580e1bd0",
+      "download_size": 1355,
+      "download_sha256": "681f38341d140aafe3396f4cd9f53289d7244190298882466fe4a8c54b562bc3"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/itrans.toml",
+      "size": 1678,
+      "sha256": "4b55e6ed3eb59598f309bcafbc575794c74b9d21a88faac93b19140305bda064",
+      "download_size": 706,
+      "download_sha256": "680b4f4e691cfd24e9077741fc7ff3f9d6f690e93b134dce239af476587f3b34"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/itrans_dravidian.toml",
+      "size": 1689,
+      "sha256": "2f7b42e8844cecf576d75e7048931751a0954986d2bb6ec4b6d84d94293c0c57",
+      "download_size": 707,
+      "download_sha256": "1a91e69480ff865ba31d438c7773698f54c1d3d2d67cbc66a2be6e3c46da0b06"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/itrans_lowercase.toml",
+      "size": 1675,
+      "sha256": "dfe839cd90a2f0bd120b72071da6623f825ebfb27eaa640a6d9945cd79712148",
+      "download_size": 703,
+      "download_sha256": "f86b39047d0a84e97f381d01880c88f2a91fc0aa0c9d6aa3e9b9b34c1ca8f6f2"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/kolkata_v2.toml",
+      "size": 2125,
+      "sha256": "99992ddae7d4c6b0b8fdfe7182e74a7f56a42e7bf9623a82cdb23652ebbe57b4",
+      "download_size": 859,
+      "download_sha256": "3e2021b4918f24269d3c99932743fdcce9e42840ccc37cb25b4063b3d3649c7d"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/mahajani.toml",
+      "size": 1437,
+      "sha256": "63acbae9775fd81b0ae9d54760921847d9a4983f6918dbbdba5f2cb30150014a",
+      "download_size": 502,
+      "download_sha256": "9d9f79fcb1ba1be4d18d555889da5345dcbc1114d0622aa83c96194292b7ac01"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/multani.toml",
+      "size": 1145,
+      "sha256": "751b1f99bdd795d3363d7d67e7e7497d39b3a89ee6e2ff65ac0d4eb3da926122",
+      "download_size": 393,
+      "download_sha256": "ca04711bf4bf3717cde7e179deba4789305e53081115fcea6af061fee3339a8a"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/optitrans.toml",
+      "size": 1714,
+      "sha256": "ec66c7255dcc5d57f3c13350906ba38125b538c3208cde98e7d011cb120ef4d5",
+      "download_size": 719,
+      "download_sha256": "92f3178037c5e5080e4edea66f639d9bfd8dfce89af0f90e697b7a0b4bbd35ab"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/optitrans_dravidian.toml",
+      "size": 1740,
+      "sha256": "1a90e9a4e6fe70fc244e830336949fe3c8e9e7b36ba1982aa778ab014cfd6267",
+      "download_size": 731,
+      "download_sha256": "be24a68889a2ba8074440fd6980754760503fe6a4af32264ce54c7ba83c999cb"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/persian_old.toml",
+      "size": 1164,
+      "sha256": "bef70ae703acd698498f72279b630d07c4738564ed56c624aaf3e648da33f4c4",
+      "download_size": 373,
+      "download_sha256": "7049217c3e6fd7c595d5cedbb82dd43fc794b02821fb90d33ee3394eb578f355"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/slp1.toml",
+      "size": 1170,
+      "sha256": "4aa6d68050bd511d35ed0d1b9e9d642b907ea99d85cbaeb89c66620382637623",
+      "download_size": 521,
+      "download_sha256": "3a4d04ef4bbbac5a9b4f56a012ba8197802557e19650a102a581da49ae279a34"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/slp1_accented.toml",
+      "size": 1814,
+      "sha256": "6c46670d32de8c43876c0333f4f6b5c3a1488add44ab22b25bd4f50ce5a5c614",
+      "download_size": 902,
+      "download_sha256": "b2ee80cf5a8b37eb6cbbeae3b21f316577aa3056bc9ff1efa0dcb970ad859499"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/titus.toml",
+      "size": 2277,
+      "sha256": "424306e1c3c3238316721bd0cee9405860ea1d440626d4249bc9066f667b334e",
+      "download_size": 944,
+      "download_sha256": "51e0cd6a051cdd530f0da9514beb9807437660ea72e53364e6defc0cea714cd8"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/velthuis.toml",
+      "size": 1259,
+      "sha256": "7725db5d5faf9be13bb5d642d79c43794a02cc997af82753d3f9653c807b1ab9",
+      "download_size": 583,
+      "download_sha256": "92c5a45a46a7e1ad75d4f799052c9dcdd86ed7ec35dc3c54f1e81f5b39056238"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/roman/wx.toml",
+      "size": 917,
+      "sha256": "940ebc91252e675293f167bdbdb0487f29465a8091f3ee1c665c6dd7f44e43e9",
+      "download_size": 384,
+      "download_sha256": "b58db0cf55906ab1863b2cf9496042964f887d303576dfd49c076f4f814ef834"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration/sanscript/schemes/data/ta_sa/manual.tsv",
+      "size": 10688,
+      "sha256": "da637292bf28e5f3315769246b91fb516a1039dd96a58132749045e554430661",
+      "download_size": 2874,
+      "download_sha256": "cb8d7b7ad97c15f767ec1e392a04a3526993f86b0a23941f45e533525a7ad631"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/entry_points.txt",
+      "size": 71,
+      "sha256": "b8c044a008d8e9642fbbcbb4c7bc4b268625553122c4fb2829c11f7d5d39c330",
+      "download_size": 78,
+      "download_sha256": "085352cfba5db26f45797289c87ca2c4631d6da220ae6f7fae1d95b9ba613527"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/INSTALLER",
+      "size": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
+      "download_size": 24,
+      "download_sha256": "4b981a6384e76c634a72c12ce50f5901eeb31c650b422277e1cbad64f5a90841"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/LICENSE.txt",
+      "size": 1081,
+      "sha256": "71e0bd649395f47e82b500dc6261ce4b8e8d03774727f583e09f5b947e75de97",
+      "download_size": 657,
+      "download_sha256": "54c76e897bb85aa3bec0c0209a3a3f16f6079f2ea469789bada0ea4f3040e836"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/METADATA",
+      "size": 1448,
+      "sha256": "cfdeedca8c5aefc938aee28bf6dbe579476c091db9aaee8f8895f159442b3a8f",
+      "download_size": 655,
+      "download_sha256": "e05dc20c1580f9eee27241550adfeca092094ebbe93dd32930a14be286334910"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/RECORD",
+      "size": 20234,
+      "sha256": "86067957f7f7b5a5174b3370f13bcad90499dd9c83fe70cf31e1a22f4332cf6f",
+      "download_size": 7163,
+      "download_sha256": "1f4f8af293986e9c5fe5542bbe7b55af1a707621c627b1dd7046a03c2aa3bc2c"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/top_level.txt",
+      "size": 63,
+      "sha256": "9142ec20da56cbcb1e36b8650263b8257d10d562c1908b946eccfce551cb10f1",
+      "download_size": 63,
+      "download_sha256": "915b72bcdca1c831be6235b6170ef9bbb0b7aa0adb5e56cdb2cb9798af4eda35"
+    },
+    {
+      "path": "BetunBackend/_internal/indic_transliteration-2.3.75.dist-info/WHEEL",
+      "size": 92,
+      "sha256": "b59a1e1a3b56c5645f769944ec4ddde3954f94b3509ef6ca8989f1ee0c00cbc0",
+      "download_size": 110,
+      "download_sha256": "6eff657d8bdc96e1ec63f797168c535034e023667b61e7d2787e69e9c65d6df3"
+    },
+    {
+      "path": "BetunBackend/_internal/libcrypto-3.dll",
+      "size": 5191960,
+      "sha256": "05fe080eab7fc535c51e10c1bd76a2f3e6217f9c91a25034774588881c3f99de",
+      "download_size": 1868210,
+      "download_sha256": "29ed0d02467b53fdf2acc24713c398c77f498203364e4e60229c47fe383f37d8"
+    },
+    {
+      "path": "BetunBackend/_internal/libffi-8.dll",
+      "size": 39696,
+      "sha256": "eff52743773eb550fcc6ce3efc37c85724502233b6b002a35496d828bd7b280a",
+      "download_size": 23226,
+      "download_sha256": "c9eadefdd4faf4bb8983b29eb433de845eaee470c26a06c4ca73b1a3172365be"
+    },
+    {
+      "path": "BetunBackend/_internal/libssl-3.dll",
+      "size": 787224,
+      "sha256": "2e9fbcd8f7fdc13a5179533239811456554f2b3aa2fb10e1b17be0df81c79006",
+      "download_size": 283707,
+      "download_sha256": "38dee4e6832e0114628c4e999fd6b9489d87efe877d4b5d9b92b60806746dba2"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/_core/_multiarray_tests.cp311-win_amd64.pyd",
+      "size": 64512,
+      "sha256": "adf0e01de577f4ccc2a11099c817cb41c8a78b6174175356dd62e745075cfac8",
+      "download_size": 29192,
+      "download_sha256": "6e94d23076cb83182a7eb29b147d138263d071e63aa6a42d87af0b22982d709f"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/_core/_multiarray_umath.cp311-win_amd64.pyd",
+      "size": 3703296,
+      "sha256": "4fb4c5d62a6bd766eea716350eaf5396580e33cf7dc159e305488d1b7d72dad2",
+      "download_size": 1218883,
+      "download_sha256": "95182f2dc16024649f952098b51eef5ae2a840aa4d7d3e2f1c3ded85eee903fa"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/fft/_pocketfft_umath.cp311-win_amd64.pyd",
+      "size": 276480,
+      "sha256": "e22ee51c9761e8cb2e153efc321d09cb656c5573488e55167f69d6e070d22466",
+      "download_size": 108534,
+      "download_sha256": "5cba76377b34d029c65f18e12961373894646331a8a5ddf2defdad45b004d27d"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/linalg/_umath_linalg.cp311-win_amd64.pyd",
+      "size": 112128,
+      "sha256": "8742391ee3d6dfb4a6e41418626bb45048b102e05229d424279ddefb877d9cd6",
+      "download_size": 44046,
+      "download_sha256": "eaf5e226bf9ea6c5742fbf147cae92a71fe466934ec61156982a0bd800e3b6fb"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_bounded_integers.cp311-win_amd64.pyd",
+      "size": 220160,
+      "sha256": "418dc5293b11f83a70c63ef77c3c9ca0dc4b9f20c7fadb4625805480305ddcef",
+      "download_size": 96923,
+      "download_sha256": "c1d7d68353112701d0bd63b7025fa33e4b3d94013d9ed6016cd8f5013f45a871"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_common.cp311-win_amd64.pyd",
+      "size": 169984,
+      "sha256": "f2cdbaa3d3d0dd8f5b74b7b4630470d609be4e4d31f8e37f8681e6c3c5aca895",
+      "download_size": 73848,
+      "download_sha256": "eac19330447d2ab42ec2d087a714da210ab36dcd4f123fc7b017ce41c3a2447a"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_generator.cp311-win_amd64.pyd",
+      "size": 608768,
+      "sha256": "91f53ff9a803213ea5fa38b73be057b448be1728b4a353586d10f08d4f2c021c",
+      "download_size": 269446,
+      "download_sha256": "7540f746847c3b3c2b38df04c7801ffcad1b17a1a7dad67419ac06e2abe92162"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_mt19937.cp311-win_amd64.pyd",
+      "size": 84992,
+      "sha256": "e66de88dbf0b9a2ae67576cf2f4e7c220e10729d445403787bc8b58f4e8a6750",
+      "download_size": 41687,
+      "download_sha256": "92a4f0bcbc11c2327462a4133517626d61a599abc37a7dfae0d314df7a2580cb"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_pcg64.cp311-win_amd64.pyd",
+      "size": 96768,
+      "sha256": "16e4f9401783c502d82bce06263d98c985c841f3115d301741b22413bbbff851",
+      "download_size": 40349,
+      "download_sha256": "19922802dbae212fdeb269ef6c3af20e50538851dfd57e82264e377fd5da5a74"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_philox.cp311-win_amd64.pyd",
+      "size": 79872,
+      "sha256": "56c44540e500dfb820e5a75004b5cf9945a648a87d0e40d64672325dd22fa3c1",
+      "download_size": 36694,
+      "download_sha256": "f3ab20133b984fbfbe47809b80f23e908e20fefba389634ecf1aa3a51c62264e"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/_sfc64.cp311-win_amd64.pyd",
+      "size": 59392,
+      "sha256": "23f03f25c5528ca51c11846bcbb5aaaee7c1c518897249865c47dca913c43863",
+      "download_size": 28445,
+      "download_sha256": "2b201e920893cce1ed9b1d8f55b7ee4499205507b9e6002b2ccfe574d22fdcc3"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/bit_generator.cp311-win_amd64.pyd",
+      "size": 165888,
+      "sha256": "eafa63966c1b3e34397bec8fef991dee5a7944b09058b38afd9f2de40acfd141",
+      "download_size": 74456,
+      "download_sha256": "58d72138d405de68ca4f8f12d0b59b8b5a5eb66a36c7733e53459a65f41a8638"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy/random/mtrand.cp311-win_amd64.pyd",
+      "size": 512512,
+      "sha256": "6f8a3d3ce835c6cd4fea9e4425b757b268ad69b0cef201a225f6cbd1b453182a",
+      "download_size": 215846,
+      "download_sha256": "b8e1bde1591967fc34c8a7af1dd4c26398c985552889518309f81370b94864e7"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/DELVEWHEEL",
+      "size": 462,
+      "sha256": "0399822db132f754a7e3ba5eac8e564e4049b30df55d53bfeba6d38b812de58d",
+      "download_size": 232,
+      "download_sha256": "2d5d843f9669ebde6444880418e38415ef85f0b03f6d0b4c1724022bac6a3f53"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/entry_points.txt",
+      "size": 220,
+      "sha256": "ec26fade0c8bdac211a6c1dd003a65eb16885b925395423e93fcaa115af4052c",
+      "download_size": 152,
+      "download_sha256": "6f60787c59f91831f61bf5e5870cb478d3b9e76bcc4719f1adfba6ba1f61e24c"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/INSTALLER",
+      "size": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
+      "download_size": 24,
+      "download_sha256": "4b981a6384e76c634a72c12ce50f5901eeb31c650b422277e1cbad64f5a90841"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/LICENSE.txt",
+      "size": 45831,
+      "sha256": "a804dff0ead9fadc5293456410bcbfc32bf024be9c4513459663fb7b442d2341",
+      "download_size": 15067,
+      "download_sha256": "8746d2413d7dfa49be097b7c959f99ffc5c3417a52c63f66f6191c10973ee54d"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/include/numpy/libdivide/LICENSE.txt",
+      "size": 1039,
+      "sha256": "d544761558b510866c21f7e8a2d5716fca76e0b98117e3b6b86314db7244d150",
+      "download_size": 557,
+      "download_sha256": "503d6b8dd898c916e20c224d898eb035c9a3656e238a60190963c112085ef4b0"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/src/common/pythoncapi-compat/COPYING",
+      "size": 704,
+      "sha256": "aea41976c720f91bd19725c16916a1ace40eb1ea42620d340e587a5de4bbcea0",
+      "download_size": 461,
+      "download_sha256": "2f59f6bf2356a68a584fd3a4c4768e823f99ac925de9977c445430fabc1d78f7"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/src/highway/LICENSE",
+      "size": 21155,
+      "sha256": "d208152e2777ffd0126eacc1bd21c0320d69e4e6b622d21a2a12a47e8ef73763",
+      "download_size": 7213,
+      "download_sha256": "a90af6506cea58b4a0fa5a4777c7acbbaf97d922a2ba2fc245231d666795a5ba"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/src/multiarray/dragon4_LICENSE.txt",
+      "size": 1441,
+      "sha256": "b0fd592d4ead563148e3977e7b589169d46a5ef2ff133c755a81af880a3fc919",
+      "download_size": 848,
+      "download_sha256": "8010b1aafba3a0fda3075ba521ed08bef2938e6731ea129bf5c487366c33487f"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/src/npysort/x86-simd-sort/LICENSE.md",
+      "size": 1542,
+      "sha256": "a732977853530066790c42817087f4829b518dd98d340c916acbfd227e39d3cb",
+      "download_size": 825,
+      "download_sha256": "b4bf7bfee29ae417b504829e157334265206503ec9fdd7bc45fcf23ea1785831"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/_core/src/umath/svml/LICENSE",
+      "size": 1573,
+      "sha256": "585483905b13d4b42f800c55ba99e89d6e2e33ccd5f503e201c07531d148ff41",
+      "download_size": 828,
+      "download_sha256": "765df063e38004b3617b7fab4a805e17243a48732264feb0de3d25cf043a5392"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/fft/pocketfft/LICENSE.md",
+      "size": 1523,
+      "sha256": "8db000e158c162e7249787852d8c69764706502ccee725c06641b31c1e95c8af",
+      "download_size": 816,
+      "download_sha256": "59e476e39c009dfb6484c7ab85e198ca9135e6e75aca34734a248b205db440ba"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/linalg/lapack_lite/LICENSE.txt",
+      "size": 2314,
+      "sha256": "19060ef465e1797d682ee0fc3081bd25ab1395e995e43d25c9d13c95d9a3cd6b",
+      "download_size": 1083,
+      "download_sha256": "9c599317c79961c3d795c9164f43079c2fab75859db5b5ee44cc1494ca298ed8"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/ma/LICENSE",
+      "size": 1616,
+      "sha256": "d78dbb208b80d92b4d333e41a4baae50d12444f46e53199fa7726a91de6e2da7",
+      "download_size": 826,
+      "download_sha256": "60b86f6958783a5fb1dd396a6cb1fb34ceab90cb4efe19e77d98e14af045469a"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/LICENSE.md",
+      "size": 3582,
+      "sha256": "b4bc2f4fa1c95778f1ed3dd8f14706bece399475b978f9f34b5d3cd72521b48a",
+      "download_size": 1508,
+      "download_sha256": "9b63384797af221b0c28a62d1e50ae5ecd4711773b5c8bd385832d7442570ef1"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/distributions/LICENSE.md",
+      "size": 2805,
+      "sha256": "cf5619f25b112d5ce7c896efffc8e610bcb345dfadcc19f2c1460aa48fff2c9e",
+      "download_size": 1345,
+      "download_sha256": "62a4d17755ec6e3ab0adebfa9e519d2c8fe20b7aa13615df86e4904d30b777ba"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/mt19937/LICENSE.md",
+      "size": 2986,
+      "sha256": "92c10699884321f1c2947fe2a70ab23b0fbf1507f756d89dd08f38c61fc3d4fa",
+      "download_size": 1442,
+      "download_sha256": "eb4dbb5f23db329261ac9d1b978d2ecc5d474d16fbbd482ce95c7d3857a1b84a"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/pcg64/LICENSE.md",
+      "size": 1176,
+      "sha256": "41190663b77bee5302386495a07b7eabfbfa571aa0ae2f11da6764162062fc4f",
+      "download_size": 709,
+      "download_sha256": "4b432c2810654d2dc1d2e9bc532f39acf348a111b2c058faa75881960a7c6e48"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/philox/LICENSE.md",
+      "size": 1540,
+      "sha256": "322ac46d870c8aeead6c53adcccc839296fb3c8e456eae155081297daf7f8013",
+      "download_size": 819,
+      "download_sha256": "dff897f37a325163e206c140b7821c9c10846f5c5c40ed0358a0146177ccbb25"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/sfc64/LICENSE.md",
+      "size": 1253,
+      "sha256": "28cad82ce1379dc529df30da78ec012d7d0d1d576b03ddcb93388aee53659f59",
+      "download_size": 781,
+      "download_sha256": "fb4b8975d14f9d8cc39125c0c4ddacf5301d811cb93c8462edf2cd1644baae67"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/licenses/numpy/random/src/splitmix64/LICENSE.md",
+      "size": 340,
+      "sha256": "454ec7350e478e037061850b67395753b425b1cb0a34bbc26290b020bf89d763",
+      "download_size": 258,
+      "download_sha256": "2188bf51663c353112be9d395d550a132d231bee356ef5778e802acd14796295"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/METADATA",
+      "size": 6608,
+      "sha256": "b082c52ccbe3b880bae177c35171b52ed6c947f3ad71e3762f2723f60a411de0",
+      "download_size": 2621,
+      "download_sha256": "c4232e484c4dc9cea4283ee0e8593254d738ddc20c0dfc13a5610f7edca7b062"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/RECORD",
+      "size": 129259,
+      "sha256": "499be58c43ea78552fd79142d93d7a495a12404aeb395163fd061102d825e806",
+      "download_size": 50366,
+      "download_sha256": "a99ecb2130bd3139ab2fac83cc24f00fdbdac7661b8261515c2caee3a21d4138"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy-2.4.6.dist-info/WHEEL",
+      "size": 85,
+      "sha256": "25d2d35a173bde827e96a4c16068225689edaffbe1cf0cdba403a29ffd9bc532",
+      "download_size": 100,
+      "download_sha256": "830c0022aa9230f12119223c25433e251e98ab872abea75b855be6dce7a12a1a"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy.libs/libscipy_openblas64_-63c857e738469261263c764a36be9436.dll",
+      "size": 20415488,
+      "sha256": "63c857e738469261263c764a36be9436ebdeaa272e340a828f42047a97131080",
+      "download_size": 6506176,
+      "download_sha256": "b9d8d037a25e70c43def835c90e87f49f3041e9965943aa64d53918a815fc525"
+    },
+    {
+      "path": "BetunBackend/_internal/numpy.libs/msvcp140-a4c2229bdc2a2a630acdc095b4d86008.dll",
+      "size": 575056,
+      "sha256": "a4c2229bdc2a2a630acdc095b4d86008e5c3e3bc7773174354f3da4f5beb9cde",
+      "download_size": 185312,
+      "download_sha256": "776f4171e91cf8c1acf11587023b19f621c56c5ba968086b5fa823ba9ce7ce70"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/entry_points.txt",
+      "size": 573,
+      "sha256": "7713ead1845b4034b097c42447e23d037f2b6db7ca406e61dae3458e9bd4e95e",
+      "download_size": 227,
+      "download_sha256": "408846b6488fea2a519657884bd28792cdcad19104800d7ac2ece7cbf414b057"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/INSTALLER",
+      "size": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
+      "download_size": 24,
+      "download_sha256": "4b981a6384e76c634a72c12ce50f5901eeb31c650b422277e1cbad64f5a90841"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/licenses/LICENSE",
+      "size": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "download_size": 3966,
+      "download_sha256": "fc359cda2da16da61be475795350defb12d08126832e72bca1eee35ae50b93b5"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/METADATA",
+      "size": 1411,
+      "sha256": "5bc71e90cb421be92a43bf5ad5b0f25dccfa2a24ddceaa2877779879962a4c9e",
+      "download_size": 547,
+      "download_sha256": "6a5440300220769126216787bcde02c14eb8f51341ce84a0871c16d4bbb51a53"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/RECORD",
+      "size": 6381,
+      "sha256": "f5785d281a0c244f1b4f7581d29e2dd23246030b1cd0c1e703d4150787d3b112",
+      "download_size": 2043,
+      "download_sha256": "a66d5c5c3c0f6564fcdaa623d685822794c854d3f5e72815b18a2209f20054dd"
+    },
+    {
+      "path": "BetunBackend/_internal/opentelemetry_api-1.45.1.dist-info/WHEEL",
+      "size": 87,
+      "sha256": "5b77e4a649bbfb07fdbc123967eeecd1e5a478cfaca6eefc23c35e6fdf037848",
+      "download_size": 104,
+      "download_sha256": "c77e31a17753271422b8cb49461c46484803ffc10fa09226bb5838431df2fa8d"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic-2.14.1.dist-info/INSTALLER",
+      "size": 4,
+      "sha256": "ceebae7b8927a3227e5303cf5e0f1f7b34bb542ad7250ac03fbcde36ec2f1508",
+      "download_size": 24,
+      "download_sha256": "4b981a6384e76c634a72c12ce50f5901eeb31c650b422277e1cbad64f5a90841"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic-2.14.1.dist-info/licenses/LICENSE",
+      "size": 1129,
+      "sha256": "a9e186f3ca16b5eef84318e7a701721351a00cb7b8ae3a4394b67b49e3529ef3",
+      "download_size": 686,
+      "download_sha256": "0f0bfd20e613c5000eca40cbe3af169fb128f7d753c456ea0eb20959b8e1c88a"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic-2.14.1.dist-info/METADATA",
+      "size": 133006,
+      "sha256": "4d4c8e8d5e6a27d5208f0d7949f25628e6747133034969d4d1399b1ad5394036",
+      "download_size": 24329,
+      "download_sha256": "ad3e68f35370fab412af7ef5f62d0de484feb5673f0a5e0c3a35003ae46da1db"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic-2.14.1.dist-info/RECORD",
+      "size": 15439,
+      "sha256": "d64f68d7d3ae1eba2b28fa030a452c08c841c52e1c8195d00c98c5205ecd73fe",
+      "download_size": 5556,
+      "download_sha256": "c320059c381ad34361c827c2702376c9ebe4a5d26d3083ae77a9a4923bd93a6e"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic-2.14.1.dist-info/WHEEL",
+      "size": 87,
+      "sha256": "5b77e4a649bbfb07fdbc123967eeecd1e5a478cfaca6eefc23c35e6fdf037848",
+      "download_size": 104,
+      "download_sha256": "c77e31a17753271422b8cb49461c46484803ffc10fa09226bb5838431df2fa8d"
+    },
+    {
+      "path": "BetunBackend/_internal/pydantic_core/_pydantic_core.cp311-win_amd64.pyd",
+      "size": 5551616,
+      "sha256": "1a5906b4b1c1893a765e5836e76f2d1e649fdc5dadcd5713b3dcac94296c8348",
+      "download_size": 2030629,
+      "download_sha256": "1cf01839e251c33e0bed4dbe960bf1dafaeac5d730084dc7379472fa5f8c237b"
+    },
+    {
+      "path": "BetunBackend/_internal/pyexpat.pyd",
+      "size": 199448,
+      "sha256": "c7c7564f7f874fb660a46384980a2cf28bc3e245ca83628a197ccf861eab5560",
+      "download_size": 96328,
+      "download_sha256": "93acb1f7b734ba42a5ec976f446d08f1fb67758a3b57095359c8d8f67f103806"
+    },
+    {
+      "path": "BetunBackend/_internal/python311.dll",
+      "size": 5800216,
+      "sha256": "0817a2a657a24c0d5fbb60df56960f42fc66b3039d522ec952dab83e2d869364",
+      "download_size": 2310732,
+      "download_sha256": "a9bcfeeeb783bdbecb631a2b876648494a2c4e98c3cecd9a1eef451f6321b295"
+    },
+    {
+      "path": "BetunBackend/_internal/regex/_regex.cp311-win_amd64.pyd",
+      "size": 736256,
+      "sha256": "8fdcd90920df13d697556e442cdd9d34955e356d9f71bf2068d9853feefd91e3",
+      "download_size": 187899,
+      "download_sha256": "1b7cbfb69e5bae5783be76425a79416c843038aab5aca557d45af6014bf1d656"
+    },
+    {
+      "path": "BetunBackend/_internal/select.pyd",
+      "size": 30488,
+      "sha256": "bae0974390945520eb99ab32486c6a964691f8f4a028ac408d98fa8fb0db7d90",
+      "download_size": 17462,
+      "download_sha256": "0257156e901d085f0551ba83a8e2904489188a8fe089df0e09ec8edb7a7f280a"
+    },
+    {
+      "path": "BetunBackend/_internal/sqlite3.dll",
+      "size": 1540888,
+      "sha256": "314bba62f4a1628b986afc94c09dc29cdaf08210eae469440fbf46bcdb86d3fd",
+      "download_size": 825315,
+      "download_sha256": "84ef72e00ca651cf4cd56acb68ba5a0bb78e6b392e4147e7f99fdeccb5a7b59d"
+    },
+    {
+      "path": "BetunBackend/_internal/ucrtbase.dll",
+      "size": 1361448,
+      "sha256": "2e5fb14b7bf8540278f3614a12f0226e56a7cc9e64b81cbd976c6fcf2f71cbfb",
+      "download_size": 652402,
+      "download_sha256": "146acc17d92463edeb396210a34de5e645453052518e01f61b4b80d891860763"
+    },
+    {
+      "path": "BetunBackend/_internal/unicodedata.pyd",
+      "size": 1140504,
+      "sha256": "37c68617fa02a2cadced17ef724e2d450ef12a8a37215da789a4679fde1c5c02",
+      "download_size": 418985,
+      "download_sha256": "85b602379bc19b1da4a0c0c2ca62092b6a57f9dbbce84a8c0a2e122975c1f6ec"
+    },
+    {
+      "path": "BetunBackend/_internal/VCRUNTIME140.dll",
+      "size": 119192,
+      "sha256": "4d292623516f65c80482081e62d5dadb759dc16e851de5db24c3cbb57b87db83",
+      "download_size": 58347,
+      "download_sha256": "0cc5e379efb7c2d3237712cdb05be2239495fc7a6cc609ad20f89834aaae92c9"
+    },
+    {
+      "path": "BetunBackend/_internal/VCRUNTIME140_1.dll",
+      "size": 49528,
+      "sha256": "a113f192195f245f17389e6ecbed8005990bcb2476ddad33f7c4c6c86327afe5",
+      "download_size": 25905,
+      "download_sha256": "2b113cc6e15bab305997edb7120cae39599acbba061a0607aedf934fcfb1e7dd"
+    },
+    {
+      "path": "BetunBackend/_internal/yaml/_yaml.cp311-win_amd64.pyd",
+      "size": 258560,
+      "sha256": "ee7df83fa5dca1467bfd841dc08189b10361f31700cf57a6aacddaf0c05706f4",
+      "download_size": 113108,
+      "download_sha256": "8a5f792207eb2333d3b81107a5731b2b876e3bba08f655b7c8d147f553c64c27"
+    },
+    {
+      "path": "BetunBackend/BetunBackend.exe",
+      "size": 9849547,
+      "sha256": "429ee8f21dd87bd8b0b085c866f15f5e12ae4530e25bb4f2c120cc7a50b9efbf",
+      "download_size": 9638227,
+      "download_sha256": "c4641df492ab900e7a4afddfbc2d98f2e7eb7af946f5b843c66989a58c9a6357"
+    },
+    {
+      "path": "Check-AI.ps1",
+      "size": 1221,
+      "sha256": "ffa9e315582898e274a89358d7ce374e7ba48c788754063e906c47a1b88caf6c",
+      "download_size": 648,
+      "download_sha256": "50e42d9c8d6d514c6270e534e2a26f8378b128cede7d74dc70934927a8ffb200"
+    },
+    {
+      "path": "configure_local_models.py",
+      "size": 2013,
+      "sha256": "ffbcfb8881cb848a654016909aa3a534401cc35c805dbb79690ab93b853696b0",
+      "download_size": 893,
+      "download_sha256": "c5260cdb2884da586c2812125e9d7c6d9e22ee045c1d335ccc30c41d358d2318"
+    },
+    {
+      "path": "Connect AI.cmd",
+      "size": 42,
+      "sha256": "96b99b68e55c9194c72f2bbf7589f815a8e8ab443e546ac8f61a9bc06e9d456b",
+      "download_size": 62,
+      "download_sha256": "a17b001c99f02f42ec2d5452ea7dc80b7c431e4e0ab037b62c87de9ddcfeb4c5"
+    },
+    {
+      "path": "Connect-AI.ps1",
+      "size": 3237,
+      "sha256": "4c07a897d92e7198c6e26c564c38a621680cda0bf665cbfe902c34ae7c7e8623",
+      "download_size": 1319,
+      "download_sha256": "4212a95bfb40bada6c7e95251d3bb794a770aff2bd75cd5d5ae2f01c1396ac66"
+    },
+    {
+      "path": "CPAL-LICENSE.txt",
+      "size": 11558,
+      "sha256": "1eb85fc97224598dad1852b5d6483bbcf0aa8608790dcc657a5a2a761ae9c8c6",
+      "download_size": 3981,
+      "download_sha256": "b6d80354d1526e37e51a030b4519418ec2f1fb6e851d6c7d4c91dfa40324e2f5"
+    },
+    {
+      "path": "download_models.py",
+      "size": 8866,
+      "sha256": "5d46a3260bf1d45aba4764e021e86bf8a3d97b4d5d49c48134d2ebdbe272b12b",
+      "download_size": 3198,
+      "download_sha256": "51fcfec011bf025ecc27e8948feacd48392e7836ce6e441c84f369013f7c8190"
+    },
+    {
+      "path": "filmcraft-cli.exe",
+      "size": 45090304,
+      "sha256": "344d3df5934d15b05a6d51eef1a37b35a3ba00b505ec3cb9ff995ea479b43d24",
+      "download_size": 17141157,
+      "download_sha256": "01a18f40f1fefbc65846a426d04f21d6349e141c32543604014ff7722e8e0f46"
+    },
+    {
+      "path": "LICENSE-APACHE",
+      "size": 10351,
+      "sha256": "eb3d7b5485466acbd81f2b496f595ab637d2792e268206b27d99e793bdb67549",
+      "download_size": 3595,
+      "download_sha256": "9f334172b243bfeed8c0f55187c3a9c856b34457c1198fb35c2f86704d0c805f"
+    },
+    {
+      "path": "LICENSE-MIT",
+      "size": 1122,
+      "sha256": "5fda8da5bfefc9ccc258624027b65f1335a272f7e1262a222e41509e6928b9cc",
+      "download_size": 676,
+      "download_sha256": "714dba393897c1844dc8af96390e7e89a0fcf1bc2c14e931854789324f98dcfc"
+    },
+    {
+      "path": "MODEL-SETUP.md",
+      "size": 10191,
+      "sha256": "41a12cd75a74672060596695a6243f1295ba838a791435a2eb50e4f2505d75f7",
+      "download_size": 4704,
+      "download_sha256": "eb0e86e37c5faa8554e3b319b1c6fe4e2c34cbfb7476df2ff10d1218dbd4a5e2"
+    },
+    {
+      "path": "models-3050.example.json",
+      "size": 1249,
+      "sha256": "438a3524f33962ffecb6ed22918e1478432e48f459d661dc787edaf969695814",
+      "download_size": 448,
+      "download_sha256": "e8e5eb8a8b65eeaa925f7ce829b970b56f0d8ba9806406d6c8de67cb7c1317f9"
+    },
+    {
+      "path": "NOTICE",
+      "size": 1569,
+      "sha256": "8176c24f470121f94b1b96631ece039730da337076517e4a701a1068196b0359",
+      "download_size": 833,
+      "download_sha256": "a7320c9b2cb5da88c6941f94288582ba3d8e7ae31770ba18a490de63aee02f39"
+    },
+    {
+      "path": "READ-ME.txt",
+      "size": 2007,
+      "sha256": "633377140e6218fdd4e8fc9fc3c7bf75360dd249d7e90ea4c71dfda20eb7f87c",
+      "download_size": 1089,
+      "download_sha256": "0411ade685f4d090ae6cf3d30fa2470d27d9ace00e7ad4d5fb0b5e8b2e06b5ba"
+    },
+    {
+      "path": "Setup models.cmd",
+      "size": 99,
+      "sha256": "ab289c8ce8031969af5e7a769c4ba1cece0d42c4796f68cf798685e1b31c43e5",
+      "download_size": 114,
+      "download_sha256": "5f927f553a0718d3be5d9aae9dbeb2290adae5131c52b1f6f4f566cda8fa70be"
+    },
+    {
+      "path": "Setup-media.ps1",
+      "size": 4683,
+      "sha256": "124bfb0530fc47dba5ff552122a3302ff90a8e5f6724756e3ef14deea668813d",
+      "download_size": 1703,
+      "download_sha256": "4c84d7a2afb852dbce80ab1731d99d71321a647ea76b4e85ee82de2a08d2932c"
+    },
+    {
+      "path": "Setup-models.ps1",
+      "size": 5944,
+      "sha256": "672a726348b06b3db60dcbe2bf107ca30b34bc7742b67b68ef5828b795110761",
+      "download_size": 2126,
+      "download_sha256": "faa0f66ccc083ab0125393775fe8b5118c30c72378afd51eb246a62cff1c60cc"
+    },
+    {
+      "path": "Setup-vision.ps1",
+      "size": 2200,
+      "sha256": "27b6d09ee91e500b89b2ea1a8bd5eb64da8a8729bb088503e1347b8045a1c6fb",
+      "download_size": 957,
+      "download_sha256": "2aa1707c0ee66807d71b0c8253be755bbc4e53be1e19283831261f26d93927f0"
+    },
+    {
+      "path": "setup_vision.py",
+      "size": 3438,
+      "sha256": "ce9d49df57ca4a3bbae1ccd69bbf76522dabef2d32daef5ea7ca3974ca1adb79",
+      "download_size": 1346,
+      "download_sha256": "261986c8e37b4c5456dd6e5654320fac063d4471251ca0f1e7b38e4fe7f3429e"
+    },
+    {
+      "path": "Start with MCP.cmd",
+      "size": 76,
+      "sha256": "0753bc3c44c264580ac2d757cb7450db312452130925df8a8e395d30c4553778",
+      "download_size": 89,
+      "download_sha256": "3a62dd3bd7080a3545eb78696c290cf8e2c362e05d2d8b57220079b585f02cbb"
+    },
+    {
+      "path": "Start YouCraft.cmd",
+      "size": 49,
+      "sha256": "1981511e006d1e1dbfa7b96faca4dfe23e2376a3f5d0a179070b354758a09039",
+      "download_size": 62,
+      "download_sha256": "8f35ea871a3942b6beb3dd1c4ae4c61488af4e93b6808106aa101bef307974ec"
+    },
+    {
+      "path": "Update-YouCraft.ps1",
+      "size": 9682,
+      "sha256": "34e8db9eed59835805a8d946ac6f85d0aca6604eb32eebab2e785b70f3e6f0bb",
+      "download_size": 3273,
+      "download_sha256": "0e7e5c8011ba356c1b3774f7e17eea5a0ff9834c51a47672b66bd88daac32d0d"
+    },
+    {
+      "path": "YouCraft.exe",
+      "size": 65756672,
+      "sha256": "8a6ca85f50e7bb1cb739ddf554d2c6847e6da5b8f88b1cc11d0ffb2bbc091a70",
+      "download_size": 25287069,
+      "download_sha256": "9472ac47d48cf63d24c28fe7df2b6759a0df7f2b70ef256ff3589e2aed02c68a"
+    },
+    {
+      "path": "YouCraft.mcpb",
+      "size": 17733523,
+      "sha256": "50927c87dbcffe1e6318b4b616427464fa9096fc69b7d0ad4e467461e4e836c2",
+      "download_size": 17710863,
+      "download_sha256": "03b69408fece7f1146fa2153e1faed59913b79522c0a0f98391b3a773e932924"
+    }
+  ]
+}
