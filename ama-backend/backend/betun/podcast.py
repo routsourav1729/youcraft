@@ -165,8 +165,8 @@ def manifest(project):
                 video.append(dict(asset=fallback.id,source_in=round(max(0.,(a-fallback.offset)/fallback.rate)*TICKS),speed=1/fallback.rate,side='full'))
         if len(video) == 1:
             video[0]['side'] = 'full'
-        if not video:
-            raise ValueError(f'No camera covers {a:.2f}–{b:.2f}s; correct synchronization or coverage')
+        # Preserve uncovered master audio as an editable black-video gap.
+        # Only an explicitly approved cut removes recording time.
         length = round(b*TICKS)-round(a*TICKS)
         clips.append(dict(start=cursor, end=cursor+length, source_start=round(a*TICKS), video=video))
         cursor += length

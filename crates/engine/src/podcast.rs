@@ -70,10 +70,9 @@ fn assemble(s: &mut Session, p: &Value) -> Result<Value> {
             || span.end <= span.start
             || span.end > 254_016_000_000_i64 * 86400
             || span.source_start.is_some_and(|v| v < 0 || v > 254_016_000_000_i64 * 86400 - (span.end - span.start))
-            || (!plan.review && span.video.is_empty())
             || span.video.len() > if plan.review { 4 } else { 2 }
         {
-            return Err(bad("podcast.assemble", "cuts must continuously cover the recording with one or two cameras"));
+            return Err(bad("podcast.assemble", "cuts must continuously cover the recording with at most two cameras"));
         }
         for v in &span.video {
             if v.source_in < 0
@@ -385,6 +384,21 @@ mod tests {
         assert_eq!(sequence.video_tracks.iter().map(|track| track.items.len()).sum::<usize>(), 3);
         assert_eq!(sequence.duration(), Tick::from_seconds_f64(4.));
         assert!(crate::transcript::sequence_words(&session).is_empty());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn final_edit_preserves_audio_only_tail_as_editable_gap() {
+        let (root, mut plan) = fixture();
+        plan["clips"][1]["video"] = json!([]);
+        let mut session = Session::default();
+        session.execute("podcast.assemble", plan).unwrap();
+        let sequence = session.active_sequence().unwrap();
+        sequence.check().unwrap();
+        assert_eq!(sequence.duration(), Tick::from_seconds_f64(4.));
+        assert_eq!(sequence.audio_tracks[0].items.len(), 2);
+        assert_eq!(sequence.video_tracks.iter().map(|t| t.items.len()).sum::<usize>(), 1);
+        assert_eq!(sequence.audio_tracks[0].items[1].source_in, Tick::from_seconds_f64(2.));
         let _ = std::fs::remove_dir_all(root);
     }
 

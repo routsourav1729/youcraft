@@ -277,11 +277,12 @@ def test_gap_removal_only_after_approval_preserves_source_audio_time():
     for camera in p.clips[1:]:
         camera.offset = 5
         camera.duration = 55
-    with pytest.raises(ValueError, match='No camera covers'):
-        manifest(p)
+    plan = manifest(p)
+    assert plan['clips'][0]['video'] == []
+    assert plan['clips'][0]['source_start'] == 0
+    assert plan['clips'][-1]['end'] == 60*TICKS
     p.cuts = [Cut(start=0, end=5, approved=False)]
-    with pytest.raises(ValueError, match='No camera covers'):
-        manifest(p)
+    assert manifest(p)['clips'][0]['video'] == []
     p.cuts[0].approved = True
     plan = manifest(p)
     assert plan['source_duration'] == 60*TICKS
@@ -289,6 +290,23 @@ def test_gap_removal_only_after_approval_preserves_source_audio_time():
     assert plan['clips'][0]['source_start'] == 5*TICKS
     assert plan['clips'][0]['video'][0]['source_in'] == 0
     assert plan['clips'][-1]['end'] == 55*TICKS
+    assert plan['master'] == 'master'
+
+
+def test_master_tail_without_cameras_remains_editable_and_single_camera_is_usable():
+    p = episode()
+    p.duration = 1200
+    p.clips[0].duration = 1200
+    p.clips[1].duration = 300
+    p.clips[2].duration = 400.64
+    p.shots = [Shot(start=0,end=1200,layout='both')]
+    plan = manifest(p)
+    assert plan['clips'][-1]['start'] == round(400.64*TICKS)
+    assert plan['clips'][-1]['end'] == 1200*TICKS
+    assert plan['clips'][-1]['source_start'] == round(400.64*TICKS)
+    assert plan['clips'][-1]['video'] == []
+    one = next(s for s in plan['clips'] if s['start'] == 300*TICKS)
+    assert len(one['video']) == 1 and one['video'][0]['side'] == 'full'
     assert plan['master'] == 'master'
 
 
